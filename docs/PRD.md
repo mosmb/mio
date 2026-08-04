@@ -92,7 +92,7 @@ Mio uses four bottom-navigation destinations:
 1. **Today** — the default, prioritized daily queue.
 2. **Library** — the complete imported collection and its management tools.
 3. **Discover** — lightweight title search and collection entry.
-4. **You** — identity, activity, synchronization state, and preferences.
+4. **You** — identity, personal recap, statistics, milestones, favorites, synchronization state, and preferences.
 
 Anime and manga are mixed in Today. Library provides remembered `All`, `Anime`, and `Manga` filters. They must not become separate bottom-navigation destinations.
 
@@ -123,7 +123,8 @@ Today presents one prominent **Now** card:
 - It represents one title, never an individual release feed.
 - It shows the next released unit after the user's recorded progress.
 - It uses the progress unit already tracked for that title by the connected provider.
-- Eligible statuses are Currently Watching, Currently Reading, Rewatching, and Rereading.
+- Confirmed v0 eligible statuses are Currently Watching and Currently Reading.
+- Rewatching and Rereading remain TBD pending verification of AniList and MyAnimeList provider behavior.
 - Paused, Planned, Dropped, and Completed titles are excluded.
 - Titles with no released unit after the user's current progress are excluded.
 - The default priority is the eligible title the user updated most recently.
@@ -215,9 +216,10 @@ Library answers: **What am I tracking?**
 
 - It imports and represents the user's entire provider collection.
 - It defaults to Currently Watching and Currently Reading.
-- Status filter chips include Current, Planned, Paused, Completed, Dropped, and Rewatching/Rereading.
+- Status filter chips include Current, Planned, Paused, Completed, and Dropped.
+- Rewatching and Rereading remain TBD pending verification of AniList and MyAnimeList provider behavior.
 - Media filters are `All`, `Anime`, and `Manga`; the last selection is remembered.
-- A `Ready` filter shows all titles with a released unit available after current progress.
+- A `Ready` filter shows Current titles with a released unit available after current progress.
 - Current titles are ordered by the user's latest progress update by default.
 - Each eligible row or card exposes a fast `+1` control.
 - Users can open a title, edit exact progress, or change collection status.
@@ -225,27 +227,68 @@ Library answers: **What am I tracking?**
 
 ### 7.6 Discover
 
-Discover is deliberately narrow in v0. It supports three jobs:
+Discover remains deliberately bounded in v0. It supports four jobs:
 
 1. Search for an anime or manga.
-2. View essential title information.
-3. Add the title to the collection or change its status.
+2. Browse a small, understandable set of current titles.
+3. View essential title information.
+4. Add the title to the collection or change its status.
+
+The screen is search-first:
+
+- A prominent search field is the first content control.
+- Visible `All`, `Anime`, and `Manga` filters apply to search results and browsing shelves.
+- A horizontal **Trending now** shelf and a horizontal **This season** shelf provide lightweight browsing without turning Discover into an endless feed.
+- Each shelf shows a small number of artwork-led title cards. `See all` opens a finite two-column grid for that shelf.
+- Tapping artwork opens the title detail screen.
+- An untracked title exposes an add action that opens a compact, single-select collection-status sheet. Mio never silently adds a title to Planning.
+- A tracked title displays its current collection status instead of an add action.
 
 Essential title information may include artwork, title, media format, release status, summary, genres, episode/chapter/volume totals when known, and the user's collection state.
 
-Personalized recommendations, rankings, seasonal exploration, editorial collections, reviews, social features, and advanced filters are deferred.
+Trending and seasonal shelves use trustworthy provider metadata and ordering. They are not personalized recommendations and must remain visually secondary to search. Personalized recommendations, editorial collections, reviews, social features, and advanced filters are deferred.
 
 ### 7.7 You
 
-You is the fourth bottom-navigation tab. In v0 it contains:
+You is the fourth bottom-navigation tab and Mio's personal reflection layer. In v0 it contains:
 
 - Connected-provider identity.
-- Basic recent activity.
+- A prominent **Your season so far** recap card.
+- Detailed personal statistics.
+- The user's latest completion milestone.
+- A **Favorites right now** artwork row.
+- Activity history.
 - Synchronization state and any actionable failure.
 - Appearance and accessibility preferences.
 - Account disconnection and sign out.
 
-You is intentionally lightweight in v0. It becomes the personal reflection layer in later versions through richer activity, completion history, and statistics.
+#### Your season so far
+
+The recap card combines personal statistics with artwork from the user's own collection:
+
+- It shows Completed titles, recorded Episodes, and recorded Chapters as three equal summary values.
+- Its artwork strip uses a stable rotating sample of titles from the user's Current and Completed collection entries.
+- The artwork is decorative and never changes the meaning or position of the statistics.
+- The heading is expressive rather than a promise of reconstructed annual history. Unless the connected provider supplies a trustworthy time range, the values represent available cumulative collection progress.
+
+#### Detailed statistics
+
+The statistics section may include:
+
+- Tracked Anime and Manga totals.
+- A compact recent-activity chart.
+- An `Anime` and `Manga` segmented view.
+- Top genres derived from the metadata of the user's tracked titles.
+
+Collection totals and genres are derived from the connected provider. Recent-activity charts use only activity Mio has observed locally since installation unless the provider supplies equivalent trustworthy history. Mio must not imply that locally incomplete activity is a complete historical record.
+
+#### Milestone, favorites, and history
+
+- **Latest milestone** shows the most recent trustworthy completion, with title artwork and completion date when available.
+- **Favorites right now** shows a small artwork row sourced from provider favorites when available. If provider favorites are unavailable, Mio uses top-rated or recently active collection titles and does not claim that the user explicitly favorited them.
+- Activity history combines trustworthy provider activity with locally recorded Mio actions. Missing provider history is omitted rather than reconstructed.
+
+The You tab has no Mio-specific achievements, badges, streaks, follower counts, or social feed. All persistent personal content comes from the active AniList or MyAnimeList account or is derived locally on the device; Mio requires no separate account or application backend.
 
 ### 7.8 Visual and interaction character
 
@@ -280,7 +323,7 @@ Mio combines calm utility with content-led immersion.
 
 ### 7.9 Meaning of “ready”
 
-In v0, Ready means that the next episode, chapter, or volume appears to have been released according to trustworthy available information and follows the user's recorded progress.
+In v0, Ready means that a Current title's next episode, chapter, or volume appears to have been released according to trustworthy available information and follows the user's recorded progress.
 
 Mio does not promise that the content is available through a particular streaming or reading service, subscription, language, edition, or region. Streaming-service aggregation and in-app playback/reading are out of scope.
 
@@ -335,8 +378,8 @@ Includes:
 - One-tap progress, Undo, automatic completion, and explicit correction.
 - Reliable offline behavior and synchronization conflict handling.
 - Complete Library with status, media, and Ready filters.
-- Minimal Discover search, title details, and collection management.
-- Lightweight You tab.
+- Search-first Discover with bounded Trending now and This season shelves, title details, and collection management.
+- You with a personal recap, detailed statistics, latest milestone, favorites, activity history, synchronization state, and preferences.
 - Living Spotlight, progress journey, and completion feedback.
 - Basic accessibility and appearance preferences.
 
@@ -349,9 +392,8 @@ Candidate scope, subject to v0 evidence:
 - Optional daily release digest.
 - Notifications only when relevant: caught-up or prioritized titles, not ordinary backlog accumulation.
 - In-app `Prioritize` preference, distinct from provider favorites.
-- Richer You activity, completion history, and useful personal statistics.
 - Better queue explanations and user controls when trust data shows they are needed.
-- Personalized recommendations and lightweight seasonal browsing in Discover.
+- Personalized recommendations in Discover.
 - Android widgets or system surfaces for viewing Now and recording progress quickly.
 - Continued improvement to release confidence, particularly for manga.
 

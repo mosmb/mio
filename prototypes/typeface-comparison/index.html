@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-font="gabarito" data-screen="today">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Mio — Typeface comparison</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@10..48,400;10..48,500;10..48,600;10..48,700&family=Gabarito:wght@400;500;600;700&family=Onest:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="prototype" aria-labelledby="prototype-title">
+      <section class="comparison-toolbar" aria-labelledby="prototype-title">
+        <p class="toolbar-kicker">Mio / type study</p>
+        <h1 id="prototype-title" class="toolbar-title">Typeface comparison</h1>
+        <p class="toolbar-intro">
+          Compare the same tracking surfaces with one variable changed: the UI typeface.
+        </p>
+
+        <div class="toolbar-controls">
+          <fieldset class="control-group">
+            <legend class="control-label">Typeface</legend>
+            <div class="segmented-control" role="group" aria-label="Typeface">
+              <button class="control-button is-active" type="button" data-font="gabarito" aria-pressed="true">
+                Gabarito
+              </button>
+              <button class="control-button" type="button" data-font="bricolage" aria-pressed="false">
+                Bricolage
+              </button>
+              <button class="control-button" type="button" data-font="onest" aria-pressed="false">
+                Onest
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Screen</legend>
+            <div class="segmented-control" role="group" aria-label="Screen">
+              <button class="control-button is-active" type="button" data-screen="today" aria-pressed="true">
+                Today
+              </button>
+              <button class="control-button" type="button" data-screen="library" aria-pressed="false">
+                Library
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Theme</legend>
+            <div class="segmented-control" role="group" aria-label="Theme">
+              <button class="control-button is-active" type="button" data-theme-choice="light" aria-pressed="true">
+                Light
+              </button>
+              <button class="control-button" type="button" data-theme-choice="dark" aria-pressed="false">
+                Dark
+              </button>
+            </div>
+          </fieldset>
+        </div>
+
+        <p class="font-status" id="font-status" data-state="loading" role="status" aria-live="polite">
+          Checking Google Fonts…
+        </p>
+      </section>
+
+      <section class="device-stage" aria-label="393 by 852 Android portrait preview">
+        <div class="device-wrap">
+          <div class="device-viewport">
+            <div class="device-app">
+              <main class="device-main" id="device-main">
+                <section class="screen-panel is-active" data-panel="today" aria-labelledby="today-title">
+                  <header class="screen-header">
+                    <h2 id="today-title" class="screen-title">Today</h2>
+                  </header>
+
+                  <section class="content-section now-section" aria-labelledby="now-title">
+                    <h3 id="now-title" class="section-title">Now</h3>
+                    <article class="now-card">
+                      <div class="artwork artwork-now" aria-hidden="true">
+                        <span class="art-shape art-shape-sun"></span>
+                        <span class="art-shape art-shape-orbit"></span>
+                        <span class="art-shape art-shape-block art-shape-block-one"></span>
+                        <span class="art-shape art-shape-block art-shape-block-two"></span>
+                        <span class="art-shape art-shape-stripe"></span>
+                        <span class="artwork-mark">08 / 24</span>
+                      </div>
+                      <div class="artwork-scrim" aria-hidden="true"></div>
+                      <div class="now-content">
+                        <h4 class="card-title clamp-two">The Apothecary’s Long and Unexpected Journey</h4>
+                        <p class="card-meta">Episode 8 of 24</p>
+                        <div class="progress-track" role="progressbar" aria-label="Episode progress" aria-valuemin="0" aria-valuemax="24" aria-valuenow="8">
+                          <span style="width: 33.3333%"></span>
+                        </div>
+                        <div class="card-actions">
+                          <button class="step-button step-button-minus" type="button" aria-label="Decrease episode progress">−</button>
+                          <button class="step-button step-button-plus" type="button" aria-label="Increase episode progress">+</button>
+                        </div>
+                      </div>
+                    </article>
+                  </section>
+
+                  <section class="content-section new-section" aria-labelledby="new-title">
+                    <h3 id="new-title" class="section-title">New</h3>
+                    <div class="new-grid">
+                      <article class="compact-card compact-card-wind">
+                        <div class="artwork artwork-compact" aria-hidden="true">
+                          <span class="compact-shape compact-shape-one"></span>
+                          <span class="compact-shape compact-shape-two"></span>
+                          <span class="compact-shape compact-shape-three"></span>
+                        </div>
+                        <div class="compact-scrim" aria-hidden="true"></div>
+                        <div class="compact-content">
+                          <h4 class="card-title clamp-two">Wind of the Blade</h4>
+                          <p class="card-meta">Episode 3 of 12</p>
+                        </div>
+                      </article>
+
+                      <article class="compact-card compact-card-sketch">
+                        <div class="artwork artwork-compact" aria-hidden="true">
+                          <span class="compact-shape compact-shape-four"></span>
+                          <span class="compact-shape compact-shape-five"></span>
+                          <span class="compact-shape compact-shape-six"></span>
+                        </div>
+                        <div class="compact-scrim" aria-hidden="true"></div>
+                        <div class="compact-content">
+                          <h4 class="card-title clamp-two">Sketch Diary</h4>
+                          <p class="card-meta">Chapter 6 of 18</p>
+                        </div>
+                      </article>
+                    </div>
+                  </section>
+                </section>
+
+                <section class="screen-panel" data-panel="library" aria-labelledby="library-title" hidden>
+                  <header class="screen-header">
+                    <h2 id="library-title" class="screen-title">Library</h2>
+                  </header>
+
+                  <section class="library-controls" aria-label="Library filters">
+                    <div class="media-selector" role="group" aria-label="Media type">
+                      <button class="choice-button is-active" type="button" data-filter-group="media" aria-pressed="true">All</button>
+                      <button class="choice-button" type="button" data-filter-group="media" aria-pressed="false">Anime</button>
+                      <button class="choice-button" type="button" data-filter-group="media" aria-pressed="false">Manga</button>
+                    </div>
+                    <div class="filter-chips" role="group" aria-label="Library status">
+                      <button class="filter-chip is-active" type="button" data-filter-group="status" aria-pressed="true">Current</button>
+                      <button class="filter-chip" type="button" data-filter-group="status" aria-pressed="false">Ready</button>
+                      <button class="filter-chip" type="button" data-filter-group="status" aria-pressed="false">Planned</button>
+                      <button class="filter-chip" type="button" data-filter-group="status" aria-pressed="false">Completed</button>
+                    </div>
+                  </section>
+
+                  <section class="library-list" aria-label="Saved titles">
+                    <article class="library-row">
+                      <div class="row-art row-art-apothecary" aria-hidden="true"><span></span><i></i></div>
+                      <div class="row-copy">
+                        <h3 class="row-title clamp-two">The Apothecary’s Long and Unexpected Journey</h3>
+                        <p class="row-meta"><span>Anime</span><span>8 / 24 episodes</span></p>
+                      </div>
+                      <div class="row-actions">
+                        <button class="row-step row-step-minus" type="button" aria-label="Decrease Apothecary progress">−</button>
+                        <button class="row-step row-step-plus" type="button" aria-label="Increase Apothecary progress">+</button>
+                      </div>
+                    </article>
+
+                    <article class="library-row">
+                      <div class="row-art row-art-frieren" aria-hidden="true"><span></span><i></i></div>
+                      <div class="row-copy">
+                        <h3 class="row-title clamp-two">Frieren: Beyond Journey’s End</h3>
+                        <p class="row-meta"><span>Anime</span><span>20 / 28 episodes</span></p>
+                      </div>
+                      <div class="row-actions">
+                        <button class="row-step row-step-minus" type="button" aria-label="Decrease Frieren progress">−</button>
+                        <button class="row-step row-step-plus" type="button" aria-label="Increase Frieren progress">+</button>
+                      </div>
+                    </article>
+
+                    <article class="library-row">
+                      <div class="row-art row-art-knapsack" aria-hidden="true"><span></span><i></i></div>
+                      <div class="row-copy">
+                        <h3 class="row-title clamp-two">Rascal Does Not Dream of a Knapsack Kid</h3>
+                        <p class="row-meta"><span>Anime</span><span>1 / 1 movie</span></p>
+                      </div>
+                      <div class="row-actions">
+                        <button class="row-step row-step-minus" type="button" aria-label="Decrease Knapsack Kid progress">−</button>
+                        <button class="row-step row-step-plus" type="button" aria-label="Increase Knapsack Kid progress">+</button>
+                      </div>
+                    </article>
+
+                    <article class="library-row">
+                      <div class="row-art row-art-japanese" aria-hidden="true"><span></span><i></i></div>
+                      <div class="row-copy">
+                        <h3 class="row-title clamp-two">葬送のフリーレン</h3>
+                        <p class="row-meta"><span>Manga</span><span>12 / 14 volumes</span></p>
+                      </div>
+                      <div class="row-actions">
+                        <button class="row-step row-step-minus" type="button" aria-label="Decrease Japanese title progress">−</button>
+                        <button class="row-step row-step-plus" type="button" aria-label="Increase Japanese title progress">+</button>
+                      </div>
+                    </article>
+
+                    <article class="library-row">
+                      <div class="row-art row-art-monogatari" aria-hidden="true"><span></span><i></i></div>
+                      <div class="row-copy">
+                        <h3 class="row-title clamp-two">MONOGATARI Series: Second Season</h3>
+                        <p class="row-meta"><span>Anime</span><span>8 / 26 episodes</span></p>
+                      </div>
+                      <div class="row-actions">
+                        <button class="row-step row-step-minus" type="button" aria-label="Decrease Monogatari progress">−</button>
+                        <button class="row-step row-step-plus" type="button" aria-label="Increase Monogatari progress">+</button>
+                      </div>
+                    </article>
+
+                    <article class="library-row">
+                      <div class="row-art row-art-eightysix" aria-hidden="true"><span></span><i></i></div>
+                      <div class="row-copy">
+                        <h3 class="row-title clamp-two">86—Eighty-Six</h3>
+                        <p class="row-meta"><span>Anime</span><span>23 / 23 episodes</span></p>
+                      </div>
+                      <div class="row-actions">
+                        <button class="row-step row-step-minus" type="button" aria-label="Decrease Eighty-Six progress">−</button>
+                        <button class="row-step row-step-plus" type="button" aria-label="Increase Eighty-Six progress">+</button>
+                      </div>
+                    </article>
+                  </section>
+                </section>
+              </main>
+
+              <nav class="bottom-nav" aria-label="Primary navigation">
+                <button class="nav-destination is-active" type="button" data-nav-screen="today" aria-current="page">
+                  <span class="nav-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M8 8h8M8 12h5M8 16h3"/></svg>
+                  </span>
+                  <span class="nav-label">Today</span>
+                </button>
+                <button class="nav-destination" type="button" data-nav-screen="library">
+                  <span class="nav-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h10.5A2.5 2.5 0 0 1 18 7v12.5H7.5A2.5 2.5 0 0 1 5 17z"/><path d="M18 19.5H7.5A2.5 2.5 0 0 0 5 22M8 8h6M8 12h6"/></svg>
+                  </span>
+                  <span class="nav-label">Library</span>
+                </button>
+                <button class="nav-destination" type="button" aria-label="Discover, preview only">
+                  <span class="nav-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><path d="m14.8 9.2-1.7 4-3.9 1.6 1.7-4z"/></svg>
+                  </span>
+                  <span class="nav-label">Discover</span>
+                </button>
+                <button class="nav-destination" type="button" aria-label="You, preview only">
+                  <span class="nav-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.25"/><path d="M5.5 19.25c1.1-3.1 3.1-4.75 6.5-4.75s5.4 1.65 6.5 4.75"/></svg>
+                  </span>
+                  <span class="nav-label">You</span>
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>

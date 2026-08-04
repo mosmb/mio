@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-motion="full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Mio — Title-detail scroll comparison</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gabarito:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="prototype" aria-labelledby="prototype-title">
+      <section class="comparison-panel" aria-labelledby="prototype-title">
+        <p class="panel-kicker">Mio / interaction study</p>
+        <h1 id="prototype-title" class="panel-title">Title-detail scroll</h1>
+        <p class="panel-intro">
+          Compare four ways the artwork, poster, title, toolbar, and detail sheet respond to one continuous scroll.
+        </p>
+
+        <div class="panel-controls">
+          <fieldset class="control-group">
+            <legend class="control-label">Variant</legend>
+            <div class="segmented-control variant-control" role="group" aria-label="Scroll treatment variant">
+              <button class="control-button is-active" type="button" data-variant="minimal" aria-pressed="true">
+                <span class="variant-index" aria-hidden="true">1</span>
+                <span>Minimal Fade</span>
+              </button>
+              <button class="control-button" type="button" data-variant="parallax" aria-pressed="false">
+                <span class="variant-index" aria-hidden="true">2</span>
+                <span>Gentle Parallax</span>
+              </button>
+              <button class="control-button" type="button" data-variant="handoff" aria-pressed="false">
+                <span class="variant-index" aria-hidden="true">3</span>
+                <span>Poster Handoff</span>
+              </button>
+              <button class="control-button" type="button" data-variant="sheet" aria-pressed="false">
+                <span class="variant-index" aria-hidden="true">4</span>
+                <span>Sheet Rise</span>
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Theme</legend>
+            <div class="segmented-control two-up" role="group" aria-label="Preview theme">
+              <button class="control-button is-active" type="button" data-theme-choice="light" aria-pressed="true">Light</button>
+              <button class="control-button" type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Motion</legend>
+            <div class="segmented-control two-up" role="group" aria-label="Preview motion">
+              <button class="control-button is-active" type="button" data-motion-choice="full" aria-pressed="true">Full</button>
+              <button class="control-button" type="button" data-motion-choice="reduced" aria-pressed="false">Reduced</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group scroll-control">
+            <legend class="control-label">
+              <span>Scroll position</span>
+              <output id="scroll-output" for="scroll-range">0%</output>
+            </legend>
+            <input id="scroll-range" class="scroll-range" type="range" min="0" max="100" step="1" value="0" aria-label="Scroll position" />
+            <div class="range-legend" aria-hidden="true">
+              <span>Top</span>
+              <span>Collapsed</span>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Position shortcuts</legend>
+            <div class="shortcut-row" role="group" aria-label="Position shortcuts">
+              <button class="shortcut-button is-active" type="button" data-position="top">Top</button>
+              <button class="shortcut-button" type="button" data-position="transition">Transition</button>
+              <button class="shortcut-button" type="button" data-position="collapsed">Collapsed</button>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="panel-actions">
+          <button class="action-button action-button-primary" id="auto-scroll-button" type="button" aria-pressed="false">
+            <span class="action-icon" aria-hidden="true">▶</span>
+            <span id="auto-scroll-label">Auto-scroll</span>
+          </button>
+          <button class="action-button action-button-secondary" id="reset-button" type="button">Reset</button>
+        </div>
+
+        <section class="status-card" aria-labelledby="status-title">
+          <div class="status-heading">
+            <h2 id="status-title">Live status</h2>
+            <span class="auto-badge" id="auto-badge" hidden>Auto-scroll active</span>
+          </div>
+          <dl class="status-list">
+            <div class="status-row">
+              <dt>Variant</dt>
+              <dd id="status-variant">Minimal Fade</dd>
+            </div>
+            <div class="status-row">
+              <dt>Scroll</dt>
+              <dd id="status-scroll">0%</dd>
+            </div>
+            <div class="status-row">
+              <dt>Phase</dt>
+              <dd id="status-phase">Expanded</dd>
+            </div>
+            <div class="status-row">
+              <dt>Reduced motion</dt>
+              <dd id="status-motion">Off</dd>
+            </div>
+          </dl>
+        </section>
+
+        <p class="variant-note" id="variant-note">
+          Baseline: native scrolling throughout; the toolbar surface fades from 0 to 1 between 130 and 190px.
+        </p>
+
+        <details class="handoff-notes">
+          <summary>Handoff notes</summary>
+          <p>Each treatment reads <code>scrollTop</code> directly and applies per-element <code>transform</code> and <code>opacity</code> values in one <code>requestAnimationFrame</code>.</p>
+          <p>Ranges: toolbar fade 130–190px; phase transition 130–240px; Poster Handoff 116–260px; Sheet Rise 128–248px.</p>
+          <p>All content stays in one scroll flow. The opaque action dock is outside that flow and remains pinned to the phone viewport.</p>
+        </details>
+      </section>
+
+      <section class="device-stage" aria-label="393 by 852 Android portrait preview">
+        <div class="device-wrap">
+          <div class="device-viewport">
+            <div class="device-app" id="device-app" data-variant="minimal" data-reduced="false">
+              <div class="title-toolbar" id="title-toolbar" aria-label="Title detail toolbar">
+                <div class="toolbar-surface" id="toolbar-surface" aria-hidden="true"></div>
+                <button class="toolbar-button" id="back-button" type="button" aria-label="Go back">
+                  <span class="toolbar-icon toolbar-icon-light" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7" /></svg>
+                  </span>
+                  <span class="toolbar-icon toolbar-icon-dark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7" /></svg>
+                  </span>
+                </button>
+                <div class="toolbar-poster" id="toolbar-poster" aria-hidden="true">
+                  <svg viewBox="0 0 393 264" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="mini-sky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#102b4c" /><stop offset="0.58" stop-color="#4b2a70" /><stop offset="1" stop-color="#d76e58" /></linearGradient>
+                    </defs>
+                    <rect width="393" height="264" fill="url(#mini-sky)" />
+                    <circle cx="284" cy="72" r="55" fill="#c8f53d" opacity="0.88" />
+                    <path d="M0 222 135 92l56 38 94-72 108 102v104H0Z" fill="#152b3f" />
+                    <path d="M-24 174 178 116l118 148H-24Z" fill="#e56e55" opacity="0.88" />
+                    <path d="M40 224 344 52" stroke="#f4f8f2" stroke-width="7" opacity="0.8" />
+                  </svg>
+                </div>
+                <p class="toolbar-title" id="toolbar-title">Eclipse Chronicles</p>
+                <button class="toolbar-button" id="overflow-button" type="button" aria-label="More title actions">
+                  <span class="toolbar-icon toolbar-icon-light" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+                  </span>
+                  <span class="toolbar-icon toolbar-icon-dark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+                  </span>
+                </button>
+              </div>
+
+              <main class="device-scroll" id="phone-scroll" tabindex="0">
+                <div class="scroll-stage" id="scroll-stage">
+                  <section class="hero-scene" id="hero-scene" aria-label="Eclipse Chronicles key art">
+                    <svg class="hero-art" id="hero-art" viewBox="0 0 393 264" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Original sci-fi anime key art with a lime eclipse and angular space station">
+                      <defs>
+                        <linearGradient id="hero-sky" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0" stop-color="#102b4c" />
+                          <stop offset="0.42" stop-color="#43326f" />
+                          <stop offset="0.76" stop-color="#a44b72" />
+                          <stop offset="1" stop-color="#e37c59" />
+                        </linearGradient>
+                        <linearGradient id="hero-panel" x1="0" y1="0" x2="0.8" y2="1">
+                          <stop offset="0" stop-color="#ee8f6d" />
+                          <stop offset="1" stop-color="#9f3f68" />
+                        </linearGradient>
+                        <radialGradient id="hero-eclipse" cx="50%" cy="50%" r="50%">
+                          <stop offset="0" stop-color="#f4f8f2" stop-opacity="0.2" />
+                          <stop offset="0.72" stop-color="#c8f53d" stop-opacity="0.82" />
+                          <stop offset="1" stop-color="#c8f53d" stop-opacity="0" />
+                        </radialGradient>
+                      </defs>
+                      <rect width="393" height="264" fill="url(#hero-sky)" />
+                      <circle cx="285" cy="69" r="96" fill="url(#hero-eclipse)" />
+                      <circle cx="285" cy="69" r="54" fill="#c8f53d" opacity="0.93" />
+                      <circle cx="285" cy="69" r="36" fill="#15223b" />
+                      <path d="M0 230 103 112l51 27 116-94 123 116v103H0Z" fill="#132b40" />
+                      <path d="M-26 188 154 101l94 163H-26Z" fill="url(#hero-panel)" opacity="0.94" />
+                      <path d="M115 264 221 86l66 178Z" fill="#0e1f32" opacity="0.92" />
+                      <path d="M-18 211 192 141l106 123H-18Z" fill="#1c4760" opacity="0.88" />
+                      <path d="M-32 190 355 38" stroke="#f4f8f2" stroke-width="7" opacity="0.72" />
+                      <path d="M12 219 330 86" stroke="#c8f53d" stroke-width="5" opacity="0.92" />
+                      <path d="M52 238 321 139" stroke="#f4f8f2" stroke-width="2" opacity="0.46" />
+                      <g fill="#f4f8f2" opacity="0.72">
+                        <circle cx="54" cy="48" r="1.5" /><circle cx="118" cy="32" r="1.2" /><circle cx="177" cy="65" r="1.4" /><circle cx="359" cy="44" r="1.4" /><circle cx="334" cy="119" r="1.1" />
+                      </g>
+                      <g fill="#c8f53d">
+                        <rect x="32" y="28" width="2" height="35" opacity="0.7" /><rect x="26" y="45" width="14" height="2" opacity="0.7" />
+                      </g>
+                      <text x="22" y="235" fill="#f4f8f2" font-family="Gabarito, sans-serif" font-size="11" font-weight="600" letter-spacing="2.2">ECLIPSE / CHRONICLES</text>
+                    </svg>
+                    <div class="hero-overlay" aria-hidden="true"></div>
+                    <div class="hero-caption" aria-hidden="true">
+                      <span>SECTOR 07</span>
+                      <span>2026</span>
+                    </div>
+                  </section>
+
+                  <section class="detail-intro" id="detail-intro" aria-labelledby="title-heading">
+                    <div class="detail-intro-grid">
+                      <div class="poster-shell" id="main-poster" role="img" aria-label="Eclipse Chronicles poster art">
+                        <svg class="poster-art" viewBox="0 0 393 264" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                          <defs>
+                            <linearGradient id="poster-sky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#102b4c" /><stop offset="0.44" stop-color="#43326f" /><stop offset="0.76" stop-color="#a44b72" /><stop offset="1" stop-color="#e37c59" /></linearGradient>
+                            <radialGradient id="poster-eclipse" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f4f8f2" stop-opacity="0.2" /><stop offset="0.72" stop-color="#c8f53d" stop-opacity="0.82" /><stop offset="1" stop-color="#c8f53d" stop-opacity="0" /></radialGradient>
+                          </defs>
+                          <rect width="393" height="264" fill="url(#poster-sky)" />
+                          <circle cx="285" cy="69" r="96" fill="url(#poster-eclipse)" />
+                          <circle cx="285" cy="69" r="54" fill="#c8f53d" opacity="0.93" />
+                          <circle cx="285" cy="69" r="36" fill="#15223b" />
+                          <path d="M0 230 103 112l51 27 116-94 123 116v103H0Z" fill="#132b40" />
+                          <path d="M-26 188 154 101l94 163H-26Z" fill="#d96158" opacity="0.94" />
+                          <path d="M115 264 221 86l66 178Z" fill="#0e1f32" opacity="0.92" />
+                          <path d="M-32 190 355 38" stroke="#f4f8f2" stroke-width="7" opacity="0.72" />
+                          <path d="M12 219 330 86" stroke="#c8f53d" stroke-width="5" opacity="0.92" />
+                        </svg>
+                        <span class="poster-mark">EC</span>
+                      </div>
+
+                      <div class="intro-copy" id="intro-copy">
+                        <h1 class="detail-title" id="title-heading">Eclipse Chronicles</h1>
+                        <p class="detail-meta">Anime <span aria-hidden="true">·</span> 12 episodes <span aria-hidden="true">·</span> 2026</p>
+                        <div class="fact-row">
+                          <span class="score-value">8.6</span>
+                          <span class="fact-label">Score</span>
+                          <span class="status-pill">Watching</span>
+                        </div>
+                        <div class="genre-row" aria-label="Genres">
+                          <span class="genre-chip">Sci-Fi</span>
+                          <span class="genre-chip">Adventure</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <section class="content-section" aria-labelledby="progress-title">
+                  <div class="section-heading-row">
+                    <h2 id="progress-title" class="section-title">Your progress</h2>
+                    <span class="section-eyebrow">Episode 8 of 12</span>
+                  </div>
+                  <article class="progress-card">
+                    <div class="progress-card-top">
+                      <div>
+                        <p class="eyebrow">Currently watching</p>
+                        <h3>Episode 8</h3>
+                      </div>
+                      <span class="next-label">Next · 09</span>
+                    </div>
+                    <div class="progress-track" role="progressbar" aria-label="Eclipse Chronicles episode progress" aria-valuemin="0" aria-valuemax="12" aria-valuenow="8" aria-valuetext="Episode 8 of 12">
+                      <span class="progress-fill"></span>
+                    </div>
+                    <p class="progress-copy">You are two episodes from the season finale.</p>
+                  </article>
+                </section>
+
+                <section class="content-section synopsis-section" aria-labelledby="synopsis-title">
+                  <div class="section-heading-row">
+                    <h2 id="synopsis-title" class="section-title">Synopsis</h2>
+                    <button class="text-button" type="button">More</button>
+                  </div>
+                  <p class="body-copy">When a quiet moon begins to eclipse every navigation signal in the outer colonies, a trainee cartographer follows a lost transmission into the dark and finds a city that should not exist.</p>
+                </section>
+
+                <section class="content-section information-section" aria-labelledby="information-title">
+                  <h2 id="information-title" class="section-title">Information</h2>
+                  <div class="info-card">
+                    <div class="info-row"><span>Studio</span><strong>North Arc</strong></div>
+                    <div class="info-row"><span>Season</span><strong>Winter 2026</strong></div>
+                    <div class="info-row"><span>Runtime</span><strong>24 min</strong></div>
+                    <div class="info-row"><span>Audio</span><strong>Japanese · English</strong></div>
+                  </div>
+                </section>
+
+                <section class="content-section related-section" aria-labelledby="related-title">
+                  <div class="section-heading-row">
+                    <h2 id="related-title" class="section-title">Related titles</h2>
+                    <button class="text-button" type="button">See all</button>
+                  </div>
+                  <div class="poster-shelf">
+                    <article class="related-item">
+                      <div class="related-poster related-poster-one" role="img" aria-label="Orbit of Ash poster">
+                        <svg viewBox="0 0 120 168" aria-hidden="true"><rect width="120" height="168" fill="#19354b" /><circle cx="78" cy="46" r="31" fill="#c8f53d" opacity="0.88" /><path d="M-18 143 115 68l28 100H-18Z" fill="#d76d59" /><path d="M7 122 104 30" stroke="#f4f8f2" stroke-width="5" opacity="0.76" /><text x="12" y="151" fill="#f4f8f2" font-family="Gabarito, sans-serif" font-size="8" font-weight="600" letter-spacing="1.4">ORBIT OF ASH</text></svg>
+                      </div>
+                      <h3>Orbit of Ash</h3>
+                      <p>Anime · 13 eps</p>
+                    </article>
+                    <article class="related-item">
+                      <div class="related-poster related-poster-two" role="img" aria-label="Signal Bloom poster">
+                        <svg viewBox="0 0 120 168" aria-hidden="true"><rect width="120" height="168" fill="#27344e" /><circle cx="40" cy="53" r="28" fill="#e87e60" opacity="0.92" /><path d="M-8 168 50 72l28 25 50-51v122Z" fill="#49698a" /><path d="M4 39 112 124" stroke="#c8f53d" stroke-width="6" opacity="0.88" /><path d="M28 17v92" stroke="#f4f8f2" stroke-width="2" opacity="0.74" /><text x="12" y="151" fill="#f4f8f2" font-family="Gabarito, sans-serif" font-size="8" font-weight="600" letter-spacing="1.4">SIGNAL BLOOM</text></svg>
+                      </div>
+                      <h3>Signal Bloom</h3>
+                      <p>Anime · 10 eps</p>
+                    </article>
+                    <article class="related-item">
+                      <div class="related-poster related-poster-three" role="img" aria-label="Zero Meridian poster">
+                        <svg viewBox="0 0 120 168" aria-hidden="true"><rect width="120" height="168" fill="#3a295d" /><circle cx="74" cy="59" r="34" fill="#c8f53d" opacity="0.82" /><path d="M-4 136 52 80l71 47v41H-4Z" fill="#0f253e" /><path d="M15 20 103 146" stroke="#ef8e6d" stroke-width="7" opacity="0.85" /><path d="M18 99 110 45" stroke="#f4f8f2" stroke-width="2" opacity="0.72" /><text x="12" y="151" fill="#f4f8f2" font-family="Gabarito, sans-serif" font-size="8" font-weight="600" letter-spacing="1.4">ZERO MERIDIAN</text></svg>
+                      </div>
+                      <h3>Zero Meridian</h3>
+                      <p>Anime · 12 eps</p>
+                    </article>
+                  </div>
+                </section>
+
+                <section class="content-section episodes-section" aria-labelledby="episodes-title">
+                  <div class="section-heading-row">
+                    <h2 id="episodes-title" class="section-title">Episodes</h2>
+                    <span class="section-eyebrow">12 total</span>
+                  </div>
+                  <div class="episode-list">
+                    <article class="episode-row is-current"><span class="episode-number">08</span><div><h3>Where the Signal Sleeps</h3><p>24 min · Watching</p></div><span class="episode-state" aria-label="Current episode">●</span></article>
+                    <article class="episode-row"><span class="episode-number">09</span><div><h3>The City Beyond Orbit</h3><p>24 min · Next episode</p></div><span class="episode-state">›</span></article>
+                    <article class="episode-row"><span class="episode-number">10</span><div><h3>Cartographers of Night</h3><p>24 min</p></div><span class="episode-state">›</span></article>
+                    <article class="episode-row"><span class="episode-number">11</span><div><h3>A Map Made of Silence</h3><p>24 min</p></div><span class="episode-state">›</span></article>
+                    <article class="episode-row"><span class="episode-number">12</span><div><h3>Eclipse, Reversed</h3><p>27 min · Finale</p></div><span class="episode-state">›</span></article>
+                  </div>
+                </section>
+
+                <section class="content-section closing-section" aria-label="End of title details">
+                  <div class="closing-mark" aria-hidden="true">EC / 12</div>
+                  <p>End of title details</p>
+                </section>
+              </main>
+
+              <div class="action-dock" aria-label="Episode progress actions">
+                <button class="dock-button dock-minus" type="button" aria-label="Decrease episode progress by one">−1</button>
+                <div class="dock-label">
+                  <span class="dock-eyebrow">Watching</span>
+                  <strong>Next: Episode 9</strong>
+                </div>
+                <button class="dock-button dock-plus" type="button" aria-label="Increase episode progress by one">+1</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <p class="sr-only" id="live-status" aria-live="polite"></p>
+    <script src="app.js" defer></script>
+  </body>
+</html>

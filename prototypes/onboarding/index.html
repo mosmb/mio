@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" data-motion="a" data-state="welcome" data-provider="anilist" data-reduced-motion="false" data-slow-motion="false">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Mio — Onboarding motion study</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="prototype" aria-labelledby="prototype-title">
+      <aside class="controls-panel" aria-labelledby="prototype-title">
+        <div class="controls-eyebrow">Mio / onboarding study</div>
+        <h1 id="prototype-title" class="controls-title">Three ways to bring a library into Today</h1>
+        <p class="controls-intro">
+          The welcome stays quiet. Compare three different ways a real collection can become an actionable Today queue.
+        </p>
+
+        <div class="controls-stack">
+          <fieldset class="control-group">
+            <legend class="control-label">Import motion</legend>
+            <div class="segmented-control motion-selector" role="group" aria-label="Import motion direction">
+              <button class="control-button is-active" type="button" data-control="variant" data-value="a" aria-pressed="true">
+                A / Cover Deal
+              </button>
+              <button class="control-button" type="button" data-control="variant" data-value="b" aria-pressed="false">
+                B / Panel Wipe
+              </button>
+              <button class="control-button" type="button" data-control="variant" data-value="c" aria-pressed="false">
+                C / Mosaic Assembly
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Preview state</legend>
+            <div class="segmented-control" role="group" aria-label="Preview state">
+              <button class="control-button is-active" type="button" data-control="state" data-value="welcome" aria-pressed="true">
+                Welcome
+              </button>
+              <button class="control-button" type="button" data-control="state" data-value="importing" aria-pressed="false">
+                Importing
+              </button>
+              <button class="control-button" type="button" data-control="state" data-value="complete" aria-pressed="false">
+                Complete
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend class="control-label">Active source</legend>
+            <div class="segmented-control" role="group" aria-label="Active source">
+              <button class="control-button is-active" type="button" data-control="provider" data-value="anilist" aria-pressed="true">
+                AniList
+              </button>
+              <button class="control-button" type="button" data-control="provider" data-value="myanimelist" aria-pressed="false">
+                MyAnimeList
+              </button>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="controls-actions">
+          <button class="inspector-button" type="button" data-action="replay">
+            <span class="inspector-button-icon" aria-hidden="true">↺</span>
+            Replay
+          </button>
+          <button class="inspector-button" type="button" data-action="reduced-motion" aria-pressed="false">
+            <span class="inspector-toggle" aria-hidden="true"></span>
+            Reduced motion
+          </button>
+          <button class="inspector-button" type="button" data-action="slow-motion" aria-pressed="false">
+            <span class="inspector-toggle inspector-toggle-slow" aria-hidden="true">½</span>
+            0.5× slow
+          </button>
+        </div>
+
+        <p class="control-status" id="control-status" role="status" aria-live="polite">
+          A / Cover Deal · Welcome · AniList
+        </p>
+      </aside>
+
+      <section class="device-stage" aria-label="393 by 852 Android portrait preview">
+        <div class="device-frame">
+          <div class="mio-app" id="mio-app">
+            <div class="status-bar" aria-hidden="true">
+              <span>9:41</span>
+              <span class="status-icons"><i></i><i></i><i></i></span>
+            </div>
+
+            <div class="app-main" id="app-main">
+              <section class="onboarding-screen welcome-screen" data-screen="welcome" aria-labelledby="welcome-title">
+                <div class="welcome-topline">
+                  <span class="section-eyebrow">ONE SOURCE, CLEARLY YOURS</span>
+                  <span class="step-marker" aria-label="Step 1 of 2">01 / 02</span>
+                </div>
+
+                <div class="welcome-a-copy">
+                  <h2 class="mio-wordmark" aria-label="Mio">mio<span aria-hidden="true">.</span></h2>
+                  <p class="welcome-title" id="welcome-title">Your anime and manga, ready when you are.</p>
+                  <p class="welcome-supporting">
+                    Mio imports the collection you already keep and keeps your progress in sync with one provider.
+                  </p>
+                </div>
+
+                <div class="provider-actions">
+                  <button class="provider-action" type="button" data-provider-action="anilist">
+                    <span class="provider-mark provider-mark-anilist" aria-hidden="true">A</span>
+                    <span class="provider-action-copy">
+                      <strong>Continue with AniList</strong>
+                      <small>Import and sync your library</small>
+                    </span>
+                    <span class="provider-arrow" aria-hidden="true">↗</span>
+                  </button>
+                  <button class="provider-action" type="button" data-provider-action="myanimelist">
+                    <span class="provider-mark provider-mark-myanimelist" aria-hidden="true">M</span>
+                    <span class="provider-action-copy">
+                      <strong>Continue with MyAnimeList</strong>
+                      <small>Import and sync your library</small>
+                    </span>
+                    <span class="provider-arrow" aria-hidden="true">↗</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="onboarding-screen sync-screen" data-screen="sync" aria-labelledby="sync-title" hidden>
+                <div class="sync-heading-block">
+                  <div class="sync-topline">
+                    <span class="provider-chip" id="sync-provider-chip">ANILIST</span>
+                    <span class="sync-stage" id="sync-stage">SIMULATED RETURN</span>
+                  </div>
+                  <h2 class="sync-title" id="sync-title">Bringing your library into focus</h2>
+                  <p class="sync-supporting" id="sync-supporting">
+                    Mio is returning from AniList with your collection ready to import.
+                  </p>
+                </div>
+
+                <section class="import-card" id="import-card" aria-labelledby="import-card-title">
+                  <div class="import-card-topline">
+                    <div>
+                      <p class="section-eyebrow" id="import-card-title">COLLECTION IMPORT</p>
+                      <p class="import-status" id="import-status" aria-live="polite">Preparing 38 titles</p>
+                    </div>
+                    <span class="import-count" id="import-count">38 titles found</span>
+                  </div>
+                  <div class="cover-grid-stage" id="cover-grid-stage">
+                    <div class="cover-grid" id="cover-grid" role="img" aria-label="A mosaic of ten library cover placeholders"></div>
+                  </div>
+                  <div class="import-card-bottom" id="import-card-bottom">
+                    <span class="import-note-mark" aria-hidden="true">↳</span>
+                    <p id="import-note">Your AniList library stays the source of truth.</p>
+                  </div>
+                </section>
+
+                <section class="today-preview" id="today-preview" aria-labelledby="today-preview-title" hidden>
+                  <div class="today-preview-topline" id="today-preview-topline">
+                    <span class="section-eyebrow">TODAY</span>
+                    <span class="preview-confirmation">READY</span>
+                  </div>
+                  <div class="today-preview-card">
+                    <div class="preview-art" id="today-artwork" aria-hidden="true"></div>
+                    <div class="preview-copy" id="preview-copy">
+                      <span class="preview-kicker">UP NEXT</span>
+                      <h3 id="today-preview-title">Lanterns at Low Tide</h3>
+                      <p>Episode 8 · ready to pick up</p>
+                      <button class="preview-action" type="button" id="preview-action">Open Today <span aria-hidden="true">↗</span></button>
+                    </div>
+                  </div>
+                  <p class="preview-caption" id="preview-caption">A small, focused queue is waiting for you.</p>
+                </section>
+              </section>
+            </div>
+
+            <div class="app-toast" id="app-toast" role="status" aria-live="polite" hidden></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
