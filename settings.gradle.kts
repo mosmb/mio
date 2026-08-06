@@ -69,4 +69,3 @@ include(":sync:work")
 include(":core:designsystem")
 include(":core:ui")
 include(":core:navigation")
-

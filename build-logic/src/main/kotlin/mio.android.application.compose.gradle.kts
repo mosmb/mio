@@ -1,14 +1,25 @@
 import com.android.build.api.dsl.ApplicationExtension
-import org.gradle.api.artifacts.VersionCatalogsExtension
+import io.morgan.mio.buildlogic.MioDependencyGuardPlugin
 import org.gradle.api.JavaVersion
+import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
 plugins {
+    id("org.jlleitschuh.gradle.ktlint")
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+apply<MioDependencyGuardPlugin>()
+
+ktlint {
+    filter {
+        exclude("**/build/**")
+        exclude("**/generated/**")
+    }
 }
 
 extensions.configure<ApplicationExtension> {
@@ -24,6 +35,14 @@ extensions.configure<ApplicationExtension> {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        checkDependencies = true
+        checkReleaseBuilds = true
+        // Task 01 and Task 02 intentionally pin the toolchain and test BOM versions.
+        informational += setOf("AndroidGradlePluginVersion", "NewerVersionAvailable")
     }
     buildFeatures {
         compose = true

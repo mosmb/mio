@@ -1,0 +1,366 @@
+package io.morgan.mio.architecture
+
+import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
+
+data class OwnedKotlinFile(
+    val modulePath: String,
+    val file: KoFileDeclaration,
+)
+
+internal object MioProductionModules {
+    val paths =
+        listOf(
+            ":app",
+            ":feature:onboarding:api",
+            ":feature:onboarding:impl",
+            ":feature:today:api",
+            ":feature:today:impl",
+            ":feature:library:api",
+            ":feature:library:impl",
+            ":feature:discover:api",
+            ":feature:discover:impl",
+            ":feature:you:api",
+            ":feature:you:impl",
+            ":feature:media:api",
+            ":feature:media:impl",
+            ":feature:progress:api",
+            ":feature:progress:impl",
+            ":domain:model",
+            ":domain:account",
+            ":domain:media",
+            ":domain:collection",
+            ":domain:progress",
+            ":domain:queue",
+            ":domain:sync",
+            ":domain:preferences",
+            ":data:account",
+            ":data:media",
+            ":data:collection",
+            ":data:progress",
+            ":data:sync",
+            ":data:preferences",
+            ":data:provider:api",
+            ":data:provider:anilist",
+            ":data:provider:myanimelist",
+            ":core:common",
+            ":core:testing",
+            ":core:database",
+            ":core:datastore",
+            ":core:network",
+            ":core:logging",
+            ":core:ui",
+            ":core:designsystem",
+            ":core:navigation",
+            ":sync:work",
+            ":architecture-tests",
+        )
+}
+
+internal fun enforcePackageOwnership(files: List<OwnedKotlinFile>) {
+    assertNoViolations("Package ownership", files) { ownedFile ->
+        val packageName =
+            ownedFile.file.packagee
+                ?.name
+                .orEmpty()
+        val expectedNamespace = moduleNamespace(ownedFile.modulePath)
+        if (packageName.isNotEmpty() &&
+            (packageName == expectedNamespace || packageName.startsWith("$expectedNamespace."))
+        ) {
+            null
+        } else {
+            "package '$packageName' must be '$expectedNamespace' or one of its subpackages"
+        }
+    }
+}
+
+internal fun enforceDomainPurity(files: List<OwnedKotlinFile>) {
+    val forbiddenPrefixes =
+        listOf(
+            "android",
+            "androidx",
+            "io.morgan.mio.app",
+            "io.morgan.mio.feature",
+            "io.morgan.mio.data",
+            "io.morgan.mio.core.database",
+            "io.morgan.mio.core.datastore",
+            "io.morgan.mio.core.network",
+            "io.morgan.mio.core.logging",
+            "io.morgan.mio.sync",
+            "retrofit2",
+            "okhttp3",
+            "timber.log",
+        )
+
+    assertNoViolations("Domain purity", files.filter { it.modulePath.startsWith(":domain:") }) { ownedFile ->
+        firstMatchingImport(ownedFile.file, forbiddenPrefixes)?.let { importName ->
+            "domain code cannot import '$importName'"
+        }
+    }
+}
+
+internal fun enforcePresentationIsolation(files: List<OwnedKotlinFile>) {
+    val forbiddenPrefixes =
+        listOf(
+            "io.morgan.mio.data",
+            "io.morgan.mio.core.database",
+            "io.morgan.mio.core.datastore",
+            "io.morgan.mio.core.network",
+            "androidx.room",
+            "androidx.datastore",
+            "retrofit2",
+            "okhttp3",
+        )
+
+    assertNoViolations(
+        "Presentation isolation",
+        files.filter { isFeatureImplementation(it.modulePath) },
+    ) { ownedFile ->
+        val forbiddenImport = firstMatchingImport(ownedFile.file, forbiddenPrefixes)
+        val otherFeatureImplementation =
+            ownedFile.file.imports
+                .map { it.name }
+                .firstOrNull { importName -> isOtherFeatureImplementationImport(ownedFile.modulePath, importName) }
+
+        when {
+            forbiddenImport != null -> "feature implementation cannot import '$forbiddenImport'"
+            otherFeatureImplementation != null ->
+                "feature implementation cannot import another feature implementation '$otherFeatureImplementation'"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceFeatureApiIsolation(files: List<OwnedKotlinFile>) {
+    val forbiddenPrefixes =
+        listOf(
+            "io.morgan.mio.data",
+            "androidx.compose",
+            "androidx.lifecycle.ViewModel",
+            "androidx.lifecycle.viewmodel",
+            "androidx.room",
+            "androidx.datastore",
+            "retrofit2",
+            "okhttp3",
+        )
+
+    assertNoViolations("Feature API isolation", files.filter { isFeatureApi(it.modulePath) }) { ownedFile ->
+        val imports = ownedFile.file.imports.map { it.name }
+        val forbiddenImport =
+            imports.firstOrNull { importName ->
+                matchesAnyPrefix(importName, forbiddenPrefixes) ||
+                    isFeatureImplementationImport(importName) ||
+                    (
+                        matchesPrefix(importName, "io.morgan.mio.domain") &&
+                            !matchesPrefix(importName, "io.morgan.mio.domain.model")
+                    )
+            }
+
+        forbiddenImport?.let { importName -> "feature API cannot import '$importName'" }
+    }
+}
+
+internal fun enforceProviderIsolation(files: List<OwnedKotlinFile>) {
+    val capabilityPrefixes =
+        listOf(
+            "io.morgan.mio.data.account",
+            "io.morgan.mio.data.media",
+            "io.morgan.mio.data.collection",
+            "io.morgan.mio.data.progress",
+            "io.morgan.mio.data.sync",
+            "io.morgan.mio.data.preferences",
+        )
+
+    assertNoViolations("Provider isolation", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { it.name }
+        val providerImports = imports.filter { importName -> matchesPrefix(importName, "io.morgan.mio.data.provider") }
+        val forbiddenProviderImport =
+            when {
+                isFeatureOrDomainModule(ownedFile.modulePath) -> providerImports.firstOrNull()
+                !isProviderModule(ownedFile.modulePath) ->
+                    providerImports.firstOrNull { importName ->
+                        !matchesPrefix(importName, "io.morgan.mio.data.provider.api")
+                    }
+
+                else -> null
+            }
+        val crossProviderImport =
+            when (ownedFile.modulePath) {
+                ":data:provider:anilist" ->
+                    imports.firstOrNull { importName ->
+                        matchesPrefix(importName, "io.morgan.mio.data.provider.myanimelist")
+                    }
+
+                ":data:provider:myanimelist" ->
+                    imports.firstOrNull { importName ->
+                        matchesPrefix(importName, "io.morgan.mio.data.provider.anilist")
+                    }
+
+                else -> null
+            }
+        val capabilityImport =
+            if (isProviderImplementation(ownedFile.modulePath)) {
+                imports.firstOrNull { importName -> matchesAnyPrefix(importName, capabilityPrefixes) }
+            } else {
+                null
+            }
+
+        when {
+            forbiddenProviderImport != null ->
+                "module '${ownedFile.modulePath}' cannot import provider code '$forbiddenProviderImport'"
+
+            crossProviderImport != null -> "provider cannot import the other provider '$crossProviderImport'"
+            capabilityImport != null -> "provider implementation cannot import capability data '$capabilityImport'"
+            else -> null
+        }
+    }
+}
+
+internal fun enforceLoggingBoundary(files: List<OwnedKotlinFile>) {
+    assertNoViolations("Logging boundary", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { it.name }
+        val timberImport = imports.firstOrNull { importName -> matchesPrefix(importName, "timber.log") }
+        val loggingPackageImport =
+            imports.firstOrNull { importName -> matchesPrefix(importName, "io.morgan.mio.core.logging") }
+
+        when {
+            timberImport != null && ownedFile.modulePath != ":core:logging" ->
+                "only :core:logging may import Timber '$timberImport'"
+
+            loggingPackageImport != null && ownedFile.modulePath.startsWith(":domain:") ->
+                "domain code cannot import logging '$loggingPackageImport'"
+
+            timberImport != null && ownedFile.modulePath.startsWith(":feature:") ->
+                "features cannot import Timber directly '$timberImport'"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceSharedUiIsolation(files: List<OwnedKotlinFile>) {
+    assertNoViolations(
+        "Shared UI isolation",
+        files.filter { it.modulePath == ":core:ui" || it.modulePath == ":core:designsystem" },
+    ) { ownedFile ->
+        firstMatchingImport(ownedFile.file, listOf("io.morgan.mio.feature"))?.let { importName ->
+            "shared UI cannot import feature code '$importName'"
+        }
+    }
+}
+
+internal fun enforceGloballyForbiddenImports(files: List<OwnedKotlinFile>) {
+    val forbiddenPrefixes =
+        listOf(
+            "androidx.navigation",
+            "androidx.paging",
+            "dagger",
+            "com.google.dagger",
+            "dagger.hilt",
+            "org.koin",
+            "com.google.gson",
+            "com.squareup.moshi",
+            "com.fasterxml.jackson",
+            "io.reactivex",
+            "java.time",
+            "kotlinx.coroutines.GlobalScope",
+        )
+    val forbiddenExactImports =
+        setOf(
+            "java.io.Serializable",
+            "java.io.ObjectInputStream",
+            "java.io.ObjectOutputStream",
+            "java.util.Date",
+            "java.util.Calendar",
+        )
+
+    assertNoViolations("Globally forbidden imports", files) { ownedFile ->
+        val forbiddenImport =
+            ownedFile.file.imports
+                .map { it.name }
+                .firstOrNull { importName ->
+                    importName in forbiddenExactImports || matchesAnyPrefix(importName, forbiddenPrefixes)
+                }
+
+        forbiddenImport?.let { importName -> "forbidden import '$importName'" }
+    }
+}
+
+private fun assertNoViolations(
+    ruleLabel: String,
+    files: List<OwnedKotlinFile>,
+    violation: (OwnedKotlinFile) -> String?,
+) {
+    val violations =
+        files.mapNotNull { ownedFile ->
+            violation(ownedFile)?.let { reason ->
+                "$ruleLabel: ${ownedFile.file.path} [${ownedFile.modulePath}] - $reason"
+            }
+        }
+
+    if (violations.isNotEmpty()) {
+        throw AssertionError(violations.joinToString(separator = "\n"))
+    }
+}
+
+private fun firstMatchingImport(
+    file: KoFileDeclaration,
+    prefixes: List<String>,
+): String? =
+    file.imports
+        .map { it.name }
+        .firstOrNull { importName -> matchesAnyPrefix(importName, prefixes) }
+
+private fun matchesAnyPrefix(
+    value: String,
+    prefixes: List<String>,
+): Boolean = prefixes.any { prefix -> matchesPrefix(value, prefix) }
+
+private fun matchesPrefix(
+    value: String,
+    prefix: String,
+): Boolean = value == prefix || value.startsWith("$prefix.")
+
+private fun moduleNamespace(modulePath: String): String =
+    if (modulePath == ":app") {
+        "io.morgan.mio"
+    } else {
+        "io.morgan.mio." + modulePath.removePrefix(":").replace(':', '.')
+    }
+
+private fun isFeatureApi(modulePath: String): Boolean =
+    modulePath.startsWith(":feature:") && modulePath.endsWith(":api")
+
+private fun isFeatureImplementation(modulePath: String): Boolean =
+    modulePath.startsWith(":feature:") && modulePath.endsWith(":impl")
+
+private fun isFeatureOrDomainModule(modulePath: String): Boolean =
+    modulePath.startsWith(":feature:") || modulePath.startsWith(":domain:")
+
+private fun isProviderModule(modulePath: String): Boolean = modulePath.startsWith(":data:provider:")
+
+private fun isProviderImplementation(modulePath: String): Boolean =
+    modulePath == ":data:provider:anilist" || modulePath == ":data:provider:myanimelist"
+
+private fun isFeatureImplementationImport(importName: String): Boolean {
+    val segments = importName.split('.')
+    return segments.size >= 6 &&
+        segments[0] == "io" &&
+        segments[1] == "morgan" &&
+        segments[2] == "mio" &&
+        segments[3] == "feature" &&
+        segments[5] == "impl"
+}
+
+private fun isOtherFeatureImplementationImport(
+    modulePath: String,
+    importName: String,
+): Boolean {
+    if (!isFeatureImplementationImport(importName)) {
+        return false
+    }
+
+    val importedFeature = importName.split('.')[4]
+    val owningFeature = modulePath.split(':').filter { it.isNotEmpty() }.getOrNull(1)
+    return importedFeature != owningFeature
+}

@@ -8,4 +8,3 @@ plugins {
 extensions.configure<KotlinJvmExtension> {
     explicitApi()
 }
-
