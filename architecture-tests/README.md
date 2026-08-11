@@ -23,3 +23,5 @@ This is the mandatory rule-evolution workflow. The fixture test must pair every 
 | First ViewModel and complete destination pair | 12 | ViewModel state/action/event contract and Route/Screen/ViewModel separation |
 
 The README is a handoff contract, not a waiver. Later tasks must update the rules when the type first exists; task 02 does not guess annotation names or APIs ahead of those tickets. The acceptance criteria in tasks 03, 04, 07, 09, and 12 already require their applicable architecture checks.
+
+Task 04's persistence ownership, persistence escape, and one-mechanism data-source rules are implemented. Task 11 and task 20 must evolve these rules when migrations, outbox, and reconciliation types appear.

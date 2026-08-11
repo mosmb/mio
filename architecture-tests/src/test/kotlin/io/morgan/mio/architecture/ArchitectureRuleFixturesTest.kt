@@ -37,6 +37,11 @@ class ArchitectureRuleFixturesTest {
                         "ValidProvider.kt" to ":data:provider:anilist",
                         "ValidLogging.kt" to ":core:logging",
                         "ValidFeatureApi.kt" to ":feature:today:api",
+                        "ValidRoomEntity.kt" to ":core:database",
+                        "ValidRoomDao.kt" to ":core:database",
+                        "ValidRoomLocalDataSource.kt" to ":data:media",
+                        "ValidDataStoreLocalDataSource.kt" to ":data:preferences",
+                        "ValidRepositoryImplementation.kt" to ":data:media",
                     ),
             )
 
@@ -51,6 +56,9 @@ class ArchitectureRuleFixturesTest {
         enforceDomainModelOwnership(files)
         enforceDomainImmutability(files)
         enforceRepositoryBoundaries(files)
+        enforcePersistenceTypeOwnership(files)
+        enforcePersistenceDoesNotEscape(files)
+        enforceOneMechanismPerDataSource(files)
     }
 
     @Test
@@ -298,6 +306,86 @@ class ArchitectureRuleFixturesTest {
         )
     }
 
+    @Test
+    fun dataOwnedEntityIsRejected() {
+        assertFixtureRejected(
+            "persistence-ownership",
+            "DataOwnedEntity.kt",
+            ":data:media",
+            ::enforcePersistenceTypeOwnership,
+        )
+    }
+
+    @Test
+    fun featureOwnedDaoIsRejected() {
+        assertFixtureRejected(
+            "persistence-ownership",
+            "FeatureOwnedDao.kt",
+            ":feature:today:impl",
+            ::enforcePersistenceTypeOwnership,
+        )
+    }
+
+    @Test
+    fun featureRoomImportIsRejected() {
+        assertFixtureRejected(
+            "persistence-escape",
+            "FeatureImportsRoom.kt",
+            ":feature:today:impl",
+            ::enforcePersistenceDoesNotEscape,
+        )
+    }
+
+    @Test
+    fun domainEntityReturnIsRejected() {
+        assertFixtureRejected(
+            "persistence-escape",
+            "DomainReturnsEntity.kt",
+            ":domain:media",
+            ::enforcePersistenceDoesNotEscape,
+        )
+    }
+
+    @Test
+    fun repositoryDaoReturnIsRejected() {
+        assertFixtureRejected(
+            "persistence-escape",
+            "RepositoryReturnsDao.kt",
+            ":data:account",
+            ::enforcePersistenceDoesNotEscape,
+        )
+    }
+
+    @Test
+    fun featureDataStoreImportIsRejected() {
+        assertFixtureRejected(
+            "persistence-escape",
+            "FeatureImportsDataStore.kt",
+            ":feature:today:impl",
+            ::enforcePersistenceDoesNotEscape,
+        )
+    }
+
+    @Test
+    fun mixedMechanismDataSourceIsRejected() {
+        assertFixtureRejected(
+            "data-source-boundary",
+            "MixedMechanismLocalDataSource.kt",
+            ":data:preferences",
+            ::enforceOneMechanismPerDataSource,
+        )
+    }
+
+    @Test
+    fun repositoryBackedDataSourceIsRejected() {
+        assertFixtureRejected(
+            "data-source-boundary",
+            "RepositoryBackedLocalDataSource.kt",
+            ":data:collection",
+            ::enforceOneMechanismPerDataSource,
+        )
+    }
+
     private fun assertFixtureRejected(
         directoryName: String,
         filename: String,
@@ -356,6 +444,9 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforceDomainModelOwnership -> "Domain model ownership"
             rule == ::enforceDomainImmutability -> "Domain immutability"
             rule == ::enforceRepositoryBoundaries -> "Repository boundaries"
+            rule == ::enforcePersistenceTypeOwnership -> "Persistence type ownership"
+            rule == ::enforcePersistenceDoesNotEscape -> "Persistence escape"
+            rule == ::enforceOneMechanismPerDataSource -> "One mechanism per data source"
             else -> fail("unknown architecture rule")
         }
 }

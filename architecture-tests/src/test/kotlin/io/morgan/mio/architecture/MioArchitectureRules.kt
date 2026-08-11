@@ -443,6 +443,138 @@ internal fun enforceRepositoryBoundaries(files: List<OwnedKotlinFile>) {
     }
 }
 
+internal fun enforcePersistenceTypeOwnership(files: List<OwnedKotlinFile>) {
+    assertNoViolations("Persistence type ownership", files) { ownedFile ->
+        val declarationNames =
+            buildList {
+                addAll(ownedFile.file.classes(true, true).map { declaration -> declaration.name })
+                addAll(ownedFile.file.interfaces(true).map { declaration -> declaration.name })
+            }.distinct()
+        val source = ownedFile.file.text
+        val hasEntity = source.contains("@Entity") || declarationNames.any { it.endsWith("Entity") }
+        val hasDao = source.contains("@Dao") || declarationNames.any { it.endsWith("Dao") }
+        val hasCorePersistenceType =
+            declarationNames.any { declaration ->
+                declaration in
+                    setOf(
+                        "MioDatabase",
+                        "MioDatabaseFactory",
+                        "MioMigrations",
+                        "MioTypeConverters",
+                        "MediaAggregate",
+                    ) ||
+                    declaration.endsWith("Migrations")
+            }
+        val repositoryClass =
+            ownedFile.file
+                .classes(true, true)
+                .firstOrNull { declaration -> declaration.name.endsWith("Repository") }
+        val localDataSourceClass =
+            ownedFile.file
+                .classes(true, true)
+                .firstOrNull { declaration -> declaration.name.endsWith("LocalDataSource") }
+
+        when {
+            (hasEntity || hasDao || hasCorePersistenceType) && ownedFile.modulePath != ":core:database" ->
+                "Room persistence types must live in :core:database"
+
+            repositoryClass != null &&
+                !ownedFile.modulePath.startsWith(":data:") &&
+                !(ownedFile.modulePath == ":core:testing" && repositoryClass.name.startsWith("Fake")) ->
+                "repository implementation '${repositoryClass.name}' must live in a :data:* module"
+
+            localDataSourceClass != null &&
+                (!ownedFile.modulePath.startsWith(":data:") || ownedFile.modulePath.startsWith(":data:provider:")) ->
+                "local data source '${localDataSourceClass.name}' must live in a capability :data:* module"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforcePersistenceDoesNotEscape(files: List<OwnedKotlinFile>) {
+    val roomPrefixes = listOf("androidx.room", "io.morgan.mio.core.database")
+    val dataStorePrefixes = listOf("androidx.datastore", "io.morgan.mio.core.datastore")
+    val publicStorageTypePattern =
+        Regex(
+            "\\b(?:[A-Za-z_][A-Za-z0-9_]*(?:Entity|Dao)|MioDatabase|Preferences|" +
+                "DevicePreferencesRecord|AccountPreferencesRecord|[A-Za-z_][A-Za-z0-9_]*ProviderIdEntity)\\b",
+        )
+
+    assertNoViolations("Persistence escape", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val source = ownedFile.file.text
+        val outsideRoomBoundary =
+            ownedFile.modulePath != ":core:database" && !ownedFile.modulePath.startsWith(":data:")
+        val outsideDataStoreBoundary =
+            ownedFile.modulePath != ":core:datastore" && ownedFile.modulePath != ":data:preferences"
+        val roomImport = if (outsideRoomBoundary) firstMatchingImport(ownedFile.file, roomPrefixes) else null
+        val dataStoreImport =
+            if (outsideDataStoreBoundary) firstMatchingImport(ownedFile.file, dataStorePrefixes) else null
+        val isRepository =
+            ownedFile.file.interfaces(true).any { declaration -> declaration.name.endsWith("Repository") } ||
+                ownedFile.file.classes(true, true).any { declaration -> declaration.name.endsWith("Repository") }
+        val exposedStorageType =
+            if (isRepository) publicStorageTypePattern.find(source)?.value else null
+
+        when {
+            roomImport != null -> "Room persistence escaped its boundary through '$roomImport'"
+            dataStoreImport != null -> "DataStore persistence escaped its boundary through '$dataStoreImport'"
+            exposedStorageType != null ->
+                "repository public API exposes persistence type '$exposedStorageType'"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceOneMechanismPerDataSource(files: List<OwnedKotlinFile>) {
+    val roomPrefixes = listOf("androidx.room", "io.morgan.mio.core.database")
+    val dataStorePrefixes = listOf("androidx.datastore", "io.morgan.mio.core.datastore")
+    val providerPrefixes = listOf("io.morgan.mio.data.provider", "retrofit2", "okhttp3")
+
+    assertNoViolations("One mechanism per data source", files) { ownedFile ->
+        val dataSource =
+            ownedFile.file
+                .classes(true, true)
+                .firstOrNull { declaration -> declaration.name.endsWith("LocalDataSource") }
+        if (dataSource == null) {
+            null
+        } else {
+            val imports = ownedFile.file.imports.map { import -> import.name }
+            val mechanisms =
+                buildSet {
+                    if (matchesAnyPrefixFromList(imports, roomPrefixes)) add("Room")
+                    if (matchesAnyPrefixFromList(imports, dataStorePrefixes)) add("DataStore")
+                    if (matchesAnyPrefixFromList(imports, providerPrefixes)) add("provider/network")
+                }
+            val repositoryImport =
+                imports.firstOrNull { importName ->
+                    importName.endsWith("Repository") || importName.contains(".Repository.")
+                }
+            val otherDataSourceImport =
+                imports.firstOrNull { importName ->
+                    importName.endsWith("LocalDataSource") &&
+                        !importName.endsWith(".${dataSource.name}")
+                }
+
+            when {
+                mechanisms.size > 1 -> "data source mixes mechanisms ${mechanisms.sorted()}"
+                repositoryImport != null -> "data source cannot depend on repository '$repositoryImport'"
+                otherDataSourceImport != null ->
+                    "data source cannot depend on another data source '$otherDataSourceImport'"
+
+                else -> null
+            }
+        }
+    }
+}
+
+private fun matchesAnyPrefixFromList(
+    imports: List<String>,
+    prefixes: List<String>,
+): Boolean = imports.any { importName -> matchesAnyPrefix(importName, prefixes) }
+
 private fun assertNoViolations(
     ruleLabel: String,
     files: List<OwnedKotlinFile>,

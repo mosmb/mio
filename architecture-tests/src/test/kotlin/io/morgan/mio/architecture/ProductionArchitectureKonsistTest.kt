@@ -73,6 +73,55 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun persistenceTypeOwnership() {
+        enforcePersistenceTypeOwnership(productionFiles())
+    }
+
+    @Test
+    fun persistenceDoesNotEscape() {
+        enforcePersistenceDoesNotEscape(productionFiles())
+    }
+
+    @Test
+    fun oneMechanismPerDataSource() {
+        enforceOneMechanismPerDataSource(productionFiles())
+    }
+
+    @Test
+    fun taskFourProductionPersistenceTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val source = files.map { ownedFile -> ownedFile.file.text }
+        assertTrue(source.any { text -> text.contains("@Entity") })
+        assertTrue(source.any { text -> text.contains("@Dao") })
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath.startsWith(":data:") &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name.endsWith("Repository") }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath.startsWith(":data:") &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name.endsWith("LocalDataSource")
+                    } &&
+                    ownedFile.file.imports.any { import ->
+                        import.name == "io.morgan.mio.core.database.MioDatabase" ||
+                            import.name.startsWith("androidx.datastore")
+                    }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:preferences" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name == "DataStorePreferencesLocalDataSource"
+                    }
+            },
+        )
+    }
+
+    @Test
     fun taskThreeProductionModulesAreActuallyScanned() {
         val scannedModules = productionFiles().mapTo(mutableSetOf(), OwnedKotlinFile::modulePath)
         val expectedModules =
