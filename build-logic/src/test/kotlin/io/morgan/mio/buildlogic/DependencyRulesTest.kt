@@ -65,7 +65,7 @@ class DependencyRulesTest {
         ).forEach {
             assertTrue(violations(":core:testing", "implementation", it).isEmpty())
         }
-        listOf(":data:account", ":feature:today:impl", ":core:common", ":data:provider:api").forEach {
+        listOf(":data:account", ":feature:today:impl", ":core:common").forEach {
             assertTrue(violations(":core:testing", "implementation", it).isNotEmpty())
         }
 
@@ -78,6 +78,45 @@ class DependencyRulesTest {
         ).forEach {
             assertTrue(violations(":domain:model", "implementation", it).isNotEmpty())
         }
+    }
+
+    @Test
+    fun opensOnlyTheTaskFiveTestingAndProviderEdges() {
+        assertTrue(violations(":core:testing", "implementation", ":data:provider:api").isEmpty())
+        assertTrue(violations(":core:testing", "implementation", ":core:network").isNotEmpty())
+
+        listOf(":domain:model", ":core:common", ":data:media", ":data:provider:anilist").forEach {
+            assertTrue(violations(":data:provider:api", "implementation", it).isNotEmpty())
+        }
+
+        listOf(
+            ":data:provider:api",
+            ":data:provider:anilist",
+            ":data:account",
+            ":domain:model",
+            ":app",
+        ).forEach {
+            assertTrue(violations(":core:network", "implementation", it).isNotEmpty())
+        }
+
+        assertTrue(
+            violations(":data:provider:anilist", "implementation", ":data:provider:api").isEmpty(),
+        )
+        assertTrue(
+            violations(":data:provider:anilist", "implementation", ":core:network").isEmpty(),
+        )
+        assertTrue(
+            violations(":data:provider:anilist", "implementation", ":data:provider:myanimelist").isNotEmpty(),
+        )
+        assertTrue(
+            violations(":data:provider:myanimelist", "implementation", ":data:provider:api").isEmpty(),
+        )
+        assertTrue(
+            violations(":data:provider:myanimelist", "implementation", ":core:network").isEmpty(),
+        )
+        assertTrue(
+            violations(":data:provider:myanimelist", "implementation", ":data:provider:anilist").isNotEmpty(),
+        )
     }
 
     @Test

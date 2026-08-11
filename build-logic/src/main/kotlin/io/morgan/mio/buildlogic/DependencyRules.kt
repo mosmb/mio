@@ -199,6 +199,7 @@ public object DependencyRules {
                     ":domain:media",
                     ":domain:collection",
                     ":domain:preferences",
+                    ":data:provider:api",
                 ),
             ":architecture-tests" to emptySet(),
             ":core:database" to emptySet(),

@@ -16,6 +16,7 @@ This is the mandatory rule-evolution workflow. The fixture test must pair every 
 |---|---:|---|
 | Repository interfaces and initial domain models | 03 | domain ownership, immutability, repository contract boundaries |
 | Repository implementations, entities, DAOs, and data sources | 04 | suffix/location, forbidden escape, one-mechanism data-source boundaries |
+| Shared network/provider contracts | 05 | network-library ownership, canonical provider-model ownership, forbidden-escape rules |
 | Metro graphs and contributions | 06 | graph ownership and allowed injection patterns |
 | Navigation keys and entry builders | 07 | API/impl ownership, serialization, allowed key payloads |
 | Shared UI and first representative Route/Screen pair | 09 | shared ownership, stateless Screen shape, same-file Route/Screen convention |
@@ -25,3 +26,5 @@ This is the mandatory rule-evolution workflow. The fixture test must pair every 
 The README is a handoff contract, not a waiver. Later tasks must update the rules when the type first exists; task 02 does not guess annotation names or APIs ahead of those tickets. The acceptance criteria in tasks 03, 04, 07, 09, and 12 already require their applicable architecture checks.
 
 Task 04's persistence ownership, persistence escape, and one-mechanism data-source rules are implemented. Task 11 and task 20 must evolve these rules when migrations, outbox, and reconciliation types appear.
+
+Task 05's network and canonical provider-contract ownership rules are implemented. Tasks 13 and 14 must extend the DTO/service ownership fixtures when those first concrete provider types appear.

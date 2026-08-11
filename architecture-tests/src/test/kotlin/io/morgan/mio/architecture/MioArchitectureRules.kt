@@ -217,6 +217,203 @@ internal fun enforceProviderIsolation(files: List<OwnedKotlinFile>) {
     }
 }
 
+internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
+    val retrofitOrOkHttpPrefixes = listOf("retrofit2", "okhttp3")
+    val serializationPrefixes = listOf("kotlinx.serialization")
+    val androidNetworkPrefixes = listOf("android.net")
+    val networkSurfaceNames =
+        setOf(
+            "NetworkClientFactory",
+            "NetworkTimeouts",
+            "NetworkEvent",
+            "NetworkEventSink",
+            "AndroidNetworkMonitor",
+        )
+
+    assertNoViolations("Network boundary", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val isNetworkOwner = ownedFile.modulePath == ":core:network"
+        val isConcreteProvider = isProviderImplementation(ownedFile.modulePath)
+        val forbiddenNetworkLibraryImport =
+            imports.firstOrNull { importName ->
+                matchesAnyPrefix(importName, retrofitOrOkHttpPrefixes) && !isNetworkOwner && !isConcreteProvider
+            }
+        val forbiddenSerializationImport =
+            imports.firstOrNull { importName ->
+                matchesAnyPrefix(importName, serializationPrefixes) && !isNetworkOwner && !isConcreteProvider
+            }
+        val forbiddenAndroidNetworkImport =
+            imports.firstOrNull { importName ->
+                matchesAnyPrefix(importName, androidNetworkPrefixes) && !isNetworkOwner
+            }
+        val escapedNetworkSurface =
+            if (!isNetworkOwner && !isConcreteProvider) {
+                imports.firstOrNull { importName -> networkSurfaceNames.any { name -> importName.endsWith(".$name") } }
+            } else {
+                null
+            }
+
+        when {
+            forbiddenNetworkLibraryImport != null ->
+                "Retrofit/OkHttp imports are owned by :core:network or concrete provider modules; found '$forbiddenNetworkLibraryImport'"
+
+            forbiddenSerializationImport != null ->
+                "serialization imports are owned by :core:network or concrete provider modules; found '$forbiddenSerializationImport'"
+
+            forbiddenAndroidNetworkImport != null ->
+                "Android connectivity imports are owned by :core:network; found '$forbiddenAndroidNetworkImport'"
+
+            escapedNetworkSurface != null ->
+                "shared network type escaped its boundary through '$escapedNetworkSurface'"
+
+            else -> null
+        }
+    }
+}
+
+private val taskFiveCanonicalProviderDeclarations =
+    setOf(
+        "ProviderKey",
+        "ProviderAccountId",
+        "ProviderMediaId",
+        "ProviderCollectionEntryId",
+        "ProviderImageReference",
+        "ProviderIdentity",
+        "ProviderAuthorizationRequest",
+        "ProviderAuthorizationTransaction",
+        "ProviderAuthorizationLaunch",
+        "ProviderAuthorizationCallback",
+        "ProviderCredentials",
+        "ProviderAuthenticator",
+        "ProviderResult",
+        "ProviderRecovery",
+        "ProviderFailure",
+        "ProviderMediaType",
+        "ProviderMediaFormat",
+        "ProviderMediaPublicationStatus",
+        "ProviderProgressUnit",
+        "ProviderMediaTotals",
+        "ProviderReleaseTime",
+        "ProviderRelease",
+        "ProviderMedia",
+        "ProviderCollectionStatus",
+        "ProviderCollectionEntry",
+        "CompleteProviderImport",
+        "ProviderIdentityDataSource",
+        "ProviderInitialImportDataSource",
+        "ProviderBinding",
+    )
+
+internal fun enforceProviderContractOwnership(files: List<OwnedKotlinFile>) {
+    val forbiddenApiImports =
+        listOf(
+            "android",
+            "androidx",
+            "io.morgan.mio.domain",
+            "io.morgan.mio.core.database",
+            "io.morgan.mio.core.datastore",
+            "io.morgan.mio.core.network",
+            "retrofit2",
+            "okhttp3",
+            "kotlinx.serialization",
+            "io.morgan.mio.data.provider.anilist",
+            "io.morgan.mio.data.provider.myanimelist",
+        )
+    val duplicatedProviderSpecificDeclarations =
+        files
+            .filter { ownedFile -> isProviderImplementation(ownedFile.modulePath) }
+            .flatMap { ownedFile ->
+                ownedFile.file
+                    .declarations(true, true)
+                    .mapNotNull { declaration -> (declaration as? KoNameProvider)?.name }
+                    .filter { name ->
+                        name.endsWith("Dto") ||
+                            name.endsWith("ApiService") ||
+                            name.endsWith("GraphQlService") ||
+                            name.endsWith("OAuthService")
+                    }
+            }.groupingBy { name -> name }
+            .eachCount()
+            .filterValues { count -> count > 1 }
+            .keys
+
+    assertNoViolations("Provider contract ownership", files) { ownedFile ->
+        val declarationNames =
+            ownedFile.file
+                .declarations(true, true)
+                .mapNotNull { declaration -> (declaration as? KoNameProvider)?.name }
+                .distinct()
+        val misplacedCanonical =
+            declarationNames.firstOrNull { name ->
+                name in taskFiveCanonicalProviderDeclarations && ownedFile.modulePath != ":data:provider:api"
+            }
+        val misplacedRemoteDeclaration =
+            declarationNames.firstOrNull { name ->
+                name.endsWith("Dto") ||
+                    name.endsWith("ApiService") ||
+                    name.endsWith("GraphQlService") ||
+                    name.endsWith("OAuthService")
+            }
+        val forbiddenApiImport =
+            if (ownedFile.modulePath == ":data:provider:api") {
+                firstMatchingImport(ownedFile.file, forbiddenApiImports)
+            } else {
+                null
+            }
+
+        when {
+            misplacedCanonical != null ->
+                "canonical provider declaration '$misplacedCanonical' must be owned by :data:provider:api"
+
+            misplacedRemoteDeclaration != null && !isProviderImplementation(ownedFile.modulePath) ->
+                "provider DTO/service declaration '$misplacedRemoteDeclaration' must live in one concrete provider module"
+
+            misplacedRemoteDeclaration != null &&
+                misplacedRemoteDeclaration in duplicatedProviderSpecificDeclarations ->
+                "provider DTO/service declaration '$misplacedRemoteDeclaration' must live in exactly one concrete provider module"
+
+            forbiddenApiImport != null ->
+                ":data:provider:api cannot import '$forbiddenApiImport'"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceProviderContractsDoNotEscape(files: List<OwnedKotlinFile>) {
+    val providerPrefixes = listOf("io.morgan.mio.data.provider")
+    val escapedTypeNames = taskFiveCanonicalProviderDeclarations
+
+    assertNoViolations("Provider contract escape", files) { ownedFile ->
+        val providerImport =
+            if (isFeatureOrDomainModule(ownedFile.modulePath)) {
+                firstMatchingImport(ownedFile.file, providerPrefixes)
+            } else {
+                null
+            }
+        val publicEscape =
+            if (
+                ownedFile.modulePath != ":data:provider:api" &&
+                !isProviderImplementation(ownedFile.modulePath) &&
+                ownedFile.modulePath != ":core:testing"
+            ) {
+                firstPublicProviderType(ownedFile, escapedTypeNames)
+            } else {
+                null
+            }
+
+        when {
+            providerImport != null ->
+                "domain and feature code cannot import provider code '$providerImport'"
+
+            publicEscape != null ->
+                "public API cannot expose provider type '$publicEscape'"
+
+            else -> null
+        }
+    }
+}
+
 internal fun enforceLoggingBoundary(files: List<OwnedKotlinFile>) {
     assertNoViolations("Logging boundary", files) { ownedFile ->
         val imports = ownedFile.file.imports.map { it.name }
@@ -308,6 +505,9 @@ internal fun enforceDomainModelOwnership(files: List<OwnedKotlinFile>) {
             "remoteid",
             "anilistid",
             "myanimelistid",
+            "provideraccountid",
+            "providermediaid",
+            "providercollectionentryid",
         )
 
     assertNoViolations("Domain model ownership", files) { ownedFile ->
@@ -599,6 +799,26 @@ private fun firstMatchingImport(
     file.imports
         .map { it.name }
         .firstOrNull { importName -> matchesAnyPrefix(importName, prefixes) }
+
+private fun firstPublicProviderType(
+    ownedFile: OwnedKotlinFile,
+    typeNames: Set<String>,
+): String? {
+    val declarations =
+        buildList {
+            addAll(ownedFile.file.functions(true).map { declaration -> declaration.text })
+            addAll(ownedFile.file.properties(true).map { declaration -> declaration.text })
+        }
+
+    return typeNames.firstOrNull { typeName ->
+        declarations.any { declaration ->
+            val trimmed = declaration.trimStart()
+            !trimmed.startsWith("private ") &&
+                !trimmed.startsWith("internal ") &&
+                Regex("\\b$typeName\\b").containsMatchIn(declaration.substringBefore('=').substringBefore('{'))
+        }
+    }
+}
 
 private fun matchesAnyPrefix(
     value: String,

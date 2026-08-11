@@ -42,6 +42,10 @@ class ArchitectureRuleFixturesTest {
                         "ValidRoomLocalDataSource.kt" to ":data:media",
                         "ValidDataStoreLocalDataSource.kt" to ":data:preferences",
                         "ValidRepositoryImplementation.kt" to ":data:media",
+                        "ValidNetworkFactory.kt" to ":core:network",
+                        "ValidProviderContract.kt" to ":data:provider:api",
+                        "ValidProviderContractFake.kt" to ":core:testing",
+                        "ValidCapabilityProviderConsumer.kt" to ":data:account",
                     ),
             )
 
@@ -50,6 +54,9 @@ class ArchitectureRuleFixturesTest {
         enforcePresentationIsolation(files)
         enforceFeatureApiIsolation(files)
         enforceProviderIsolation(files)
+        enforceNetworkBoundary(files)
+        enforceProviderContractOwnership(files)
+        enforceProviderContractsDoNotEscape(files)
         enforceLoggingBoundary(files)
         enforceSharedUiIsolation(files)
         enforceGloballyForbiddenImports(files)
@@ -153,6 +160,86 @@ class ArchitectureRuleFixturesTest {
             "ProviderImportsRepositoryImpl.kt",
             ":data:provider:anilist",
             ::enforceProviderIsolation,
+        )
+    }
+
+    @Test
+    fun retrofitOutsideNetworkBoundaryIsRejected() {
+        assertFixtureRejected(
+            "network-boundary",
+            "FeatureImportsRetrofit.kt",
+            ":feature:today:impl",
+            ::enforceNetworkBoundary,
+        )
+    }
+
+    @Test
+    fun okhttpOutsideNetworkBoundaryIsRejected() {
+        assertFixtureRejected(
+            "network-boundary",
+            "CapabilityImportsOkHttp.kt",
+            ":data:media",
+            ::enforceNetworkBoundary,
+        )
+    }
+
+    @Test
+    fun serializationInProviderApiIsRejected() {
+        assertFixtureRejected(
+            "network-boundary",
+            "ProviderApiImportsSerialization.kt",
+            ":data:provider:api",
+            ::enforceNetworkBoundary,
+        )
+    }
+
+    @Test
+    fun networkFactoryOutsideBoundaryIsRejected() {
+        assertFixtureRejected(
+            "network-boundary",
+            "FeatureImportsNetworkFactory.kt",
+            ":feature:today:impl",
+            ::enforceNetworkBoundary,
+        )
+    }
+
+    @Test
+    fun misplacedProviderIdIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "DomainOwnsProviderMediaId.kt",
+            ":domain:media",
+            ::enforceProviderContractOwnership,
+        )
+    }
+
+    @Test
+    fun providerDtoInCanonicalApiIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "ProviderApiOwnsDto.kt",
+            ":data:provider:api",
+            ::enforceProviderContractOwnership,
+        )
+    }
+
+    @Test
+    fun providerResultEscapeIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-escape",
+            "FeatureImportsProviderResult.kt",
+            ":feature:today:impl",
+            ::enforceProviderContractsDoNotEscape,
+        )
+    }
+
+    @Test
+    fun providerCredentialsEscapeIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-escape",
+            "RepositoryReturnsProviderCredentials.kt",
+            ":data:account",
+            ::enforceProviderContractsDoNotEscape,
         )
     }
 
@@ -438,6 +525,9 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforcePresentationIsolation -> "Presentation isolation"
             rule == ::enforceFeatureApiIsolation -> "Feature API isolation"
             rule == ::enforceProviderIsolation -> "Provider isolation"
+            rule == ::enforceNetworkBoundary -> "Network boundary"
+            rule == ::enforceProviderContractOwnership -> "Provider contract ownership"
+            rule == ::enforceProviderContractsDoNotEscape -> "Provider contract escape"
             rule == ::enforceLoggingBoundary -> "Logging boundary"
             rule == ::enforceSharedUiIsolation -> "Shared UI isolation"
             rule == ::enforceGloballyForbiddenImports -> "Globally forbidden imports"

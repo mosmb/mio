@@ -43,6 +43,21 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun networkBoundary() {
+        enforceNetworkBoundary(productionFiles())
+    }
+
+    @Test
+    fun providerContractOwnership() {
+        enforceProviderContractOwnership(productionFiles())
+    }
+
+    @Test
+    fun providerContractsDoNotEscape() {
+        enforceProviderContractsDoNotEscape(productionFiles())
+    }
+
+    @Test
     fun loggingBoundary() {
         enforceLoggingBoundary(productionFiles())
     }
@@ -137,6 +152,25 @@ class ProductionArchitectureKonsistTest {
         assertTrue(
             scannedModules.containsAll(expectedModules),
             "production scan omitted task-three modules: ${expectedModules - scannedModules}",
+        )
+    }
+
+    @Test
+    fun taskFiveProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val source = files.map { ownedFile -> ownedFile.file.text }
+        assertTrue(source.any { text -> text.contains("NetworkClientFactory") })
+        assertTrue(source.any { text -> text.contains("AndroidNetworkMonitor") })
+        assertTrue(source.any { text -> text.contains("ProviderAuthenticator") })
+        assertTrue(source.any { text -> text.contains("ProviderInitialImportDataSource") })
+        assertTrue(source.any { text -> text.contains("CompleteProviderImport") })
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:testing" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name.startsWith("FakeProvider")
+                    }
+            },
         )
     }
 

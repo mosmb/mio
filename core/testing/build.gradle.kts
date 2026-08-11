@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":domain:media"))
     implementation(project(":domain:collection"))
     implementation(project(":domain:preferences"))
+    implementation(project(":data:provider:api"))
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
