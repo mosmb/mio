@@ -11,7 +11,7 @@ class DependencyRulesTest {
     fun matrixContainsAllCurrentLeafModulesAndRejectsUnknownPaths() {
         assertEquals(43, DependencyRules.productionProjectDependencies.size)
         assertEquals(
-            18,
+            13,
             DependencyRules.productionProjectDependencies.values.count { it.isEmpty() },
         )
         assertFalse(DependencyRules.productionProjectDependencies.containsKey(":new:module"))
@@ -47,6 +47,37 @@ class DependencyRulesTest {
         assertTrue(violations(":data:progress", "implementation", ":data:provider:api").isEmpty())
         assertTrue(violations(":data:progress", "implementation", ":data:provider:anilist").isNotEmpty())
         assertTrue(violations(":domain:model", "implementation", ":core:common").isNotEmpty())
+    }
+
+    @Test
+    fun opensOnlyTheTaskThreeDomainEdges() {
+        listOf(":domain:account", ":domain:media", ":domain:collection", ":domain:preferences").forEach {
+            assertTrue(violations(it, "implementation", ":domain:model").isEmpty())
+        }
+        assertTrue(violations(":domain:collection", "implementation", ":domain:media").isNotEmpty())
+
+        listOf(
+            ":domain:model",
+            ":domain:account",
+            ":domain:media",
+            ":domain:collection",
+            ":domain:preferences",
+        ).forEach {
+            assertTrue(violations(":core:testing", "implementation", it).isEmpty())
+        }
+        listOf(":data:account", ":feature:today:impl", ":core:common", ":data:provider:api").forEach {
+            assertTrue(violations(":core:testing", "implementation", it).isNotEmpty())
+        }
+
+        listOf(
+            ":domain:account",
+            ":domain:media",
+            ":domain:collection",
+            ":domain:preferences",
+            ":core:testing",
+        ).forEach {
+            assertTrue(violations(":domain:model", "implementation", it).isNotEmpty())
+        }
     }
 
     @Test

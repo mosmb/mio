@@ -1,6 +1,7 @@
 package io.morgan.mio.architecture
 
 import com.lemonappdev.konsist.api.Konsist
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
@@ -56,11 +57,45 @@ class ProductionArchitectureKonsistTest {
         enforceGloballyForbiddenImports(productionFiles())
     }
 
+    @Test
+    fun domainModelOwnership() {
+        enforceDomainModelOwnership(productionFiles())
+    }
+
+    @Test
+    fun domainImmutability() {
+        enforceDomainImmutability(productionFiles())
+    }
+
+    @Test
+    fun repositoryBoundaries() {
+        enforceRepositoryBoundaries(productionFiles())
+    }
+
+    @Test
+    fun taskThreeProductionModulesAreActuallyScanned() {
+        val scannedModules = productionFiles().mapTo(mutableSetOf(), OwnedKotlinFile::modulePath)
+        val expectedModules =
+            setOf(
+                ":domain:model",
+                ":domain:account",
+                ":domain:media",
+                ":domain:collection",
+                ":domain:preferences",
+                ":core:testing",
+            )
+
+        assertTrue(
+            scannedModules.containsAll(expectedModules),
+            "production scan omitted task-three modules: ${expectedModules - scannedModules}",
+        )
+    }
+
     private fun productionFiles(): List<OwnedKotlinFile> =
         MioProductionModules.paths.flatMap { modulePath ->
             val sourceDirectory =
                 repositoryRoot
-                    .resolve(modulePath.removePrefix(":"))
+                    .resolve(modulePath.removePrefix(":").replace(':', '/'))
                     .resolve("src/main/kotlin")
                     .normalize()
 

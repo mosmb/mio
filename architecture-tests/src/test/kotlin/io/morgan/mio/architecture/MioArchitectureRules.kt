@@ -1,6 +1,7 @@
 package io.morgan.mio.architecture
 
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
+import com.lemonappdev.konsist.api.provider.KoNameProvider
 
 data class OwnedKotlinFile(
     val modulePath: String,
@@ -283,6 +284,162 @@ internal fun enforceGloballyForbiddenImports(files: List<OwnedKotlinFile>) {
                 }
 
         forbiddenImport?.let { importName -> "forbidden import '$importName'" }
+    }
+}
+
+internal fun enforceDomainModelOwnership(files: List<OwnedKotlinFile>) {
+    val domainModelDeclarations =
+        setOf(
+            "AccountId",
+            "MediaId",
+            "CollectionEntryId",
+            "OperationId",
+            "MediaType",
+            "ProgressUnit",
+            "ProgressValue",
+            "UnitTotal",
+            "UnitNumber",
+            "MediaTitle",
+            "ImageReference",
+        )
+    val rawIdentifierNames =
+        setOf(
+            "providerid",
+            "remoteid",
+            "anilistid",
+            "myanimelistid",
+        )
+
+    assertNoViolations("Domain model ownership", files) { ownedFile ->
+        val declarationNames =
+            buildList {
+                addAll(
+                    ownedFile.file.declarations(true, true).mapNotNull { declaration ->
+                        (declaration as? KoNameProvider)?.name
+                    },
+                )
+                addAll(ownedFile.file.properties(true).map { property -> property.name })
+            }.distinct()
+        val misplacedDeclaration =
+            declarationNames.firstOrNull { name ->
+                name in domainModelDeclarations && ownedFile.modulePath != ":domain:model"
+            }
+        val rawIdentifier =
+            if (ownedFile.modulePath.startsWith(":domain:")) {
+                declarationNames.firstOrNull { name -> name.lowercase() in rawIdentifierNames }
+            } else {
+                null
+            }
+
+        when {
+            misplacedDeclaration != null ->
+                "domain model declaration '$misplacedDeclaration' must be owned by :domain:model"
+
+            rawIdentifier != null -> "domain code cannot declare raw identifier '$rawIdentifier'"
+            else -> null
+        }
+    }
+}
+
+internal fun enforceDomainImmutability(files: List<OwnedKotlinFile>) {
+    val forbiddenTypeFragments =
+        listOf(
+            "MutableList",
+            "MutableSet",
+            "MutableMap",
+            "ArrayList",
+            "HashSet",
+            "HashMap",
+            "Array<",
+            "BooleanArray",
+            "ByteArray",
+            "CharArray",
+            "DoubleArray",
+            "FloatArray",
+            "IntArray",
+            "LongArray",
+            "ShortArray",
+            "UByteArray",
+            "UIntArray",
+            "ULongArray",
+            "UShortArray",
+        )
+
+    assertNoViolations("Domain immutability", files.filter { it.modulePath.startsWith(":domain:") }) { ownedFile ->
+        val properties = ownedFile.file.properties(true)
+        val mutableProperty = properties.firstOrNull { property -> property.isVar }
+        val mutableTypeProperty =
+            properties.firstOrNull { property ->
+                forbiddenTypeFragments.any { fragment -> property.text.contains(fragment) }
+            }
+
+        when {
+            mutableProperty != null ->
+                "property '${mutableProperty.name}' is mutable"
+
+            mutableTypeProperty != null ->
+                "property '${mutableTypeProperty.name}' uses a mutable or array type"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceRepositoryBoundaries(files: List<OwnedKotlinFile>) {
+    val forbiddenRepositoryTextFragments =
+        listOf(
+            "android",
+            "androidx",
+            "room",
+            "datastore",
+            "retrofit",
+            "dto",
+            "entity",
+            "dao",
+            "io.morgan.mio.data.provider.",
+        )
+    val genericWrapperPattern = Regex("\\b(?:Resource|Outcome|Either|Result)\\s*<")
+    val extendedRepositoryPattern = Regex("(?s)\\binterface\\s+\\w+Repository\\b[^{}]*:")
+
+    assertNoViolations("Repository boundaries", files) { ownedFile ->
+        val repositoryInterfaces =
+            ownedFile.file
+                .interfaces(true)
+                .filter { declaration -> declaration.name.endsWith("Repository") }
+        val repositoryClasses =
+            ownedFile.file
+                .classes(true, true)
+                .filter { declaration -> declaration.name.endsWith("Repository") }
+        val repositorySource = ownedFile.file.text
+        val forbiddenFragment =
+            forbiddenRepositoryTextFragments.firstOrNull { fragment ->
+                repositorySource.contains(fragment, ignoreCase = true)
+            }
+        val wrappedResult = genericWrapperPattern.find(repositorySource)?.value
+        val misplacedRepositoryClass =
+            repositoryClasses.firstOrNull { declaration ->
+                !ownedFile.modulePath.startsWith(":data:") &&
+                    !(ownedFile.modulePath == ":core:testing" && declaration.name.startsWith("Fake"))
+            }
+
+        when {
+            repositoryInterfaces.isNotEmpty() && !ownedFile.modulePath.startsWith(":domain:") ->
+                "repository interface '${repositoryInterfaces.first().name}' must live in a :domain:* module"
+
+            misplacedRepositoryClass != null ->
+                "repository class '${misplacedRepositoryClass.name}' must live in a :data:* module"
+
+            repositoryInterfaces.any { declaration -> extendedRepositoryPattern.containsMatchIn(declaration.text) } ->
+                "repository interfaces must not extend a base repository or marker interface"
+
+            repositoryInterfaces.isNotEmpty() && forbiddenFragment != null ->
+                "repository interface source cannot mention '$forbiddenFragment'"
+
+            repositoryInterfaces.isNotEmpty() && wrappedResult != null ->
+                "repository interfaces cannot return generic wrapper '$wrappedResult'"
+
+            else -> null
+        }
     }
 }
 

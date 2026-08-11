@@ -29,6 +29,9 @@ class ArchitectureRuleFixturesTest {
                 ownerByFilename =
                     mapOf(
                         "ValidDomain.kt" to ":domain:model",
+                        "ValidDomainModel.kt" to ":domain:model",
+                        "ValidRepositoryContract.kt" to ":domain:account",
+                        "ValidFakeRepository.kt" to ":core:testing",
                         "ValidFeatureImpl.kt" to ":feature:today:impl",
                         "ValidCapabilityData.kt" to ":data:progress",
                         "ValidProvider.kt" to ":data:provider:anilist",
@@ -45,6 +48,9 @@ class ArchitectureRuleFixturesTest {
         enforceLoggingBoundary(files)
         enforceSharedUiIsolation(files)
         enforceGloballyForbiddenImports(files)
+        enforceDomainModelOwnership(files)
+        enforceDomainImmutability(files)
+        enforceRepositoryBoundaries(files)
     }
 
     @Test
@@ -202,13 +208,103 @@ class ArchitectureRuleFixturesTest {
         )
     }
 
+    @Test
+    fun misplacedDomainModelDeclarationIsRejected() {
+        assertFixtureRejected(
+            "domain-model-ownership",
+            "MisplacedMediaId.kt",
+            ":domain:media",
+            ::enforceDomainModelOwnership,
+        )
+    }
+
+    @Test
+    fun featureOwnedDomainModelDeclarationIsRejected() {
+        assertFixtureRejected(
+            "domain-model-ownership",
+            "FeatureMediaId.kt",
+            ":feature:media:api",
+            ::enforceDomainModelOwnership,
+        )
+    }
+
+    @Test
+    fun rawProviderIdentifierIsRejected() {
+        assertFixtureRejected(
+            "domain-model-ownership",
+            "RawProviderId.kt",
+            ":domain:media",
+            ::enforceDomainModelOwnership,
+        )
+    }
+
+    @Test
+    fun mutableDomainPropertyIsRejected() {
+        assertFixtureRejected(
+            "domain-immutability",
+            "MutableDomainModel.kt",
+            ":domain:media",
+            ::enforceDomainImmutability,
+        )
+    }
+
+    @Test
+    fun mutableDomainCollectionIsRejected() {
+        assertFixtureRejected(
+            "domain-immutability",
+            "MutableDomainCollection.kt",
+            ":domain:collection",
+            ::enforceDomainImmutability,
+        )
+    }
+
+    @Test
+    fun dataRepositoryInterfaceIsRejected() {
+        assertFixtureRejected(
+            "repository-boundary",
+            "DataRepositoryInterface.kt",
+            ":data:account",
+            ::enforceRepositoryBoundaries,
+        )
+    }
+
+    @Test
+    fun domainRepositoryClassIsRejected() {
+        assertFixtureRejected(
+            "repository-boundary",
+            "DomainRepositoryClass.kt",
+            ":domain:account",
+            ::enforceRepositoryBoundaries,
+        )
+    }
+
+    @Test
+    fun fakeRepositoryOutsideCoreTestingIsRejected() {
+        assertFixtureRejected(
+            "repository-boundary",
+            "FeatureFakeRepository.kt",
+            ":feature:today:impl",
+            ::enforceRepositoryBoundaries,
+        )
+    }
+
+    @Test
+    fun wrappedRepositoryResultIsRejected() {
+        assertFixtureRejected(
+            "repository-boundary",
+            "WrappedRepositoryResult.kt",
+            ":domain:account",
+            ::enforceRepositoryBoundaries,
+        )
+    }
+
     private fun assertFixtureRejected(
         directoryName: String,
         filename: String,
         ownerModule: String,
         rule: (List<OwnedKotlinFile>) -> Unit,
     ) {
-        val files = loadFixtureDirectory(directoryName, ownerModule)
+        val files = loadFixtureDirectory(directoryName, ownerModule, filename = filename)
         val failure = assertThrows<AssertionError> { rule(files) }
         val message = failure.message.orEmpty()
 
@@ -219,6 +315,7 @@ class ArchitectureRuleFixturesTest {
     private fun loadFixtureDirectory(
         directoryName: String,
         ownerModule: String,
+        filename: String? = null,
         ownerByFilename: Map<String, String> = emptyMap(),
     ): List<OwnedKotlinFile> {
         val fixtureDirectory =
@@ -235,7 +332,8 @@ class ArchitectureRuleFixturesTest {
                 .files
                 .filter { file ->
                     val normalizedPath = file.path.replace('\\', '/')
-                    normalizedPath.startsWith("${fixtureDirectory.toString().replace('\\', '/')}/")
+                    normalizedPath.startsWith("${fixtureDirectory.toString().replace('\\', '/')}/") &&
+                        (filename == null || normalizedPath.substringAfterLast('/') == filename)
                 }.map { file ->
                     val filename = file.path.replace('\\', '/').substringAfterLast('/')
                     OwnedKotlinFile(ownerByFilename[filename] ?: ownerModule, file)
@@ -255,6 +353,9 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforceLoggingBoundary -> "Logging boundary"
             rule == ::enforceSharedUiIsolation -> "Shared UI isolation"
             rule == ::enforceGloballyForbiddenImports -> "Globally forbidden imports"
+            rule == ::enforceDomainModelOwnership -> "Domain model ownership"
+            rule == ::enforceDomainImmutability -> "Domain immutability"
+            rule == ::enforceRepositoryBoundaries -> "Repository boundaries"
             else -> fail("unknown architecture rule")
         }
 }
