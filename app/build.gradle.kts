@@ -1,8 +1,21 @@
 plugins {
     id("mio.android.application.compose")
+    alias(libs.plugins.metro)
 }
 
 dependencies {
+    implementation(project(":core:common"))
+    implementation(project(":core:database"))
+    implementation(project(":core:datastore"))
+    implementation(project(":core:network"))
+    implementation(project(":data:provider:api"))
+    implementation(project(":domain:model"))
+    implementation(project(":domain:account"))
+    implementation(project(":domain:media"))
+    implementation(project(":domain:collection"))
+    implementation(project(":domain:preferences"))
+    implementation(libs.kotlinx.coroutines.core)
+
     implementation(project(":feature:onboarding:impl"))
     implementation(project(":feature:today:impl"))
     implementation(project(":feature:library:impl"))
@@ -21,4 +34,12 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":sync:work"))
+
+    testImplementation(project(":core:testing"))
+    testImplementation(libs.room.testing)
+    testImplementation(libs.datastore.preferences)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

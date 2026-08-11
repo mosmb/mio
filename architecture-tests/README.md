@@ -28,3 +28,5 @@ The README is a handoff contract, not a waiver. Later tasks must update the rule
 Task 04's persistence ownership, persistence escape, and one-mechanism data-source rules are implemented. Task 11 and task 20 must evolve these rules when migrations, outbox, and reconciliation types appear.
 
 Task 05's network and canonical provider-contract ownership rules are implemented. Tasks 13 and 14 must extend the DTO/service ownership fixtures when those first concrete provider types appear.
+
+Task 06's Metro graph ownership, constructor-injection, graph-creation, and no-static-holder rules are implemented. Task 10 must evolve the clock, dispatcher, and credential boundaries, and task 12 must evolve the ViewModel injection boundary.

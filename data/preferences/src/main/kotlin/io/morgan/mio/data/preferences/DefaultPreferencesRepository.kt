@@ -1,5 +1,9 @@
 package io.morgan.mio.data.preferences
 
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.data.preferences.local.DataStorePreferencesLocalDataSource
 import io.morgan.mio.data.preferences.mapper.toDomain
 import io.morgan.mio.data.preferences.mapper.toStoredValue
@@ -13,6 +17,9 @@ import io.morgan.mio.domain.preferences.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+@ContributesBinding(AppScope::class)
+@SingleIn(AppScope::class)
+@Inject
 public class DefaultPreferencesRepository(
     private val localDataSource: DataStorePreferencesLocalDataSource,
 ) : PreferencesRepository {

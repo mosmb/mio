@@ -103,6 +103,11 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun metroBoundaries() {
+        enforceMetroBoundaries(productionFiles())
+    }
+
+    @Test
     fun taskFourProductionPersistenceTypesAreActuallyScanned() {
         val files = productionFiles()
         val source = files.map { ownedFile -> ownedFile.file.text }
@@ -170,6 +175,47 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.classes(true, true).any { declaration ->
                         declaration.name.startsWith("FakeProvider")
                     }
+            },
+        )
+    }
+
+    @Test
+    fun taskSixProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val source = files.map { ownedFile -> ownedFile.file.text }
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.interfaces(true).any { declaration -> declaration.name == "AppGraph" }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.interfaces(true).any { declaration -> declaration.name == "AccountGraph" }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath.startsWith(":data:") &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name.endsWith("Repository") &&
+                            declaration.hasAnnotationWithName("ContributesBinding")
+                    }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file.classes(true, true).any { declaration ->
+                    declaration.hasAnnotationWithName("Inject") && declaration.hasPrimaryConstructor
+                }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.text.contains("class MioApplication") &&
+                    ownedFile.file.text.contains("createGraphFactory<AppGraph.Factory>()")
             },
         )
     }

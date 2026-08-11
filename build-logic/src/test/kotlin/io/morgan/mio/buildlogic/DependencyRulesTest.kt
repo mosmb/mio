@@ -11,7 +11,7 @@ class DependencyRulesTest {
     fun matrixContainsAllCurrentLeafModulesAndRejectsUnknownPaths() {
         assertEquals(43, DependencyRules.productionProjectDependencies.size)
         assertEquals(
-            13,
+            10,
             DependencyRules.productionProjectDependencies.values.count { it.isEmpty() },
         )
         assertFalse(DependencyRules.productionProjectDependencies.containsKey(":new:module"))
@@ -117,6 +117,55 @@ class DependencyRulesTest {
         assertTrue(
             violations(":data:provider:myanimelist", "implementation", ":data:provider:anilist").isNotEmpty(),
         )
+    }
+
+    @Test
+    fun opensOnlyTheTaskSixCompositionEdges() {
+        val taskSixEdges =
+            mapOf(
+                ":app" to
+                    listOf(
+                        ":core:common",
+                        ":core:database",
+                        ":core:datastore",
+                        ":core:network",
+                        ":data:provider:api",
+                        ":domain:model",
+                        ":domain:account",
+                        ":domain:media",
+                        ":domain:collection",
+                        ":domain:preferences",
+                    ),
+                ":core:database" to listOf(":core:common"),
+                ":core:datastore" to listOf(":core:common"),
+                ":core:network" to listOf(":core:common"),
+                ":data:account" to listOf(":core:common"),
+                ":data:media" to listOf(":core:common"),
+                ":data:collection" to listOf(":core:common"),
+                ":data:preferences" to listOf(":core:common"),
+            )
+
+        taskSixEdges.forEach { (owner, dependencies) ->
+            dependencies.forEach { dependency ->
+                assertTrue(
+                    violations(owner, "implementation", dependency).isEmpty(),
+                    "Expected $owner -> $dependency to be allowed",
+                )
+            }
+        }
+
+        listOf(
+            ":domain:model" to ":core:common",
+            ":feature:today:impl" to ":app",
+            ":data:provider:anilist" to ":data:account",
+            ":core:database" to ":app",
+            ":data:account" to ":data:media",
+        ).forEach { (owner, dependency) ->
+            assertTrue(
+                violations(owner, "implementation", dependency).isNotEmpty(),
+                "Expected $owner -> $dependency to remain forbidden",
+            )
+        }
     }
 
     @Test

@@ -3,6 +3,7 @@ package io.morgan.mio.data.preferences.local
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import dev.zacsweers.metro.Inject
 import io.morgan.mio.core.datastore.AccountPreferencesRecord
 import io.morgan.mio.core.datastore.DevicePreferencesRecord
 import io.morgan.mio.core.datastore.PreferencesKeys
@@ -10,6 +11,7 @@ import io.morgan.mio.domain.model.AccountId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+@Inject
 public class DataStorePreferencesLocalDataSource(
     private val dataStore: DataStore<Preferences>,
 ) {

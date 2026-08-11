@@ -1,10 +1,13 @@
 plugins {
     id("mio.android.library")
+    alias(libs.plugins.metro)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
 
 dependencies {
+    implementation(project(":core:common"))
+
     api(libs.room.runtime)
     ksp(libs.room.compiler)
 

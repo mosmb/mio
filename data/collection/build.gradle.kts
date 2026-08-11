@@ -1,11 +1,13 @@
 plugins {
     id("mio.android.library")
+    alias(libs.plugins.metro)
 }
 
 dependencies {
     implementation(project(":domain:collection"))
     implementation(project(":domain:model"))
     implementation(project(":core:database"))
+    implementation(project(":core:common"))
     implementation(project(":data:provider:api"))
     implementation(project(":data:sync"))
     implementation(libs.kotlinx.coroutines.core)

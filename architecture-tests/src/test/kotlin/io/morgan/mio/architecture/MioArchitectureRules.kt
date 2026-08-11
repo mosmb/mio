@@ -1,6 +1,7 @@
 package io.morgan.mio.architecture
 
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
+import com.lemonappdev.konsist.api.declaration.KoObjectDeclaration
 import com.lemonappdev.konsist.api.provider.KoNameProvider
 
 data class OwnedKotlinFile(
@@ -234,6 +235,9 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
         val imports = ownedFile.file.imports.map { import -> import.name }
         val isNetworkOwner = ownedFile.modulePath == ":core:network"
         val isConcreteProvider = isProviderImplementation(ownedFile.modulePath)
+        val isAppCompositionFile =
+            ownedFile.modulePath == ":app" &&
+                ownedFile.file.packagee?.name == "io.morgan.mio.di"
         val forbiddenNetworkLibraryImport =
             imports.firstOrNull { importName ->
                 matchesAnyPrefix(importName, retrofitOrOkHttpPrefixes) && !isNetworkOwner && !isConcreteProvider
@@ -248,7 +252,17 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
             }
         val escapedNetworkSurface =
             if (!isNetworkOwner && !isConcreteProvider) {
-                imports.firstOrNull { importName -> networkSurfaceNames.any { name -> importName.endsWith(".$name") } }
+                imports.firstOrNull { importName ->
+                    networkSurfaceNames.any { name -> importName.endsWith(".$name") } &&
+                        (
+                            !isAppCompositionFile ||
+                                importName !in
+                                setOf(
+                                    "io.morgan.mio.core.network.NetworkClientFactory",
+                                    "io.morgan.mio.core.network.NetworkMonitor",
+                                )
+                        )
+                }
             } else {
                 null
             }
@@ -265,6 +279,190 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
 
             escapedNetworkSurface != null ->
                 "shared network type escaped its boundary through '$escapedNetworkSurface'"
+
+            else -> null
+        }
+    }
+}
+
+private val taskSixScopeAndQualifierNames =
+    setOf(
+        "AppScope",
+        "AccountScope",
+        "ApplicationContext",
+        "DefaultDispatcher",
+        "IoDispatcher",
+        "MainDispatcher",
+    )
+
+private val taskSixGraphIntrinsicNames =
+    setOf(
+        "createGraph",
+        "createGraphFactory",
+        "createDynamicGraph",
+        "createDynamicGraphFactory",
+        "asContribution",
+    )
+
+private val taskSixGraphTypePattern = Regex("\\b(?:AppGraph|AccountGraph)\\b")
+
+internal fun enforceMetroBoundaries(files: List<OwnedKotlinFile>) {
+    assertNoViolations("Metro boundaries", files) { ownedFile ->
+        val declarations = ownedFile.file.declarations(true, true)
+        val declarationNames = declarations.mapNotNull { declaration -> (declaration as? KoNameProvider)?.name }
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val source = ownedFile.file.text
+        val isApp = ownedFile.modulePath == ":app"
+        val isFeatureApiModule = isFeatureApi(ownedFile.modulePath)
+        val isFeatureImplementationModule = isFeatureImplementation(ownedFile.modulePath)
+        val hasGraphDeclaration =
+            ownedFile.file.classes(true, true).any { declaration ->
+                declaration.hasAnnotationWithName("DependencyGraph") ||
+                    declaration.hasAnnotationWithName("GraphExtension")
+            } ||
+                ownedFile.file.interfaces(true).any { declaration ->
+                    declaration.hasAnnotationWithName("DependencyGraph") ||
+                        declaration.hasAnnotationWithName("GraphExtension")
+                }
+        val graphDeclarationName =
+            ownedFile.file
+                .classes(true, true)
+                .firstOrNull { declaration ->
+                    declaration.hasAnnotationWithName("DependencyGraph") ||
+                        declaration.hasAnnotationWithName("GraphExtension")
+                }?.name
+                ?: ownedFile.file
+                    .interfaces(true)
+                    .firstOrNull { declaration ->
+                        declaration.hasAnnotationWithName("DependencyGraph") ||
+                            declaration.hasAnnotationWithName("GraphExtension")
+                    }?.name
+        val misplacedGraphName =
+            if (hasGraphDeclaration && !isApp) {
+                graphDeclarationName ?: "graph declaration"
+            } else {
+                null
+            }
+        val misplacedNamedGraph =
+            declarationNames
+                .firstOrNull { name ->
+                    name == "AppGraph" || name == "AccountGraph"
+                }?.takeUnless { isApp }
+        val misplacedScopeOrQualifier =
+            declarationNames.firstOrNull { name ->
+                name in taskSixScopeAndQualifierNames && ownedFile.modulePath != ":core:common"
+            }
+        val forbiddenDomainOrApiImport =
+            if (isFeatureApiModule || ownedFile.modulePath.startsWith(":domain:")) {
+                firstMatchingImport(ownedFile.file, listOf("dev.zacsweers.metro", "io.morgan.mio.di"))
+            } else {
+                null
+            }
+        val intrinsicImport =
+            imports.firstOrNull { importName ->
+                taskSixGraphIntrinsicNames.any { intrinsicName ->
+                    importName == "dev.zacsweers.metro.$intrinsicName"
+                }
+            }
+        val intrinsicCall =
+            Regex(
+                "\\b(?:createGraph|createGraphFactory|createDynamicGraph|createDynamicGraphFactory|asContribution)\\s*(?:<|\\()",
+            ).find(source)?.value
+        val dynamicGraphUse =
+            imports.firstOrNull { importName ->
+                importName == "dev.zacsweers.metro.createDynamicGraph" ||
+                    importName == "dev.zacsweers.metro.createDynamicGraphFactory"
+            } ?: Regex("\\bcreateDynamicGraph(?:Factory)?\\s*(?:<|\\()")
+                .find(source)
+                ?.value
+        val forbiddenIntrinsicOutsideApp =
+            if (!isApp && (intrinsicImport != null || intrinsicCall != null)) {
+                intrinsicImport ?: intrinsicCall
+            } else {
+                null
+            }
+        val forbiddenFeatureGraphUse =
+            if (isFeatureImplementationModule &&
+                (hasGraphDeclaration || intrinsicImport != null || intrinsicCall != null)
+            ) {
+                graphDeclarationName ?: intrinsicImport ?: intrinsicCall ?: "graph use"
+            } else {
+                null
+            }
+        val forbiddenName =
+            (declarationNames + ownedFile.file.properties(true).map { property -> property.name })
+                .firstOrNull { name ->
+                    name.endsWith("ServiceLocator") ||
+                        name.endsWith("GraphHolder") ||
+                        name.endsWith("Injector")
+                }
+        val staticGraphObject =
+            ownedFile.file.objects(true).firstOrNull { declaration ->
+                taskSixGraphTypePattern.containsMatchIn(declaration.text)
+            }
+        val topLevelGraphProperty =
+            ownedFile.file.properties(true).firstOrNull { property ->
+                property.isTopLevel && taskSixGraphTypePattern.containsMatchIn(property.text)
+            }
+        val companionGraphProperty =
+            ownedFile.file.properties(true).firstOrNull { property ->
+                !property.isTopLevel &&
+                    taskSixGraphTypePattern.containsMatchIn(property.text) &&
+                    (property.containingDeclaration as? KoObjectDeclaration)?.hasCompanionModifier == true
+            }
+        val fieldInjection =
+            ownedFile.file.properties(true).firstOrNull { property ->
+                property.hasAnnotationWithName("Inject")
+            }
+        val forbiddenContribution =
+            if (ownedFile.modulePath.startsWith(":domain:") ||
+                isFeatureApiModule ||
+                ownedFile.modulePath == ":data:provider:api"
+            ) {
+                if (Regex("@ContributesBinding\\b").containsMatchIn(source)) "@ContributesBinding" else null
+            } else {
+                null
+            }
+
+        when {
+            misplacedGraphName != null ->
+                "graph declaration '$misplacedGraphName' must live in :app"
+
+            misplacedNamedGraph != null ->
+                "graph declaration '$misplacedNamedGraph' must live in :app"
+
+            misplacedScopeOrQualifier != null ->
+                "scope or qualifier '$misplacedScopeOrQualifier' must live in :core:common"
+
+            forbiddenDomainOrApiImport != null ->
+                "domain and feature API code cannot import '$forbiddenDomainOrApiImport'"
+
+            forbiddenFeatureGraphUse != null ->
+                "feature implementation cannot declare or create a graph '$forbiddenFeatureGraphUse'"
+
+            forbiddenIntrinsicOutsideApp != null ->
+                "graph intrinsic '$forbiddenIntrinsicOutsideApp' is only allowed in :app production code"
+
+            dynamicGraphUse != null ->
+                "dynamic graph intrinsic '$dynamicGraphUse' is test-only"
+
+            forbiddenName != null ->
+                "production declaration '$forbiddenName' uses a forbidden locator/holder/injector name"
+
+            staticGraphObject != null ->
+                "object '${staticGraphObject.name}' must not hold AppGraph or AccountGraph"
+
+            topLevelGraphProperty != null ->
+                "top-level property '${topLevelGraphProperty.name}' must not hold AppGraph or AccountGraph"
+
+            companionGraphProperty != null ->
+                "companion property '${companionGraphProperty.name}' must not hold AppGraph or AccountGraph"
+
+            fieldInjection != null ->
+                "property '${fieldInjection.name}' uses field injection; use constructor injection"
+
+            forbiddenContribution != null ->
+                "@ContributesBinding is not allowed in '${ownedFile.modulePath}'"
 
             else -> null
         }
@@ -395,7 +593,8 @@ internal fun enforceProviderContractsDoNotEscape(files: List<OwnedKotlinFile>) {
             if (
                 ownedFile.modulePath != ":data:provider:api" &&
                 !isProviderImplementation(ownedFile.modulePath) &&
-                ownedFile.modulePath != ":core:testing"
+                ownedFile.modulePath != ":core:testing" &&
+                !(ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di")
             ) {
                 firstPublicProviderType(ownedFile, escapedTypeNames)
             } else {
@@ -708,7 +907,16 @@ internal fun enforcePersistenceDoesNotEscape(files: List<OwnedKotlinFile>) {
             ownedFile.modulePath != ":core:database" && !ownedFile.modulePath.startsWith(":data:")
         val outsideDataStoreBoundary =
             ownedFile.modulePath != ":core:datastore" && ownedFile.modulePath != ":data:preferences"
-        val roomImport = if (outsideRoomBoundary) firstMatchingImport(ownedFile.file, roomPrefixes) else null
+        val isAppCompositionFile =
+            ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di"
+        val roomImport =
+            if (outsideRoomBoundary &&
+                !isAppCompositionFile
+            ) {
+                firstMatchingImport(ownedFile.file, roomPrefixes)
+            } else {
+                null
+            }
         val dataStoreImport =
             if (outsideDataStoreBoundary) firstMatchingImport(ownedFile.file, dataStorePrefixes) else null
         val isRepository =

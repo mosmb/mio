@@ -42,6 +42,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidRoomLocalDataSource.kt" to ":data:media",
                         "ValidDataStoreLocalDataSource.kt" to ":data:preferences",
                         "ValidRepositoryImplementation.kt" to ":data:media",
+                        "ValidMetroContribution.kt" to ":data:media",
                         "ValidNetworkFactory.kt" to ":core:network",
                         "ValidProviderContract.kt" to ":data:provider:api",
                         "ValidProviderContractFake.kt" to ":core:testing",
@@ -66,6 +67,7 @@ class ArchitectureRuleFixturesTest {
         enforcePersistenceTypeOwnership(files)
         enforcePersistenceDoesNotEscape(files)
         enforceOneMechanismPerDataSource(files)
+        enforceMetroBoundaries(files)
     }
 
     @Test
@@ -473,6 +475,46 @@ class ArchitectureRuleFixturesTest {
         )
     }
 
+    @Test
+    fun graphOutsideAppIsRejected() {
+        assertFixtureRejected(
+            "metro-boundary",
+            "DataOwnsGraph.kt",
+            ":data:media",
+            ::enforceMetroBoundaries,
+        )
+    }
+
+    @Test
+    fun featureGraphCreationIsRejected() {
+        assertFixtureRejected(
+            "metro-boundary",
+            "FeatureCreatesGraph.kt",
+            ":feature:today:impl",
+            ::enforceMetroBoundaries,
+        )
+    }
+
+    @Test
+    fun fieldInjectionIsRejected() {
+        assertFixtureRejected(
+            "metro-boundary",
+            "FieldInjectedRepository.kt",
+            ":data:account",
+            ::enforceMetroBoundaries,
+        )
+    }
+
+    @Test
+    fun staticGraphHolderIsRejected() {
+        assertFixtureRejected(
+            "metro-boundary",
+            "StaticGraphHolder.kt",
+            ":app",
+            ::enforceMetroBoundaries,
+        )
+    }
+
     private fun assertFixtureRejected(
         directoryName: String,
         filename: String,
@@ -537,6 +579,7 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforcePersistenceTypeOwnership -> "Persistence type ownership"
             rule == ::enforcePersistenceDoesNotEscape -> "Persistence escape"
             rule == ::enforceOneMechanismPerDataSource -> "One mechanism per data source"
+            rule == ::enforceMetroBoundaries -> "Metro boundaries"
             else -> fail("unknown architecture rule")
         }
 }

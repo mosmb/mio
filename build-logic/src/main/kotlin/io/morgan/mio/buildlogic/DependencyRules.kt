@@ -22,6 +22,16 @@ public object DependencyRules {
         mapOf(
             ":app" to
                 setOf(
+                    ":core:common",
+                    ":core:database",
+                    ":core:datastore",
+                    ":core:network",
+                    ":data:provider:api",
+                    ":domain:model",
+                    ":domain:account",
+                    ":domain:media",
+                    ":domain:collection",
+                    ":domain:preferences",
                     ":feature:onboarding:impl",
                     ":feature:today:impl",
                     ":feature:library:impl",
@@ -135,6 +145,7 @@ public object DependencyRules {
                     ":domain:account",
                     ":domain:model",
                     ":core:database",
+                    ":core:common",
                     ":data:provider:api",
                 ),
             ":data:media" to
@@ -142,6 +153,7 @@ public object DependencyRules {
                     ":domain:media",
                     ":domain:model",
                     ":core:database",
+                    ":core:common",
                     ":data:provider:api",
                 ),
             ":data:collection" to
@@ -149,6 +161,7 @@ public object DependencyRules {
                     ":domain:collection",
                     ":domain:model",
                     ":core:database",
+                    ":core:common",
                     ":data:provider:api",
                     ":data:sync",
                 ),
@@ -173,6 +186,7 @@ public object DependencyRules {
                     ":domain:preferences",
                     ":domain:model",
                     ":core:datastore",
+                    ":core:common",
                 ),
             ":data:provider:anilist" to
                 setOf(
@@ -202,9 +216,9 @@ public object DependencyRules {
                     ":data:provider:api",
                 ),
             ":architecture-tests" to emptySet(),
-            ":core:database" to emptySet(),
-            ":core:datastore" to emptySet(),
-            ":core:network" to emptySet(),
+            ":core:database" to setOf(":core:common"),
+            ":core:datastore" to setOf(":core:common"),
+            ":core:network" to setOf(":core:common"),
             ":core:logging" to emptySet(),
             ":core:designsystem" to emptySet(),
             ":core:navigation" to emptySet(),

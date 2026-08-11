@@ -1,5 +1,6 @@
 package io.morgan.mio.data.collection.local
 
+import dev.zacsweers.metro.Inject
 import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.data.collection.mapper.CollectionEntryPersistenceSnapshot
 import io.morgan.mio.data.collection.mapper.toEffectiveDomain
@@ -12,6 +13,7 @@ import io.morgan.mio.domain.model.MediaId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+@Inject
 public class RoomCollectionLocalDataSource(
     private val database: MioDatabase,
 ) {

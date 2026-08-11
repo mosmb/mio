@@ -1,5 +1,6 @@
 package io.morgan.mio.data.account.local
 
+import dev.zacsweers.metro.Inject
 import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.data.account.mapper.AccountProviderIdInput
 import io.morgan.mio.data.account.mapper.toDomain
@@ -8,6 +9,7 @@ import io.morgan.mio.domain.account.Account
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+@Inject
 public class RoomAccountLocalDataSource(
     private val database: MioDatabase,
 ) {

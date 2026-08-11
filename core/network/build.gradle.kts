@@ -1,9 +1,12 @@
 plugins {
     id("mio.android.library")
+    alias(libs.plugins.metro)
     alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {
+    implementation(project(":core:common"))
+
     api(libs.retrofit)
     api(libs.okhttp)
     api(libs.kotlinx.serialization.json)

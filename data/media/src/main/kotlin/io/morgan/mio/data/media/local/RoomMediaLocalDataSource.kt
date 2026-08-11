@@ -1,5 +1,6 @@
 package io.morgan.mio.data.media.local
 
+import dev.zacsweers.metro.Inject
 import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.data.media.mapper.MediaPersistenceSnapshot
 import io.morgan.mio.data.media.mapper.toDomain
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.map
 import io.morgan.mio.data.media.mapper.toEntity as providerIdToEntity
 import io.morgan.mio.data.media.mapper.toEntity as releaseToEntity
 
+@Inject
 public class RoomMediaLocalDataSource(
     private val database: MioDatabase,
 ) {
