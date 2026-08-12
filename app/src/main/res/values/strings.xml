@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mio</string>
+    <string name="navigation_today">Today</string>
+    <string name="navigation_library">Library</string>
+    <string name="navigation_discover">Discover</string>
+    <string name="navigation_you">You</string>
 </resources>
-

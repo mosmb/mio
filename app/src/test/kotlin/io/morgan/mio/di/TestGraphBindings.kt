@@ -11,6 +11,10 @@ import io.morgan.mio.core.common.di.IoDispatcher
 import io.morgan.mio.core.common.di.MainDispatcher
 import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.core.database.MioDatabaseFactory
+import io.morgan.mio.core.navigation.NavEntryBuilder
+import io.morgan.mio.core.navigation.NavigationRegistry
+import io.morgan.mio.core.navigation.OnboardingDestination
+import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.testing.repository.FakeAccountRepository
 import io.morgan.mio.core.testing.repository.FakeCollectionRepository
 import io.morgan.mio.core.testing.repository.FakeMediaRepository
@@ -81,6 +85,18 @@ internal class TestGraphBindings(
 
     @Provides
     fun providePreferencesRepository(): PreferencesRepository = preferencesRepository
+
+    @Provides
+    fun provideNavigationRegistry(
+        onboardingDestination: OnboardingDestination,
+        topLevelDestinations: Set<TopLevelDestination>,
+        entryBuilders: Set<NavEntryBuilder>,
+    ): NavigationRegistry =
+        NavigationRegistry(
+            onboardingDestination = onboardingDestination,
+            topLevelDestinations = topLevelDestinations,
+            entryBuilders = entryBuilders,
+        )
 }
 
 internal class TestGraphFixture(

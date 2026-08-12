@@ -1,6 +1,7 @@
 package io.morgan.mio.architecture
 
 import com.lemonappdev.konsist.api.Konsist
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
@@ -45,6 +46,11 @@ class ProductionArchitectureKonsistTest {
     @Test
     fun networkBoundary() {
         enforceNetworkBoundary(productionFiles())
+    }
+
+    @Test
+    fun navigationBoundaries() {
+        enforceNavigationBoundaries(productionFiles())
     }
 
     @Test
@@ -218,6 +224,70 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.text.contains("createGraphFactory<AppGraph.Factory>()")
             },
         )
+    }
+
+    @Test
+    fun taskSevenProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val expectedRootKeys =
+            mapOf(
+                ":feature:onboarding:api" to "OnboardingKey",
+                ":feature:today:api" to "TodayKey",
+                ":feature:library:api" to "LibraryKey",
+                ":feature:discover:api" to "DiscoverKey",
+                ":feature:you:api" to "YouKey",
+            )
+
+        expectedRootKeys.forEach { (modulePath, keyName) ->
+            assertTrue(
+                files.any { ownedFile ->
+                    ownedFile.modulePath == modulePath &&
+                        ownedFile.file.text.contains("data object $keyName")
+                },
+                "production scan omitted $keyName from $modulePath",
+            )
+        }
+
+        val builderFiles =
+            files.count { ownedFile ->
+                ownedFile.modulePath.startsWith(":feature:") &&
+                    ownedFile.modulePath.endsWith(":impl") &&
+                    ownedFile.file.text.contains(": NavEntryBuilder")
+            }
+        assertTrue(builderFiles >= 5, "expected at least five feature NavEntryBuilder implementations")
+
+        val builderSetProviders =
+            files.count { ownedFile ->
+                ownedFile.modulePath.startsWith(":feature:") &&
+                    ownedFile.modulePath.endsWith(":impl") &&
+                    ownedFile.file.text.contains("@IntoSet") &&
+                    ownedFile.file.text.contains("NavEntryBuilder")
+            }
+        assertTrue(builderSetProviders >= 5, "expected at least five Metro NavEntryBuilder set providers")
+
+        val navDisplayOwners =
+            files
+                .filter { ownedFile ->
+                    ownedFile.file.imports.any { import ->
+                        import.name == "androidx.navigation3.ui.NavDisplay"
+                    }
+                }.mapTo(mutableSetOf(), OwnedKotlinFile::modulePath)
+        assertEquals(setOf(":app"), navDisplayOwners)
+
+        val appGraphNavigationRoots =
+            files.count { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.text.contains("interface AppGraph") &&
+                    ownedFile.file.text.contains("val navigationRegistry: NavigationRegistry")
+            }
+        assertEquals(1, appGraphNavigationRoots)
+
+        val focusedMarkers =
+            files.count { ownedFile ->
+                ownedFile.modulePath == ":core:navigation" &&
+                    ownedFile.file.text.contains("interface FocusedDestination")
+            }
+        assertEquals(1, focusedMarkers)
     }
 
     private fun productionFiles(): List<OwnedKotlinFile> =

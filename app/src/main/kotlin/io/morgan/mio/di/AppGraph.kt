@@ -9,6 +9,7 @@ import io.morgan.mio.core.common.di.DefaultDispatcher
 import io.morgan.mio.core.common.di.IoDispatcher
 import io.morgan.mio.core.common.di.MainDispatcher
 import io.morgan.mio.core.database.MioDatabase
+import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.network.NetworkClientFactory
 import io.morgan.mio.core.network.NetworkMonitor
 import io.morgan.mio.domain.preferences.PreferencesRepository
@@ -23,6 +24,7 @@ internal interface AppGraph : AccountGraph.Factory {
     val networkMonitor: NetworkMonitor
     val clock: Clock
     val preferencesRepository: PreferencesRepository
+    val navigationRegistry: NavigationRegistry
 
     @get:DefaultDispatcher
     val defaultDispatcher: CoroutineDispatcher

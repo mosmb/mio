@@ -8,6 +8,10 @@ import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.common.di.DefaultDispatcher
 import io.morgan.mio.core.common.di.IoDispatcher
 import io.morgan.mio.core.common.di.MainDispatcher
+import io.morgan.mio.core.navigation.NavEntryBuilder
+import io.morgan.mio.core.navigation.NavigationRegistry
+import io.morgan.mio.core.navigation.OnboardingDestination
+import io.morgan.mio.core.navigation.TopLevelDestination
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlin.time.Clock
@@ -33,4 +37,17 @@ internal object ProcessBindings {
     @SingleIn(AppScope::class)
     @MainDispatcher
     internal fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main.immediate
+
+    @Provides
+    @SingleIn(AppScope::class)
+    internal fun provideNavigationRegistry(
+        onboardingDestination: OnboardingDestination,
+        topLevelDestinations: Set<TopLevelDestination>,
+        entryBuilders: Set<NavEntryBuilder>,
+    ): NavigationRegistry =
+        NavigationRegistry(
+            onboardingDestination = onboardingDestination,
+            topLevelDestinations = topLevelDestinations,
+            entryBuilders = entryBuilders,
+        )
 }

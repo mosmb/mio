@@ -61,6 +61,7 @@ public object DependencyRules {
             ":feature:onboarding:impl" to
                 setOf(
                     ":feature:onboarding:api",
+                    ":core:common",
                     ":core:designsystem",
                     ":core:ui",
                     ":core:navigation",
@@ -71,6 +72,7 @@ public object DependencyRules {
             ":feature:today:impl" to
                 setOf(
                     ":feature:today:api",
+                    ":core:common",
                     ":feature:media:api",
                     ":feature:library:api",
                     ":core:designsystem",
@@ -85,6 +87,7 @@ public object DependencyRules {
             ":feature:library:impl" to
                 setOf(
                     ":feature:library:api",
+                    ":core:common",
                     ":feature:media:api",
                     ":feature:progress:api",
                     ":core:designsystem",
@@ -98,6 +101,7 @@ public object DependencyRules {
             ":feature:discover:impl" to
                 setOf(
                     ":feature:discover:api",
+                    ":core:common",
                     ":feature:media:api",
                     ":core:designsystem",
                     ":core:ui",
@@ -109,6 +113,7 @@ public object DependencyRules {
             ":feature:you:impl" to
                 setOf(
                     ":feature:you:api",
+                    ":core:common",
                     ":core:designsystem",
                     ":core:ui",
                     ":core:navigation",

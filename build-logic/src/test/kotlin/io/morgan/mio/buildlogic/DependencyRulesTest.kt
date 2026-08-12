@@ -169,6 +169,41 @@ class DependencyRulesTest {
     }
 
     @Test
+    fun opensOnlyTheTaskSevenNavigationCompositionEdges() {
+        listOf(
+            ":feature:onboarding:impl",
+            ":feature:today:impl",
+            ":feature:library:impl",
+            ":feature:discover:impl",
+            ":feature:you:impl",
+        ).forEach { owner ->
+            assertTrue(
+                violations(owner, "implementation", ":core:common").isEmpty(),
+                "Expected $owner -> :core:common to be allowed",
+            )
+        }
+
+        listOf(
+            ":feature:media:impl",
+            ":feature:progress:impl",
+            ":feature:today:api",
+        ).forEach { owner ->
+            assertTrue(
+                violations(owner, "implementation", ":core:common").isNotEmpty(),
+                "Expected $owner -> :core:common to remain forbidden",
+            )
+        }
+        assertTrue(
+            violations(":app", "implementation", ":feature:today:api").isNotEmpty(),
+            "Expected :app -> :feature:today:api to remain forbidden",
+        )
+        assertTrue(
+            violations(":feature:today:impl", "implementation", ":core:navigation").isEmpty(),
+            "Expected the existing :feature:today:impl -> :core:navigation edge to remain allowed",
+        )
+    }
+
+    @Test
     fun testConfigurationsDoNotWidenTheProductionProjectMatrix() {
         assertTrue(
             violations(":domain:model", "testImplementation", ":data:progress").isEmpty(),

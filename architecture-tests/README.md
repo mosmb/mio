@@ -30,3 +30,5 @@ Task 04's persistence ownership, persistence escape, and one-mechanism data-sour
 Task 05's network and canonical provider-contract ownership rules are implemented. Tasks 13 and 14 must extend the DTO/service ownership fixtures when those first concrete provider types appear.
 
 Task 06's Metro graph ownership, constructor-injection, graph-creation, and no-static-holder rules are implemented. Task 10 must evolve the clock, dispatcher, and credential boundaries, and task 12 must evolve the ViewModel injection boundary.
+
+Task 07's navigation key ownership, serialization/payload, entry-builder ownership, app-only display, and back-stack ownership rules are implemented. Task 09 must evolve the navigation rules for the Route/Screen convention, and task 12 must extend them for complete destinations and ViewModels.

@@ -1,7 +1,10 @@
 package io.morgan.mio.architecture
 
+import com.lemonappdev.konsist.api.declaration.KoClassDeclaration
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
+import com.lemonappdev.konsist.api.declaration.KoInterfaceDeclaration
 import com.lemonappdev.konsist.api.declaration.KoObjectDeclaration
+import com.lemonappdev.konsist.api.declaration.combined.KoClassAndInterfaceAndObjectDeclaration
 import com.lemonappdev.konsist.api.provider.KoNameProvider
 
 data class OwnedKotlinFile(
@@ -235,6 +238,7 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
         val imports = ownedFile.file.imports.map { import -> import.name }
         val isNetworkOwner = ownedFile.modulePath == ":core:network"
         val isConcreteProvider = isProviderImplementation(ownedFile.modulePath)
+        val isNavigationFeatureApi = isFeatureApi(ownedFile.modulePath)
         val isAppCompositionFile =
             ownedFile.modulePath == ":app" &&
                 ownedFile.file.packagee?.name == "io.morgan.mio.di"
@@ -244,7 +248,10 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
             }
         val forbiddenSerializationImport =
             imports.firstOrNull { importName ->
-                matchesAnyPrefix(importName, serializationPrefixes) && !isNetworkOwner && !isConcreteProvider
+                matchesAnyPrefix(importName, serializationPrefixes) &&
+                    !isNetworkOwner &&
+                    !isConcreteProvider &&
+                    !(isNavigationFeatureApi && importName == "kotlinx.serialization.Serializable")
             }
         val forbiddenAndroidNetworkImport =
             imports.firstOrNull { importName ->
@@ -282,6 +289,259 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
 
             else -> null
         }
+    }
+}
+
+internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
+    val typedDomainModelNames =
+        files
+            .filter { ownedFile -> ownedFile.modulePath == ":domain:model" }
+            .flatMap { ownedFile ->
+                ownedFile.file
+                    .classes(true, true)
+                    .filter { declaration ->
+                        declaration.hasValueModifier
+                    }.map { declaration -> declaration.name }
+            }.toSet()
+    val allowedEnumNames =
+        files
+            .filter { ownedFile ->
+                ownedFile.modulePath == ":domain:model" || isFeatureApi(ownedFile.modulePath)
+            }.flatMap { ownedFile ->
+                ownedFile.file
+                    .classes(true, true)
+                    .filter { declaration ->
+                        declaration.hasEnumModifier
+                    }.map { declaration -> declaration.name }
+            }.toSet()
+    val primitiveTypes =
+        setOf(
+            "Byte",
+            "Short",
+            "Int",
+            "Long",
+            "Float",
+            "Double",
+            "Boolean",
+            "Char",
+            "String",
+        )
+    val stateOwnerModules = setOf(":app", ":core:navigation")
+    val navigationStateImports =
+        listOf(
+            "androidx.navigation3.runtime.NavBackStack",
+            "androidx.navigation3.runtime.rememberNavBackStack",
+            "androidx.navigation3.runtime.rememberDecoratedNavEntries",
+            "androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator",
+        )
+
+    assertNoViolations("Navigation boundaries", files) { ownedFile ->
+        val declarations = navigationDeclarations(ownedFile.file)
+        val parentNamesByDeclaration: Map<KoClassAndInterfaceAndObjectDeclaration, Set<String>> =
+            declarations.associate { declaration ->
+                declaration to navigationParentNames(declaration)
+            }
+        val markerDeclaration =
+            declarations.firstOrNull { declaration ->
+                declaration.name == "FocusedDestination" &&
+                    declaration is KoInterfaceDeclaration &&
+                    ownedFile.modulePath == ":core:navigation"
+            }
+        val keyDeclarations =
+            parentNamesByDeclaration
+                .filter { (declaration, parentNames) ->
+                    "NavKey" in parentNames || "FocusedDestination" in parentNames
+                }.keys
+                .filterNot { declaration -> declaration == markerDeclaration }
+        val entryBuilderDeclarations =
+            parentNamesByDeclaration
+                .filter { (_, parentNames) -> "NavEntryBuilder" in parentNames }
+                .keys
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val navDisplayUse =
+            imports.firstOrNull { importName ->
+                importName == "androidx.navigation3.ui.NavDisplay"
+            } ?: "androidx.navigation3.ui.NavDisplay"
+                .takeIf(ownedFile.file.text::contains)
+        val forbiddenFeatureApiImport =
+            if (isFeatureApi(ownedFile.modulePath)) {
+                imports.firstOrNull { importName ->
+                    matchesAnyPrefix(
+                        importName,
+                        listOf(
+                            "androidx.compose",
+                            "androidx.navigation3.runtime.EntryProviderScope",
+                            "androidx.navigation3.runtime.NavEntry",
+                            "io.morgan.mio.core.navigation.NavEntryBuilder",
+                        ),
+                    )
+                }
+            } else {
+                null
+            }
+        val forbiddenStateUse =
+            imports.firstOrNull { importName ->
+                matchesAnyPrefix(importName, navigationStateImports) && ownedFile.modulePath !in stateOwnerModules
+            } ?: navigationStateImports
+                .firstOrNull { importName ->
+                    ownedFile.modulePath !in stateOwnerModules && ownedFile.file.text.contains(importName)
+                }
+        val directBackStackMutation =
+            if (ownedFile.modulePath !in stateOwnerModules &&
+                (ownedFile.file.text.contains("NavBackStack") || ownedFile.file.text.contains("rememberNavBackStack"))
+            ) {
+                Regex("\\b\\w+\\.(?:add|addAll|remove|removeAt|removeLast|clear|set)\\s*(?:<[^>]+>)?\\(")
+                    .find(ownedFile.file.text)
+                    ?.value
+            } else {
+                null
+            }
+        val serializationImport =
+            if (isFeatureApi(ownedFile.modulePath)) {
+                imports.firstOrNull { importName ->
+                    matchesPrefix(importName, "kotlinx.serialization") &&
+                        importName != "kotlinx.serialization.Serializable"
+                }
+            } else {
+                null
+            }
+        val keyPayloadIssue =
+            keyDeclarations
+                .asSequence()
+                .flatMap { declaration ->
+                    val parameters =
+                        if (declaration is KoClassDeclaration && declaration.hasPrimaryConstructor) {
+                            declaration.primaryConstructor?.parameters.orEmpty()
+                        } else {
+                            emptyList()
+                        }
+                    val properties = declaration.properties(false)
+                    (
+                        parameters.mapNotNull { parameter ->
+                            parameter.type.text.let { typeText -> typeText to parameter.name }
+                        } +
+                            properties.mapNotNull { property ->
+                                property.type?.text?.let { typeText -> typeText to property.name }
+                            }
+                    ).asSequence()
+                }.mapNotNull { (typeText, propertyName) ->
+                    val normalizedType = typeText.replace(" ", "").removeSuffix("?")
+                    val simpleType = normalizedType.substringAfterLast('.')
+                    val importedType =
+                        imports.firstOrNull { importName ->
+                            importName.substringAfterLast('.') == simpleType
+                        }
+                    val importedPackage = importedType?.substringBeforeLast('.', missingDelimiterValue = "")
+                    val isPrimitive = simpleType in primitiveTypes && normalizedType == simpleType
+                    val isTypedDomainValue =
+                        simpleType in typedDomainModelNames &&
+                            importedPackage == "io.morgan.mio.domain.model"
+                    val isAllowedEnum =
+                        simpleType in allowedEnumNames &&
+                            (
+                                importedPackage == "io.morgan.mio.domain.model" ||
+                                    importedPackage != null &&
+                                    importedPackage.startsWith("io.morgan.mio.feature.") &&
+                                    importedPackage.endsWith(".api")
+                            )
+                    if (isPrimitive || isTypedDomainValue || isAllowedEnum) {
+                        null
+                    } else {
+                        "key property '$propertyName' uses forbidden payload type '$typeText'"
+                    }
+                }.firstOrNull()
+        val wrongKeyOwner =
+            keyDeclarations
+                .firstOrNull { declaration ->
+                    !isFeatureApi(ownedFile.modulePath)
+                }?.name
+        val unserializableKey =
+            keyDeclarations
+                .firstOrNull { declaration ->
+                    !declaration.hasAnnotationWithName("Serializable")
+                }?.name
+        val parcelableKey =
+            keyDeclarations
+                .firstOrNull { declaration ->
+                    val parentNames = parentNamesByDeclaration.getValue(declaration)
+                    "Parcelable" in parentNames || imports.any { importName -> importName == "android.os.Parcelable" }
+                }?.name
+        val wrongFocusedOwner =
+            keyDeclarations
+                .firstOrNull { declaration ->
+                    "FocusedDestination" in parentNamesByDeclaration.getValue(declaration) &&
+                        !isFeatureApi(ownedFile.modulePath)
+                }?.name
+        val wrongEntryBuilderOwner =
+            entryBuilderDeclarations
+                .firstOrNull { declaration ->
+                    !isFeatureImplementation(ownedFile.modulePath)
+                }?.name
+        val wrongEntryBuilderFeature =
+            if (entryBuilderDeclarations.isNotEmpty() && isFeatureImplementation(ownedFile.modulePath)) {
+                val implementationFeature = ownedFile.modulePath.split(':').getOrNull(2)
+                imports.firstOrNull { importName ->
+                    val segments = importName.split('.')
+                    segments.size > 5 &&
+                        segments.take(4) == listOf("io", "morgan", "mio", "feature") &&
+                        segments[5] == "api" &&
+                        segments[4] != implementationFeature
+                }
+            } else {
+                null
+            }
+
+        when {
+            wrongKeyOwner != null ->
+                "NavKey declaration '$wrongKeyOwner' must live in a feature API module"
+
+            unserializableKey != null ->
+                "NavKey declaration '$unserializableKey' must be annotated with @Serializable"
+
+            parcelableKey != null ->
+                "NavKey declaration '$parcelableKey' must not implement Parcelable"
+
+            keyPayloadIssue != null -> keyPayloadIssue
+            wrongEntryBuilderOwner != null ->
+                "NavEntryBuilder implementation '$wrongEntryBuilderOwner' must live in its matching feature impl module"
+
+            wrongEntryBuilderFeature != null ->
+                "NavEntryBuilder implementation cannot register another feature API '$wrongEntryBuilderFeature'"
+
+            navDisplayUse != null && ownedFile.modulePath != ":app" ->
+                "NavDisplay is app-owned; found '$navDisplayUse'"
+
+            forbiddenStateUse != null ->
+                "navigation back-stack state is owned by :core:navigation or :app; found '$forbiddenStateUse'"
+
+            directBackStackMutation != null ->
+                "direct back-stack mutation is owned by :core:navigation or :app; found '$directBackStackMutation'"
+
+            wrongFocusedOwner != null ->
+                "FocusedDestination implementation '$wrongFocusedOwner' must live in a feature API module"
+
+            forbiddenFeatureApiImport != null ->
+                "feature API cannot own entry builders or Compose/navigation UI types; found '$forbiddenFeatureApiImport'"
+
+            serializationImport != null ->
+                "feature API serialization is limited to kotlinx.serialization.Serializable; found '$serializationImport'"
+
+            else -> null
+        }
+    }
+}
+
+private fun navigationDeclarations(file: KoFileDeclaration): List<KoClassAndInterfaceAndObjectDeclaration> =
+    file
+        .declarations(true, true)
+        .filterIsInstance<KoClassAndInterfaceAndObjectDeclaration>()
+
+private fun navigationParentNames(declaration: KoClassAndInterfaceAndObjectDeclaration): Set<String> {
+    val header = declaration.text.substringBefore('{').substringBefore('=')
+    return setOf("NavKey", "FocusedDestination", "NavEntryBuilder").filterTo(mutableSetOf()) { parentName ->
+        Regex("\\)\\s*:\\s*[^\\n]*\\b$parentName\\b").containsMatchIn(header) ||
+            Regex("\\b(?:class|object|interface)\\s+\\w+\\s*:\\s*[^\\n]*\\b$parentName\\b")
+                .containsMatchIn(header)
     }
 }
 

@@ -3,6 +3,12 @@ plugins {
     alias(libs.plugins.metro)
 }
 
+android {
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:database"))
@@ -34,6 +40,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":sync:work"))
+    implementation(libs.navigation3.ui)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.room.testing)
@@ -42,4 +49,6 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

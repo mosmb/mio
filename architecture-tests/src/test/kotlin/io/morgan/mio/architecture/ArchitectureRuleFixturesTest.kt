@@ -56,6 +56,7 @@ class ArchitectureRuleFixturesTest {
         enforceFeatureApiIsolation(files)
         enforceProviderIsolation(files)
         enforceNetworkBoundary(files)
+        enforceNavigationBoundaries(files)
         enforceProviderContractOwnership(files)
         enforceProviderContractsDoNotEscape(files)
         enforceLoggingBoundary(files)
@@ -202,6 +203,106 @@ class ArchitectureRuleFixturesTest {
             "FeatureImportsNetworkFactory.kt",
             ":feature:today:impl",
             ::enforceNetworkBoundary,
+        )
+    }
+
+    @Test
+    fun nonSerializableNavKeyIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "NonSerializableNavKey.kt",
+            ":feature:today:api",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun aggregateNavKeyPayloadIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "NavKeyWithAggregate.kt",
+            ":feature:today:api",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun featureImplementationNavKeyIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "NavKeyInFeatureImpl.kt",
+            ":feature:today:impl",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun coreNavigationNavKeyIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "CoreOwnsNavKey.kt",
+            ":core:navigation",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun featureApiEntryBuilderIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "EntryBuilderInFeatureApi.kt",
+            ":feature:today:api",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun featureOwnedNavDisplayIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "FeatureOwnsNavDisplay.kt",
+            ":feature:today:impl",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun fullyQualifiedFeatureNavDisplayIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "FeatureUsesQualifiedNavDisplay.kt",
+            ":feature:today:impl",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun featureBackStackMutationIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "FeatureMutatesBackStack.kt",
+            ":feature:today:impl",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun fullyQualifiedFeatureBackStackUseIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "FeatureUsesQualifiedNavigationState.kt",
+            ":feature:today:impl",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun featureApiJsonSerializationIsRejected() {
+        assertFixtureRejected(
+            "navigation-boundary",
+            "FeatureApiImportsJson.kt",
+            ":feature:today:api",
+            ::enforceNavigationBoundaries,
         )
     }
 
@@ -568,6 +669,7 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforceFeatureApiIsolation -> "Feature API isolation"
             rule == ::enforceProviderIsolation -> "Provider isolation"
             rule == ::enforceNetworkBoundary -> "Network boundary"
+            rule == ::enforceNavigationBoundaries -> "Navigation boundaries"
             rule == ::enforceProviderContractOwnership -> "Provider contract ownership"
             rule == ::enforceProviderContractsDoNotEscape -> "Provider contract escape"
             rule == ::enforceLoggingBoundary -> "Logging boundary"
