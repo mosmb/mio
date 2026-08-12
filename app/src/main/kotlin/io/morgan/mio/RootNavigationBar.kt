@@ -7,13 +7,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 
@@ -31,8 +32,9 @@ internal fun RootNavigationBar(
     ) {
         TopLevelSlot.entries.forEach { slot ->
             val destination = destinations.single { it.slot == slot }
-            BasicText(
+            Text(
                 text = stringResource(navigationLabel(slot)),
+                style = MioTheme.typography.label,
                 modifier =
                     Modifier
                         .weight(1f)

@@ -4,6 +4,10 @@ plugins {
 }
 
 android {
+    lint {
+        // Task 08 deliberately keeps the v26 adaptive-icon source beside its v33 overlay.
+        disable += setOf("ObsoleteSdkInt")
+    }
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
@@ -40,6 +44,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":sync:work"))
+    implementation(libs.core.splashscreen)
     implementation(libs.navigation3.ui)
 
     testImplementation(project(":core:testing"))

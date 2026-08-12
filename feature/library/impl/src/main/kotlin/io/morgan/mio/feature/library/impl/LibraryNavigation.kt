@@ -3,7 +3,7 @@
 package io.morgan.mio.feature.library.impl
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
@@ -13,6 +13,7 @@ import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import io.morgan.mio.core.common.di.AppScope
+import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.TopLevelDestination
@@ -48,8 +49,9 @@ public object LibraryNavigationBindings {
 
 @Composable
 private fun LibraryTaskSevenPlaceholder() {
-    BasicText(
+    Text(
         text = "Library",
+        style = MioTheme.typography.body,
         modifier = Modifier.fillMaxSize(),
     )
 }

@@ -19,6 +19,8 @@ dependencies {
     add("implementation", platform(mioLibs.findLibrary("compose-bom").get()))
     add("implementation", mioLibs.findLibrary("compose-ui").get())
     add("implementation", mioLibs.findLibrary("compose-foundation").get())
+    add("implementation", mioLibs.findLibrary("compose-animation-core").get())
+    add("implementation", mioLibs.findLibrary("compose-material3").get())
     add("implementation", mioLibs.findLibrary("compose-ui-tooling-preview").get())
     add("debugImplementation", mioLibs.findLibrary("compose-ui-tooling").get())
 }

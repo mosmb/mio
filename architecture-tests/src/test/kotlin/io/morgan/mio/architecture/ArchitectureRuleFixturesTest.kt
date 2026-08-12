@@ -367,6 +367,16 @@ class ArchitectureRuleFixturesTest {
     }
 
     @Test
+    fun designSystemFeatureImportIsRejected() {
+        assertFixtureRejected(
+            "shared-ui-isolation",
+            "DesignSystemImportsFeature.kt",
+            ":core:designsystem",
+            ::enforceSharedUiIsolation,
+        )
+    }
+
+    @Test
     fun javaTimeImportIsRejected() {
         assertFixtureRejected(
             "forbidden-imports",
