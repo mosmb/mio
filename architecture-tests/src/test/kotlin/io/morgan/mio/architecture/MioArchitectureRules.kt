@@ -2,10 +2,12 @@ package io.morgan.mio.architecture
 
 import com.lemonappdev.konsist.api.declaration.KoClassDeclaration
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
+import com.lemonappdev.konsist.api.declaration.KoFunctionDeclaration
 import com.lemonappdev.konsist.api.declaration.KoInterfaceDeclaration
 import com.lemonappdev.konsist.api.declaration.KoObjectDeclaration
 import com.lemonappdev.konsist.api.declaration.combined.KoClassAndInterfaceAndObjectDeclaration
 import com.lemonappdev.konsist.api.provider.KoNameProvider
+import com.lemonappdev.konsist.api.provider.modifier.KoVisibilityModifierProvider
 
 data class OwnedKotlinFile(
     val modulePath: String,
@@ -905,6 +907,156 @@ internal fun enforceSharedUiIsolation(files: List<OwnedKotlinFile>) {
         }
     }
 }
+
+internal fun enforceSharedUiOwnership(files: List<OwnedKotlinFile>) {
+    val forbiddenImports =
+        listOf(
+            "io.morgan.mio.feature",
+            "io.morgan.mio.domain",
+            "io.morgan.mio.data",
+            "io.morgan.mio.core.navigation",
+            "androidx.navigation",
+            "androidx.room",
+            "androidx.datastore",
+            "retrofit2",
+            "okhttp3",
+            "io.morgan.mio.data.provider",
+        )
+
+    assertNoViolations(
+        "Shared UI ownership",
+        files.filter { ownedFile ->
+            ownedFile.modulePath == ":core:designsystem" &&
+                ownedFile.file.packagee?.name == "io.morgan.mio.core.designsystem.component"
+        },
+    ) { ownedFile ->
+        val publicDeclaration =
+            ownedFile.file
+                .declarations(false, false)
+                .mapNotNull { declaration ->
+                    if (declaration !is KoClassAndInterfaceAndObjectDeclaration &&
+                        declaration !is KoFunctionDeclaration
+                    ) {
+                        return@mapNotNull null
+                    }
+                    val named = declaration as? KoNameProvider ?: return@mapNotNull null
+                    if (named.name != ownedFile.file.packagee?.name &&
+                        isPublicDeclaration(declaration) &&
+                        !named.name.startsWith("Mio")
+                    ) {
+                        named.name
+                    } else {
+                        null
+                    }
+                }.firstOrNull()
+        val forbiddenImport = firstMatchingImport(ownedFile.file, forbiddenImports)
+
+        when {
+            publicDeclaration != null ->
+                "public shared component/type '$publicDeclaration' must start with Mio"
+
+            forbiddenImport != null ->
+                "design-system component cannot import '$forbiddenImport'"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceRouteScreenConvention(files: List<OwnedKotlinFile>) {
+    assertNoViolations(
+        "Route/Screen convention",
+        files.filter { ownedFile -> isFeatureImplementation(ownedFile.modulePath) },
+    ) { ownedFile ->
+        val functions = ownedFile.file.functions(true)
+        val routes = functions.filter { declaration -> declaration.name.endsWith("Route") }
+        val screens = functions.filter { declaration -> declaration.name.endsWith("Screen") }
+
+        val routeIssue =
+            routes
+                .asSequence()
+                .mapNotNull { route ->
+                    val prefix = route.name.removeSuffix("Route")
+                    val matchingScreens = screens.filter { screen -> screen.name == "${prefix}Screen" }
+                    when {
+                        matchingScreens.size != 1 ->
+                            "Route '${route.name}' must have exactly one same-file '${prefix}Screen'"
+
+                        fileName(ownedFile.file.path) != "${prefix}Screen.kt" ->
+                            "Route '${route.name}' must be declared in '${prefix}Screen.kt'"
+
+                        !hasModifierAsFirstOptionalParameter(route) ->
+                            "Route '${route.name}' must have Modifier as its first optional parameter"
+
+                        countCall(route.text, "${prefix}Screen") != 1 ->
+                            "Route '${route.name}' must invoke '${prefix}Screen' exactly once"
+
+                        containsVisualLayout(route.text) ->
+                            "Route '${route.name}' must not declare visual layout"
+
+                        else -> null
+                    }
+                }.firstOrNull()
+        val screenIssue =
+            screens
+                .asSequence()
+                .mapNotNull { screen ->
+                    val prefix = screen.name.removeSuffix("Screen")
+                    val matchingRoutes = routes.filter { route -> route.name == "${prefix}Route" }
+                    when {
+                        matchingRoutes.size != 1 ->
+                            "Screen '${screen.name}' must have exactly one same-file '${prefix}Route'"
+
+                        fileName(ownedFile.file.path) != "${prefix}Screen.kt" ->
+                            "Screen '${screen.name}' must be declared in '${prefix}Screen.kt'"
+
+                        !hasModifierAsFirstOptionalParameter(screen) ->
+                            "Screen '${screen.name}' must have Modifier as its first optional parameter"
+
+                        containsForbiddenScreenParameter(screen) ->
+                            "Screen '${screen.name}' must remain stateless and not accept navigation/data types"
+
+                        else -> null
+                    }
+                }.firstOrNull()
+
+        routeIssue ?: screenIssue
+    }
+}
+
+private fun isPublicDeclaration(declaration: Any): Boolean =
+    (declaration as? KoVisibilityModifierProvider)?.hasPublicOrDefaultModifier == true
+
+private fun fileName(path: String): String = path.replace('\\', '/').substringAfterLast('/')
+
+private fun hasModifierAsFirstOptionalParameter(function: KoFunctionDeclaration): Boolean {
+    val firstOptionalParameter =
+        function.parameters.firstOrNull { parameter ->
+            parameter.defaultValue
+                .orEmpty()
+                .isNotBlank()
+        }
+    return firstOptionalParameter?.name == "modifier" &&
+        firstOptionalParameter.type.name == "Modifier" &&
+        firstOptionalParameter.defaultValue == "Modifier"
+}
+
+private fun countCall(
+    text: String,
+    functionName: String,
+): Int = Regex("""\b${Regex.escape(functionName)}\s*\(""").findAll(text).count()
+
+private fun containsVisualLayout(text: String): Boolean =
+    Regex("""\b(?:Text|Row|Column|Box|Surface|Image|Button|LazyColumn|LazyRow)\s*\(""").containsMatchIn(text)
+
+private fun containsForbiddenScreenParameter(function: KoFunctionDeclaration): Boolean =
+    function.parameters.any { parameter ->
+        Regex(
+            """(?:ViewModel|Repository|DataSource|MioNavigator|NavKey|NavBackStack|NavigationState|BackStack)""",
+        ).containsMatchIn(parameter.type.text) ||
+            parameter.name in
+            setOf("navigator", "navigationState", "backStack", "repository", "dataSource", "viewModel")
+    }
 
 internal fun enforceGloballyForbiddenImports(files: List<OwnedKotlinFile>) {
     val forbiddenPrefixes =

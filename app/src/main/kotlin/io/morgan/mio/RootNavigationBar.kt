@@ -1,20 +1,11 @@
 package io.morgan.mio
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
-import io.morgan.mio.core.designsystem.theme.MioTheme
+import io.morgan.mio.core.designsystem.component.MioBottomNavigation
+import io.morgan.mio.core.designsystem.component.MioBottomNavigationItem
+import io.morgan.mio.core.designsystem.icon.MioIcons
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 
@@ -25,28 +16,24 @@ internal fun RootNavigationBar(
     selectedSlot: TopLevelSlot,
     onSelected: (TopLevelDestination) -> Unit,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth().selectableGroup(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TopLevelSlot.entries.forEach { slot ->
-            val destination = destinations.single { it.slot == slot }
-            Text(
-                text = stringResource(navigationLabel(slot)),
-                style = MioTheme.typography.label,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .selectable(
-                            selected = selectedSlot == slot,
-                            role = Role.Tab,
-                            onClick = { onSelected(destination) },
-                        ).heightIn(min = 48.dp)
-                        .wrapContentHeight(Alignment.CenterVertically),
+    val orderedDestinations = TopLevelSlot.entries.map { slot -> destinations.single { it.slot == slot } }
+    val destinationById = orderedDestinations.associateBy { it.slot.name }
+    val items =
+        TopLevelSlot.entries.map { slot ->
+            MioBottomNavigationItem(
+                id = slot.name,
+                label = stringResource(navigationLabel(slot)),
+                outlineIconRes = navigationOutlineIcon(slot),
+                filledIconRes = navigationFilledIcon(slot),
             )
         }
-    }
+
+    MioBottomNavigation(
+        items = items,
+        selectedItemId = selectedSlot.name,
+        onItemSelected = { id -> onSelected(destinationById.getValue(id)) },
+        modifier = modifier,
+    )
 }
 
 private fun navigationLabel(slot: TopLevelSlot): Int =
@@ -55,4 +42,20 @@ private fun navigationLabel(slot: TopLevelSlot): Int =
         TopLevelSlot.LIBRARY -> R.string.navigation_library
         TopLevelSlot.DISCOVER -> R.string.navigation_discover
         TopLevelSlot.YOU -> R.string.navigation_you
+    }
+
+private fun navigationOutlineIcon(slot: TopLevelSlot): Int =
+    when (slot) {
+        TopLevelSlot.TODAY -> MioIcons.TodayOutline
+        TopLevelSlot.LIBRARY -> MioIcons.LibraryOutline
+        TopLevelSlot.DISCOVER -> MioIcons.DiscoverOutline
+        TopLevelSlot.YOU -> MioIcons.YouOutline
+    }
+
+private fun navigationFilledIcon(slot: TopLevelSlot): Int =
+    when (slot) {
+        TopLevelSlot.TODAY -> MioIcons.TodayFilled
+        TopLevelSlot.LIBRARY -> MioIcons.LibraryFilled
+        TopLevelSlot.DISCOVER -> MioIcons.DiscoverFilled
+        TopLevelSlot.YOU -> MioIcons.YouFilled
     }

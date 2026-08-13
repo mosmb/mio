@@ -1,6 +1,7 @@
 [versions]
 agp = "9.3.1"
 kotlin = "2.3.21"
+#noinspection GradleDependency -- Task 09 deliberately pins the validated Compose BOM.
 composeBom = "2026.06.01"
 activityCompose = "1.13.0"
 coreSplashscreen = "1.2.0"

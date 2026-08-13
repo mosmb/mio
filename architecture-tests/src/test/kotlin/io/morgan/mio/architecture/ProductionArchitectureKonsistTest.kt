@@ -74,6 +74,16 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun sharedUiOwnership() {
+        enforceSharedUiOwnership(productionFiles())
+    }
+
+    @Test
+    fun routeScreenConvention() {
+        enforceRouteScreenConvention(productionFiles())
+    }
+
+    @Test
     fun globallyForbiddenImports() {
         enforceGloballyForbiddenImports(productionFiles())
     }
@@ -288,6 +298,86 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.text.contains("interface FocusedDestination")
             }
         assertEquals(1, focusedMarkers)
+    }
+
+    @Test
+    fun taskNineProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val expectedScreens =
+            mapOf(
+                ":feature:onboarding:impl" to "Onboarding",
+                ":feature:today:impl" to "Today",
+                ":feature:library:impl" to "Library",
+                ":feature:discover:impl" to "Discover",
+                ":feature:you:impl" to "You",
+            )
+
+        expectedScreens.forEach { (modulePath, prefix) ->
+            assertTrue(
+                files.any { ownedFile ->
+                    ownedFile.modulePath == modulePath &&
+                        ownedFile.file.path
+                            .replace('\\', '/')
+                            .endsWith("/${prefix}Screen.kt") &&
+                        ownedFile.file.text.contains("fun ${prefix}Route") &&
+                        ownedFile.file.text.contains("fun ${prefix}Screen")
+                },
+                "production scan omitted ${prefix}Route/${prefix}Screen from $modulePath",
+            )
+        }
+
+        listOf(
+            "MioBottomNavigation",
+            "MioButton",
+            "MioBottomSheet",
+            "MioSnackbar",
+            "MioSnackbarHost",
+        ).forEach { declarationName ->
+            assertTrue(
+                files.any { ownedFile ->
+                    ownedFile.modulePath == ":core:designsystem" &&
+                        ownedFile.file.packagee?.name == "io.morgan.mio.core.designsystem.component" &&
+                        ownedFile.file.text.contains(declarationName)
+                },
+                "production scan omitted $declarationName from :core:designsystem",
+            )
+        }
+
+        assertTrue(
+            files.none { ownedFile ->
+                ownedFile.modulePath == ":core:ui" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .contains("/src/main/")
+            },
+            ":core:ui must remain empty for task 09",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/RootNavigationBar.kt") &&
+                    ownedFile.file.imports.any { import ->
+                        import.name == "io.morgan.mio.core.designsystem.component.MioBottomNavigation"
+                    }
+            },
+            "RootNavigationBar must adapt MioBottomNavigation",
+        )
+        assertTrue(
+            files
+                .filter { ownedFile ->
+                    ownedFile.modulePath == ":core:designsystem" &&
+                        ownedFile.file.packagee?.name == "io.morgan.mio.core.designsystem.component"
+                }.none { ownedFile ->
+                    ownedFile.file.imports.any { import ->
+                        import.name == "io.morgan.mio.core.navigation.MioNavigator" ||
+                            import.name.startsWith("io.morgan.mio.core.navigation.") ||
+                            import.name.startsWith("androidx.navigation")
+                    }
+                },
+            "design-system components must not import navigation types",
+        )
     }
 
     private fun productionFiles(): List<OwnedKotlinFile> =

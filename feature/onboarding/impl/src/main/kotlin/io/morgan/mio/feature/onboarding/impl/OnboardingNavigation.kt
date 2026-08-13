@@ -2,10 +2,6 @@
 
 package io.morgan.mio.feature.onboarding.impl
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import dev.zacsweers.metro.BindingContainer
@@ -13,7 +9,6 @@ import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import io.morgan.mio.core.common.di.AppScope
-import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.OnboardingDestination
@@ -25,7 +20,7 @@ private object OnboardingNavEntryBuilder : NavEntryBuilder {
 
     override fun EntryProviderScope<NavKey>.build(navigator: MioNavigator) {
         entry<OnboardingKey> {
-            OnboardingTaskSevenPlaceholder()
+            OnboardingRoute()
         }
     }
 }
@@ -39,13 +34,4 @@ public object OnboardingNavigationBindings {
 
     @Provides
     public fun provideOnboardingDestination(): OnboardingDestination = OnboardingDestination(OnboardingKey)
-}
-
-@Composable
-private fun OnboardingTaskSevenPlaceholder() {
-    Text(
-        text = "Onboarding",
-        style = MioTheme.typography.body,
-        modifier = Modifier.fillMaxSize(),
-    )
 }

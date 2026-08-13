@@ -47,6 +47,8 @@ class ArchitectureRuleFixturesTest {
                         "ValidProviderContract.kt" to ":data:provider:api",
                         "ValidProviderContractFake.kt" to ":core:testing",
                         "ValidCapabilityProviderConsumer.kt" to ":data:account",
+                        "ValidRouteScreen.kt" to ":feature:today:impl",
+                        "ValidDesignSystemComponent.kt" to ":core:designsystem",
                     ),
             )
 
@@ -69,6 +71,8 @@ class ArchitectureRuleFixturesTest {
         enforcePersistenceDoesNotEscape(files)
         enforceOneMechanismPerDataSource(files)
         enforceMetroBoundaries(files)
+        enforceSharedUiOwnership(files)
+        enforceRouteScreenConvention(files)
     }
 
     @Test
@@ -374,6 +378,58 @@ class ArchitectureRuleFixturesTest {
             ":core:designsystem",
             ::enforceSharedUiIsolation,
         )
+    }
+
+    @Test
+    fun designSystemDomainImportIsRejected() {
+        assertFixtureRejected(
+            "shared-ui-ownership",
+            "DesignSystemImportsDomain.kt",
+            ":core:designsystem",
+            ::enforceSharedUiOwnership,
+        )
+    }
+
+    @Test
+    fun unprefixedSharedComponentIsRejected() {
+        assertFixtureRejected(
+            "shared-ui-ownership",
+            "UnprefixedSharedComponent.kt",
+            ":core:designsystem",
+            ::enforceSharedUiOwnership,
+        )
+    }
+
+    @Test
+    fun routeWithoutScreenIsRejected() {
+        assertFixtureRejected(
+            "route-screen",
+            "RouteWithoutScreen.kt",
+            ":feature:today:impl",
+            ::enforceRouteScreenConvention,
+        )
+    }
+
+    @Test
+    fun screenWithNavigatorIsRejected() {
+        assertFixtureRejected(
+            "route-screen",
+            "ScreenWithNavigator.kt",
+            ":feature:today:impl",
+            ::enforceRouteScreenConvention,
+        )
+    }
+
+    @Test
+    fun requiredParametersMayPrecedeTheModifierAndLocalNamesAreNotScreenParameters() {
+        val files =
+            loadFixtureDirectory(
+                directoryName = "route-screen",
+                ownerModule = ":feature:today:impl",
+                filename = "ValidRequiredScreen.kt",
+            )
+
+        enforceRouteScreenConvention(files)
     }
 
     @Test
@@ -684,6 +740,8 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforceProviderContractsDoNotEscape -> "Provider contract escape"
             rule == ::enforceLoggingBoundary -> "Logging boundary"
             rule == ::enforceSharedUiIsolation -> "Shared UI isolation"
+            rule == ::enforceSharedUiOwnership -> "Shared UI ownership"
+            rule == ::enforceRouteScreenConvention -> "Route/Screen convention"
             rule == ::enforceGloballyForbiddenImports -> "Globally forbidden imports"
             rule == ::enforceDomainModelOwnership -> "Domain model ownership"
             rule == ::enforceDomainImmutability -> "Domain immutability"
