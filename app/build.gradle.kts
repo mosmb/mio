@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.metro)
 }
 
+metro {
+    generateContributionProviders.set(true)
+}
+
 android {
     lint {
         // Task 08 deliberately keeps the v26 adaptive-icon source beside its v33 overlay.
@@ -27,6 +31,8 @@ dependencies {
     implementation(project(":domain:collection"))
     implementation(project(":domain:preferences"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.metrox.viewmodel.compose)
 
     implementation(project(":feature:onboarding:impl"))
     implementation(project(":feature:today:impl"))

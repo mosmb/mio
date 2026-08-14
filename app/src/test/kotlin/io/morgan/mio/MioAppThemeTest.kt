@@ -61,6 +61,7 @@ class MioAppThemeTest {
                 root = rootState.value,
                 navigationRegistry = navigationRegistry,
                 imageLoader = imageLoader,
+                viewModelFactory = testMetroViewModelFactory,
                 darkTheme = darkThemeState.value,
                 highContrastOverride = false,
             )

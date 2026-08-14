@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(libs.navigation3.runtime)
+    implementation(libs.lifecycle.viewmodel.navigation3)
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)

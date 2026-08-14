@@ -744,7 +744,7 @@ private val taskFiveCanonicalProviderDeclarations =
         "ProviderAuthorizationRequest",
         "ProviderAuthorizationTransaction",
         "ProviderAuthorizationLaunch",
-        "ProviderAuthorizationCallback",
+        "ProviderAuthorizationRedirect",
         "ProviderCredentials",
         "ProviderAuthenticator",
         "ProviderResult",
@@ -1161,6 +1161,9 @@ internal fun enforceRouteScreenConvention(files: List<OwnedKotlinFile>) {
                         containsForbiddenScreenParameter(screen) ->
                             "Screen '${screen.name}' must remain stateless and not accept navigation/data types"
 
+                        containsForbiddenScreenBody(screen.text) ->
+                            "Screen '${screen.name}' must remain stateless and contain only UI rendering"
+
                         else -> null
                     }
                 }.firstOrNull()
@@ -1168,6 +1171,226 @@ internal fun enforceRouteScreenConvention(files: List<OwnedKotlinFile>) {
         routeIssue ?: screenIssue
     }
 }
+
+internal fun enforceArchitecturalFileCohesion(files: List<OwnedKotlinFile>) {
+    assertNoViolations(
+        "Architectural file cohesion",
+        files.filter { ownedFile -> ownedFile.sourceSet == "main" },
+    ) { ownedFile ->
+        val roleNames =
+            (
+                ownedFile.file
+                    .classes()
+                    .filter(::isPublicDeclaration)
+                    .map { declaration -> declaration.name } +
+                    ownedFile.file
+                        .interfaces()
+                        .filter(::isPublicDeclaration)
+                        .map { declaration -> declaration.name }
+            ).filter { name -> name.endsWith("Repository") || name.endsWith("UseCase") }
+        val actualFileName = fileName(ownedFile.file.path)
+
+        when {
+            roleNames.size > 1 ->
+                "file '$actualFileName' contains multiple public architectural roles: ${roleNames.joinToString()}"
+
+            roleNames.singleOrNull()?.let { roleName -> actualFileName != "$roleName.kt" } == true ->
+                "architectural role '${roleNames.single()}' must live in '${roleNames.single()}.kt'"
+
+            else -> null
+        }
+    }
+}
+
+internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>) {
+    val featureFiles = files.filter { ownedFile -> isFeatureImplementation(ownedFile.modulePath) }
+    val viewModelNames =
+        featureFiles
+            .flatMap { ownedFile -> ownedFile.file.classes(true, true) }
+            .map { declaration -> declaration.name }
+            .filter { name -> name.endsWith("ViewModel") }
+            .toSet()
+
+    assertNoViolations("ViewModel presentation convention", featureFiles) { ownedFile ->
+        val source = ownedFile.file.text
+        val viewModel =
+            ownedFile.file
+                .classes(true, true)
+                .firstOrNull { declaration -> declaration.name.endsWith("ViewModel") }
+        val viewModelIssue =
+            viewModel?.let { declaration ->
+                val declarationText = declaration.text
+                val matchingRouteName = "${declaration.name.removeSuffix("ViewModel")}Route"
+                val matchingRoute =
+                    featureFiles
+                        .filter { routeFile -> routeFile.modulePath == ownedFile.modulePath }
+                        .asSequence()
+                        .flatMap { routeFile ->
+                            routeFile.file.functions(true).asSequence().map { route ->
+                                routeFile to
+                                    route
+                            }
+                        }.filter { (_, route) -> route.name == matchingRouteName }
+                        .toList()
+                val route = matchingRoute.singleOrNull()
+                val stateFlowNames =
+                    Regex("\\bval\\s+([A-Za-z][A-Za-z0-9_]*)\\s*:\\s*StateFlow\\s*<")
+                        .findAll(declarationText)
+                        .map { match -> match.groupValues[1] }
+                        .toList()
+                when {
+                    !Regex("\\bViewModel\\s*\\(").containsMatchIn(declarationText) ->
+                        "ViewModel '${declaration.name}' must extend androidx.lifecycle.ViewModel"
+
+                    !declaration.hasAnnotationWithName("Inject") ->
+                        "ViewModel '${declaration.name}' must use constructor injection"
+
+                    !declaration.hasAnnotationWithName("ViewModelKey") ->
+                        "ViewModel '${declaration.name}' must have @ViewModelKey"
+
+                    !Regex("@ContributesIntoMap\\s*\\(\\s*AppScope::class\\s*\\)").containsMatchIn(source) ->
+                        "ViewModel '${declaration.name}' must contribute into AppScope"
+
+                    matchingRoute.size != 1 ->
+                        "ViewModel '${declaration.name}' must have exactly one matching Route in ${ownedFile.modulePath}"
+
+                    !Regex("\\bmetroViewModel\\s*<\\s*${Regex.escape(declaration.name)}\\s*>").containsMatchIn(
+                        route!!.second.text,
+                    ) ->
+                        "Route '$matchingRouteName' must obtain '${declaration.name}' with metroViewModel()"
+
+                    stateFlowNames.isEmpty() ->
+                        "ViewModel '${declaration.name}' must expose feature-owned StateFlow presentation state"
+
+                    stateFlowNames.any { propertyName ->
+                        !Regex(
+                            "\\bviewModel\\s*\\.\\s*${Regex.escape(
+                                propertyName,
+                            )}\\s*\\.\\s*collectAsStateWithLifecycle\\s*\\(",
+                        ).containsMatchIn(route.second.text)
+                    } ->
+                        "Route '$matchingRouteName' must lifecycle-collect every ViewModel StateFlow property"
+
+                    countCall(route.second.text, "${declaration.name.removeSuffix("ViewModel")}Screen") != 1 ->
+                        "Route '$matchingRouteName' must invoke its Screen exactly once"
+
+                    else -> null
+                }
+            }
+
+        val flowPropertyIssue =
+            ownedFile.file
+                .properties(true)
+                .firstOrNull { property ->
+                    val propertyText = property.text
+                    val isFlow =
+                        Regex("\\b(?:StateFlow|SharedFlow)\\s*<").containsMatchIn(propertyText)
+                    isFlow && containsForbiddenPresentationFlowType(ownedFile, propertyText)
+                }?.let { property ->
+                    "flow property '${property.name}' must expose only feature-owned UI state/effects"
+                }
+
+        val screenIssue =
+            ownedFile.file
+                .functions(true)
+                .filter { function -> function.name.endsWith("Screen") }
+                .firstOrNull { function ->
+                    containsForbiddenScreenBody(function.text) ||
+                        containsForbiddenScreenParameter(function)
+                }?.let { function ->
+                    "Screen '${function.name}' must not accept or use ViewModel/domain/navigation/runtime types"
+                }
+
+        when {
+            Regex("\\bChannel\\s*<|\\bChannel\\s*\\(").containsMatchIn(source) ->
+                "feature presentation must not use Channel for UI effects"
+
+            Regex("\\bcollectAsState\\s*\\(").containsMatchIn(source) ->
+                "feature ViewModel state must use collectAsStateWithLifecycle()"
+
+            firstMatchingImport(ownedFile.file, listOf("io.morgan.mio.data", "io.morgan.mio.data.provider")) != null ->
+                "feature presentation cannot import data or provider code"
+
+            firstMatchingImport(ownedFile.file, listOf("io.morgan.mio.di.AppGraph", "io.morgan.mio.di.AccountGraph")) !=
+                null ||
+                Regex("\\b(?:AppGraph|AccountGraph)\\b").containsMatchIn(source) ->
+                "feature presentation cannot access application or account graphs"
+
+            Regex(
+                "\\b(?:EventWrapper|ConsumedEvent|hasBeenHandled|consumed)\\b|\\bEvent\\s*<",
+            ).containsMatchIn(source) ->
+                "feature presentation must not use consumed-event wrappers"
+
+            viewModelIssue != null -> viewModelIssue
+            flowPropertyIssue != null -> flowPropertyIssue
+            screenIssue != null -> screenIssue
+            else -> null
+        }
+    }
+
+    assertNoViolations("ViewModel presentation convention", files) { ownedFile ->
+        val source = ownedFile.file.text
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val localFactoryImport = imports.firstOrNull { importName -> importName.endsWith("LocalMetroViewModelFactory") }
+        val providerModuleIssue =
+            if (isProviderImplementation(ownedFile.modulePath) &&
+                Regex(
+                    "\\b(?:AccountSession|OnboardingViewModel|OnboardingScreen|OnboardingRoute)\\b",
+                ).containsMatchIn(source)
+            ) {
+                "provider implementation must not contain Task 12 session or onboarding behavior"
+            } else {
+                null
+            }
+
+        when {
+            localFactoryImport != null && ownedFile.modulePath != ":app" ->
+                "LocalMetroViewModelFactory may only be provided by app composition"
+
+            ownedFile.modulePath == ":app" &&
+                ownedFile.sourceSet == "main" &&
+                imports.any { importName -> matchesPrefix(importName, "io.morgan.mio.core.testing") } ->
+                "production app cannot import :core:testing"
+
+            providerModuleIssue != null -> providerModuleIssue
+            else -> null
+        }
+    }
+
+    if (viewModelNames.isEmpty() && featureFiles.any { ownedFile -> ownedFile.file.text.contains("ViewModel") }) {
+        throw AssertionError("ViewModel presentation convention: feature ViewModel text was not parsed as a class")
+    }
+}
+
+private fun containsForbiddenPresentationFlowType(
+    ownedFile: OwnedKotlinFile,
+    propertyText: String,
+): Boolean {
+    val forbiddenImportedType =
+        ownedFile.file.imports
+            .filter { import ->
+                matchesAnyPrefix(
+                    import.name,
+                    listOf(
+                        "io.morgan.mio.data",
+                        "io.morgan.mio.data.provider",
+                        "androidx.room",
+                        "android.net.Uri",
+                    ),
+                )
+            }.map { import -> import.name.substringAfterLast('.') }
+            .any { typeName -> Regex("\\b${Regex.escape(typeName)}\\b").containsMatchIn(propertyText) }
+    val forbiddenName =
+        Regex(
+            "\\b(?:AccountSessionState|AccountId|ConnectedProvider|Provider[A-Za-z]*|[A-Za-z]*Repository|[A-Za-z]*DataSource|[A-Za-z]*Dao|[A-Za-z]*Entity|[A-Za-z]*Dto|NavKey|NavBackStack|NavigationState|BackStack|Uri)\\b",
+        ).containsMatchIn(propertyText)
+    return forbiddenImportedType || forbiddenName
+}
+
+private fun containsForbiddenScreenBody(text: String): Boolean =
+    Regex(
+        "\\b(?:ViewModel|Repository|DataSource|MioNavigator|NavKey|NavBackStack|NavigationState|BackStack|LocalUriHandler|UriHandler|repeatOnLifecycle|metroViewModel|collectAsStateWithLifecycle|AccountSessionState|ConnectedProvider|AccountId)\\b|\\b(?:openUri|collectAsStateWithLifecycle)\\s*\\(",
+    ).containsMatchIn(text)
 
 private fun isPublicDeclaration(declaration: Any): Boolean =
     (declaration as? KoVisibilityModifierProvider)?.hasPublicOrDefaultModifier == true

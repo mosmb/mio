@@ -1,0 +1,26 @@
+<resources>
+    <string name="onboarding_wordmark">mio</string>
+    <string name="onboarding_title">Your anime and manga, ready when you are.</string>
+    <string name="onboarding_source_of_truth">Connect the provider you already use. It stays the source of truth for your library and progress.</string>
+    <string name="onboarding_provider_anilist">AniList</string>
+    <string name="onboarding_provider_my_anime_list">MyAnimeList</string>
+    <string name="onboarding_continue_anilist">Continue with AniList</string>
+    <string name="onboarding_continue_my_anime_list">Continue with MyAnimeList</string>
+    <string name="onboarding_disclaimer">Mio doesn\'t create a separate account. It connects to one provider at a time, and your provider remains in control.</string>
+    <string name="onboarding_status_restoring">Checking your connection</string>
+    <string name="onboarding_status_authorizing">Continue in your browser to connect %1$s.</string>
+    <string name="onboarding_status_importing">Bringing in your library</string>
+    <string name="onboarding_import_source_note">Your %1$s library remains the source of truth for your library and progress.</string>
+    <string name="onboarding_import_progress_semantics">Library import in progress</string>
+    <string name="onboarding_retry">Retry</string>
+    <string name="onboarding_error_restoration_title">We couldn\'t restore your connection</string>
+    <string name="onboarding_error_restoration_message">Try again, or connect your provider again.</string>
+    <string name="onboarding_error_authorization_title">We couldn\'t open %1$s</string>
+    <string name="onboarding_error_authorization_message">Try connecting to %1$s again.</string>
+    <string name="onboarding_error_authentication_title">We couldn\'t connect %1$s</string>
+    <string name="onboarding_error_authentication_message">Return to %1$s and try again.</string>
+    <string name="onboarding_error_initial_import_title">We couldn\'t bring in your %1$s library</string>
+    <string name="onboarding_error_initial_import_message">Nothing was added. Try connecting again.</string>
+    <string name="onboarding_error_unavailable_title">Connection isn\'t available in this build</string>
+    <string name="onboarding_error_unavailable_message">Use a build with provider connections enabled.</string>
+</resources>

@@ -32,7 +32,9 @@ class AppGraphTest {
     fun productionGraphConstructionResolvesEveryDeclaredRoot() {
         val graph = createGraphFactory<AppGraph.Factory>().create(context)
         try {
-            assertNotNull(graph.accountGraphManager)
+            assertNotNull(graph.accountGraphLifecycle)
+            assertNotNull(graph.accountSessionRepository)
+            assertNotNull(graph.metroViewModelFactory)
             assertNotNull(graph.database)
             assertNotNull(graph.networkClientFactory)
             assertNotNull(graph.networkMonitor)
@@ -58,7 +60,9 @@ class AppGraphTest {
     fun productionGraphAccessorsKeepProcessScopedIdentity() {
         val graph = createGraphFactory<AppGraph.Factory>().create(context)
         try {
-            assertSame(graph.accountGraphManager, graph.accountGraphManager)
+            assertSame(graph.accountGraphLifecycle, graph.accountGraphLifecycle)
+            assertSame(graph.accountSessionRepository, graph.accountSessionRepository)
+            assertSame(graph.metroViewModelFactory, graph.metroViewModelFactory)
             assertSame(graph.database, graph.database)
             assertSame(graph.networkClientFactory, graph.networkClientFactory)
             assertSame(graph.networkMonitor, graph.networkMonitor)
@@ -101,6 +105,8 @@ class AppGraphTest {
                 assertSame(fixture.workerFactory, graph.workerFactory)
                 assertSame(fixture.workManagerConfiguration, graph.workManagerConfiguration)
                 assertSame(fixture.preferencesRepository, graph.preferencesRepository)
+                assertSame(graph.accountSessionRepository, graph.accountSessionRepository)
+                assertSame(graph.metroViewModelFactory, graph.metroViewModelFactory)
 
                 val providerBinding = providerBindingFixture(provider = ProviderKey.ANILIST)
                 val accountGraph =

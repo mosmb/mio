@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -28,10 +29,11 @@ public class OnboardingNavigationState internal constructor(
 
     @Composable
     public fun decoratedEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List<NavEntry<NavKey>> {
-        val entryDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val saveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val viewModelStoreDecorator = rememberViewModelStoreNavEntryDecorator<NavKey>()
         return rememberDecoratedNavEntries(
             backStack = backStack,
-            entryDecorators = listOf(entryDecorator),
+            entryDecorators = listOf(saveableStateDecorator, viewModelStoreDecorator),
             entryProvider = entryProvider,
         )
     }
@@ -70,33 +72,37 @@ public class AuthenticatedNavigationState internal constructor(
 
     @Composable
     public fun decoratedEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List<NavEntry<NavKey>> {
-        val todayDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
-        val libraryDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
-        val discoverDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
-        val youDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val todaySaveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val todayViewModelStoreDecorator = rememberViewModelStoreNavEntryDecorator<NavKey>()
+        val librarySaveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val libraryViewModelStoreDecorator = rememberViewModelStoreNavEntryDecorator<NavKey>()
+        val discoverSaveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val discoverViewModelStoreDecorator = rememberViewModelStoreNavEntryDecorator<NavKey>()
+        val youSaveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+        val youViewModelStoreDecorator = rememberViewModelStoreNavEntryDecorator<NavKey>()
 
         val todayEntries =
             rememberDecoratedNavEntries(
                 backStack = backStacks.getValue(TopLevelSlot.TODAY),
-                entryDecorators = listOf(todayDecorator),
+                entryDecorators = listOf(todaySaveableStateDecorator, todayViewModelStoreDecorator),
                 entryProvider = entryProvider,
             )
         val libraryEntries =
             rememberDecoratedNavEntries(
                 backStack = backStacks.getValue(TopLevelSlot.LIBRARY),
-                entryDecorators = listOf(libraryDecorator),
+                entryDecorators = listOf(librarySaveableStateDecorator, libraryViewModelStoreDecorator),
                 entryProvider = entryProvider,
             )
         val discoverEntries =
             rememberDecoratedNavEntries(
                 backStack = backStacks.getValue(TopLevelSlot.DISCOVER),
-                entryDecorators = listOf(discoverDecorator),
+                entryDecorators = listOf(discoverSaveableStateDecorator, discoverViewModelStoreDecorator),
                 entryProvider = entryProvider,
             )
         val youEntries =
             rememberDecoratedNavEntries(
                 backStack = backStacks.getValue(TopLevelSlot.YOU),
-                entryDecorators = listOf(youDecorator),
+                entryDecorators = listOf(youSaveableStateDecorator, youViewModelStoreDecorator),
                 entryProvider = entryProvider,
             )
 

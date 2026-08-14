@@ -37,7 +37,7 @@ internal class AccountGraphHandle internal constructor(
 
 @SingleIn(AppScope::class)
 @Inject
-internal class AccountGraphManager(
+internal class AccountGraphLifecycle(
     private val factory: AccountGraph.Factory,
 ) {
     private var currentHandle: AccountGraphHandle? = null

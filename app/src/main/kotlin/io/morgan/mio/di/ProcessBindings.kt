@@ -1,12 +1,18 @@
 package io.morgan.mio.di
 
 import android.content.Context
+import androidx.lifecycle.ViewModel
 import coil3.ImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
+import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
+import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.common.di.ApplicationContext
 import io.morgan.mio.core.common.di.DefaultDispatcher
@@ -22,6 +28,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlin.reflect.KClass
 import kotlin.time.Clock
 
 @BindingContainer
@@ -80,3 +87,13 @@ internal object ProcessBindings {
             entryBuilders = entryBuilders,
         )
 }
+
+@ContributesBinding(AppScope::class)
+@SingleIn(AppScope::class)
+@Inject
+internal class DefaultMetroViewModelFactory(
+    override val viewModelProviders: Map<KClass<out ViewModel>, () -> ViewModel>,
+    override val assistedFactoryProviders: Map<KClass<out ViewModel>, () -> ViewModelAssistedFactory>,
+    override val manualAssistedFactoryProviders:
+        Map<KClass<out ManualViewModelAssistedFactory>, () -> ManualViewModelAssistedFactory>,
+) : MetroViewModelFactory()

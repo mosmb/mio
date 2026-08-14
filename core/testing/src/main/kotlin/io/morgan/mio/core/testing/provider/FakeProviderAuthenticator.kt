@@ -1,8 +1,8 @@
 package io.morgan.mio.core.testing.provider
 
 import io.morgan.mio.data.provider.api.ProviderAuthenticator
-import io.morgan.mio.data.provider.api.ProviderAuthorizationCallback
 import io.morgan.mio.data.provider.api.ProviderAuthorizationLaunch
+import io.morgan.mio.data.provider.api.ProviderAuthorizationRedirect
 import io.morgan.mio.data.provider.api.ProviderAuthorizationRequest
 import io.morgan.mio.data.provider.api.ProviderAuthorizationTransaction
 import io.morgan.mio.data.provider.api.ProviderCredentials
@@ -16,7 +16,7 @@ public class FakeProviderAuthenticator(
         ArrayDeque<suspend (ProviderAuthorizationRequest) -> ProviderResult<ProviderAuthorizationLaunch>>()
     private val completeHandlers =
         ArrayDeque<
-            suspend (ProviderAuthorizationTransaction, ProviderAuthorizationCallback) ->
+            suspend (ProviderAuthorizationTransaction, ProviderAuthorizationRedirect) ->
             ProviderResult<ProviderCredentials>,
         >()
     private val refreshHandlers =
@@ -42,7 +42,7 @@ public class FakeProviderAuthenticator(
     }
 
     public fun enqueueCompleteAuthorization(
-        handler: suspend (ProviderAuthorizationTransaction, ProviderAuthorizationCallback) ->
+        handler: suspend (ProviderAuthorizationTransaction, ProviderAuthorizationRedirect) ->
         ProviderResult<ProviderCredentials>,
     ) {
         completeHandlers.addLast(handler)
@@ -62,11 +62,11 @@ public class FakeProviderAuthenticator(
 
     override suspend fun completeAuthorization(
         transaction: ProviderAuthorizationTransaction,
-        callback: ProviderAuthorizationCallback,
+        redirect: ProviderAuthorizationRedirect,
     ): ProviderResult<ProviderCredentials> {
-        completeCallsValue += AuthorizationCompletionCall(transaction, callback)
+        completeCallsValue += AuthorizationCompletionCall(transaction, redirect)
         val result =
-            completeHandlers.removeFirstOrNull()?.invoke(transaction, callback)
+            completeHandlers.removeFirstOrNull()?.invoke(transaction, redirect)
                 ?: error("No queued completeAuthorization handler for provider $provider")
         result.requireProvider(provider)
         return result
@@ -93,5 +93,5 @@ public class FakeProviderAuthenticator(
 
 public data class AuthorizationCompletionCall(
     public val transaction: ProviderAuthorizationTransaction,
-    public val callback: ProviderAuthorizationCallback,
+    public val redirect: ProviderAuthorizationRedirect,
 )

@@ -33,14 +33,14 @@ public class ProviderAuthorizationLaunch(
     override fun toString(): String = "ProviderAuthorizationLaunch([REDACTED])"
 }
 
-public class ProviderAuthorizationCallback(
-    public val callbackUri: String,
+public class ProviderAuthorizationRedirect(
+    public val redirectUri: String,
 ) {
     init {
-        require(callbackUri.isNotBlank())
+        require(redirectUri.isNotBlank())
     }
 
-    override fun toString(): String = "ProviderAuthorizationCallback([REDACTED])"
+    override fun toString(): String = "ProviderAuthorizationRedirect([REDACTED])"
 }
 
 public class ProviderCredentials(
@@ -68,7 +68,7 @@ public interface ProviderAuthenticator {
 
     public suspend fun completeAuthorization(
         transaction: ProviderAuthorizationTransaction,
-        callback: ProviderAuthorizationCallback,
+        redirect: ProviderAuthorizationRedirect,
     ): ProviderResult<ProviderCredentials>
 
     public suspend fun refresh(credentials: ProviderCredentials): ProviderResult<ProviderCredentials>

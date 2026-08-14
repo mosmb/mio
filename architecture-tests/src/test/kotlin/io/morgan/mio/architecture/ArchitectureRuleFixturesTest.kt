@@ -53,6 +53,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidCapabilityProviderConsumer.kt" to ":data:account",
                         "ValidPendingOperationWriterConsumer.kt" to ":data:progress",
                         "ValidRouteScreen.kt" to ":feature:today:impl",
+                        "ValidViewModelPresentation.kt" to ":feature:today:impl",
                         "ValidDesignSystemComponent.kt" to ":core:designsystem",
                     ),
                 sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
@@ -81,6 +82,7 @@ class ArchitectureRuleFixturesTest {
         enforceMetroBoundaries(files)
         enforceSharedUiOwnership(files)
         enforceRouteScreenConvention(files)
+        enforceViewModelPresentationConvention(files)
     }
 
     @Test
@@ -543,6 +545,75 @@ class ArchitectureRuleFixturesTest {
     }
 
     @Test
+    fun routeCollectAsStateIsRejected() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "RouteUsesCollectAsState.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+        )
+    }
+
+    @Test
+    fun architecturalRoleInMismatchedFileIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "Session.kt",
+            ":domain:account",
+            ::enforceArchitecturalFileCohesion,
+        )
+    }
+
+    @Test
+    fun routeInAnotherFeatureModuleCannotSatisfyViewModelOwnership() {
+        val files =
+            loadFixtureDirectory(
+                directoryName = "viewmodel-module-ownership",
+                ownerModule = ":feature:today:impl",
+                ownerByFilename =
+                    mapOf(
+                        "CrossModuleViewModel.kt" to ":feature:today:impl",
+                        "CrossModuleScreen.kt" to ":feature:onboarding:impl",
+                    ),
+            )
+
+        val failure = assertThrows<AssertionError> { enforceViewModelPresentationConvention(files) }
+        val message = failure.message.orEmpty()
+        assertTrue(message.contains("CrossModuleViewModel.kt"), message)
+        assertTrue(message.contains("ViewModel presentation convention"), message)
+    }
+
+    @Test
+    fun screenViewModelParameterIsRejected() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "ScreenAcceptsViewModel.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+        )
+    }
+
+    @Test
+    fun viewModelDomainStateIsRejected() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "ViewModelExposesDomainState.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+        )
+    }
+
+    @Test
+    fun viewModelChannelIsRejected() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "ViewModelUsesChannel.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+        )
+    }
+
+    @Test
     fun javaTimeImportIsRejected() {
         assertFixtureRejected(
             "forbidden-imports",
@@ -906,6 +977,8 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforceSharedUiIsolation -> "Shared UI isolation"
             rule == ::enforceSharedUiOwnership -> "Shared UI ownership"
             rule == ::enforceRouteScreenConvention -> "Route/Screen convention"
+            rule == ::enforceArchitecturalFileCohesion -> "Architectural file cohesion"
+            rule == ::enforceViewModelPresentationConvention -> "ViewModel presentation convention"
             rule == ::enforceGloballyForbiddenImports -> "Globally forbidden imports"
             rule == ::enforceDomainModelOwnership -> "Domain model ownership"
             rule == ::enforceDomainImmutability -> "Domain immutability"

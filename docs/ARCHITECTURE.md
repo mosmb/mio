@@ -251,7 +251,7 @@ Dependencies between domain modules MUST be explicit, minimal, and acyclic. `:do
 
 Capability data modules implement domain repository contracts and aggregate local, provider, credential, preference, or outbox data sources as appropriate.
 
-- `:data:account`: account repository, credential data source, and account persistence coordination.
+- `:data:account`: account and account-session repositories, credential data source, and account persistence coordination.
 - `:data:media`: media/release repository and local/provider media data sources.
 - `:data:collection`: collection repository and local/provider collection data sources.
 - `:data:progress`: progress repository and atomic progress persistence coordinated with the sync outbox writer.
@@ -690,7 +690,7 @@ Unexpected normalized failure        -> domain-safe exception
 - Domain code is dispatcher-agnostic.
 - Dispatchers are injected through Metro-qualified abstractions; business/data classes MUST NOT hardcode dispatchers.
 - UI collects state with `collectAsStateWithLifecycle()`.
-- SharedFlow events use one lifecycle-aware collector in the Route.
+- Required external effects use retained `StateFlow`; explicitly lossy feedback may use `SharedFlow`. Both are collected lifecycle-aware in the Route.
 - Do not use callbacks for data/repository APIs, RxJava, `GlobalScope`, or unmanaged scopes.
 - Do not swallow cancellation. Any broad catch rethrows `CancellationException` before mapping other failures.
 - Tests use injected test dispatchers and virtual time.
@@ -735,7 +735,7 @@ AppGraph
 └── AccountGraph
 ```
 
-`AppGraph` is process-scoped and owns Room, shared network infrastructure, DataStore, secure credential infrastructure, clocks/dispatchers, account-session coordination, and onboarding dependencies.
+`AppGraph` is process-scoped and owns construction of Room, shared network infrastructure, DataStore, secure credential infrastructure, clocks/dispatchers, the account-session repository, and onboarding dependencies. The Android entry-point may invoke session restoration and observe session state through that domain repository; authentication and import workflow remain in data and onboarding presentation.
 
 `AccountGraph` is a Metro graph extension created only after an account is connected. It owns selected-provider bindings, account-scoped repositories/sync objects, authenticated feature dependencies, and account-scoped resources.
 
@@ -786,16 +786,16 @@ TodayScreen.kt
 TodayViewModel.kt
 TodayUiState.kt
 TodayAction.kt
-TodayUiEvent.kt
+TodayUiEffect.kt        # only when a retained external effect is required
 TodayUiMapper.kt
 ```
 
 `XRoute`:
 
 - Obtains the Metro-created ViewModel.
-- Collects `UiState` lifecycle-aware.
-- Collects `SharedFlow<UiEvent>` lifecycle-aware.
+- Collects every exposed `StateFlow` lifecycle-aware.
 - Connects navigation/effect handlers.
+- Acknowledges a retained external effect only after its handler succeeds; handler failure is sent back as a typed action/use-case intention.
 - Produces UI by invoking exactly one `XScreen`.
 - Contains no visual layout or product business logic.
 
@@ -810,23 +810,22 @@ TodayUiMapper.kt
 
 Large feature-specific pieces live under the feature's `component` package. Small private pieces MAY remain in the Screen file.
 
-### 19.2 State, actions, and events
+### 19.2 State, actions, and effects
 
 ViewModels expose:
 
 - One immutable `StateFlow<UiState>` for ongoing render state.
-- One `SharedFlow<UiEvent>` for single-occurrence output events.
+- A separate nullable `StateFlow<UiEffect?>` only for external work that must survive an inactive or recreated Route.
 - One typed `onAction(UiAction)` input by default.
 
-This project deliberately uses `SharedFlow` for single live events:
+Effect delivery is classified by consequence, not by whether it happens once:
 
-- Navigation after asynchronous work, Snackbar, Undo prompt, messages, haptics, and other one-shot output MAY be `UiEvent`s.
-- Use `replay = 0`.
-- Do not use event-wrapper/consumed-flag objects.
-- Do not duplicate single live events into `UiState`.
-- `SharedFlow` MUST NOT carry ongoing render state.
-- Each event flow has exactly one lifecycle-aware collector in its Route.
-- Do not use `Channel` as a competing presentation-event convention.
+- Browser/intent launches, permission requests, navigation after asynchronous work, and any output whose loss would strand domain state MUST be retained in `StateFlow` until the Route reports successful handling or explicit failure.
+- A retained effect has a stable opaque identity. Acknowledgement for an obsolete identity is ignored, so a late handler cannot clear a newer effect.
+- A Route MUST NOT acknowledge before the external call succeeds. Exceptions are converted to a typed failure intention; raw URI/token/callback values are never included in logs, state diagnostics, or exception messages.
+- A zero-replay `SharedFlow` MAY be used only for best-effort transient feedback whose loss while the UI is stopped is explicitly harmless, such as a nonessential haptic pulse. It MUST NOT carry render state or a required external action.
+- Do not use event-wrapper/consumed-flag objects or `Channel` as competing delivery conventions.
+- Do not copy best-effort feedback into `UiState`; retained effects are separate state because acknowledgement is part of their lifecycle.
 
 User input requiring ViewModel/business handling becomes `UiAction`. Direct navigation caused by a tap uses an explicit navigation callback. Child components receive focused callbacks rather than a ViewModel or the entire action sink unless they genuinely own most screen interactions.
 
@@ -1048,7 +1047,7 @@ Before considering any feature complete, confirm:
 - [ ] Navigation uses Navigation 3 typed keys and `api`/`impl` boundaries.
 - [ ] Route and stateless Screen share the `XScreen.kt` file.
 - [ ] ViewModels expose UI state models, never domain models.
-- [ ] One-shot outputs use `SharedFlow<UiEvent>`; ongoing render state uses `StateFlow<UiState>`.
+- [ ] Ongoing render state uses `StateFlow<UiState>`; required external effects are retained and acknowledged, while zero-replay flows are limited to explicitly lossy feedback.
 - [ ] Compose children receive state and callbacks, never ViewModels or repositories.
 - [ ] Time uses Kotlin APIs and an injected clock.
 - [ ] No Paging 3, Java time, unapproved serialization/DI, or direct provider types appear.

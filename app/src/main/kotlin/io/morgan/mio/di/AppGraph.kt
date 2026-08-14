@@ -6,6 +6,7 @@ import androidx.work.WorkerFactory
 import coil3.ImageLoader
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.common.di.ApplicationContext
 import io.morgan.mio.core.common.di.DefaultDispatcher
@@ -18,14 +19,18 @@ import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.network.NetworkClientFactory
 import io.morgan.mio.core.network.NetworkMonitor
 import io.morgan.mio.data.provider.api.ProviderCredentialStore
+import io.morgan.mio.domain.account.AccountSessionRepository
 import io.morgan.mio.domain.preferences.PreferencesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Clock
 
 @DependencyGraph(AppScope::class)
-internal interface AppGraph : AccountGraph.Factory {
-    val accountGraphManager: AccountGraphManager
+internal interface AppGraph :
+    AccountGraph.Factory,
+    ViewModelGraph {
+    val accountGraphLifecycle: AccountGraphLifecycle
+    val accountSessionRepository: AccountSessionRepository
     val database: MioDatabase
     val networkClientFactory: NetworkClientFactory
     val networkMonitor: NetworkMonitor

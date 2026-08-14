@@ -23,7 +23,7 @@ class ProviderAuthenticationTest {
         assertThrows<IllegalArgumentException> {
             ProviderAuthorizationLaunch("", ProviderAuthorizationTransaction("state", null))
         }
-        assertThrows<IllegalArgumentException> { ProviderAuthorizationCallback(" ") }
+        assertThrows<IllegalArgumentException> { ProviderAuthorizationRedirect(" ") }
         assertThrows<IllegalArgumentException> {
             ProviderCredentials(ProviderKey.ANILIST, "", null, null, "Bearer")
         }
@@ -40,16 +40,16 @@ class ProviderAuthenticationTest {
         val sentinel = "fixture-sensitive-value"
         val transaction = ProviderAuthorizationTransaction(sentinel, sentinel)
         val launch = ProviderAuthorizationLaunch(sentinel, transaction)
-        val callback = ProviderAuthorizationCallback(sentinel)
+        val redirect = ProviderAuthorizationRedirect(sentinel)
         val credentials = ProviderCredentials(ProviderKey.ANILIST, sentinel, sentinel, null, sentinel)
 
         assertEquals("ProviderAuthorizationTransaction([REDACTED])", transaction.toString())
         assertEquals("ProviderAuthorizationLaunch([REDACTED])", launch.toString())
-        assertEquals("ProviderAuthorizationCallback([REDACTED])", callback.toString())
+        assertEquals("ProviderAuthorizationRedirect([REDACTED])", redirect.toString())
         assertEquals("ProviderCredentials([REDACTED])", credentials.toString())
         assertTrue(transaction.toString().contains("REDACTED"))
         assertTrue(
-            !listOf(transaction, launch, callback, credentials).any { value ->
+            !listOf(transaction, launch, redirect, credentials).any { value ->
                 value.toString().contains(sentinel)
             },
         )

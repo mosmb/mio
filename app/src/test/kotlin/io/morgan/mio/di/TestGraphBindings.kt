@@ -23,6 +23,7 @@ import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.OnboardingDestination
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.testing.provider.FakeProviderCredentialStore
+import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.core.testing.repository.FakeAccountRepository
 import io.morgan.mio.core.testing.repository.FakeCollectionRepository
 import io.morgan.mio.core.testing.repository.FakeMediaRepository
@@ -30,11 +31,14 @@ import io.morgan.mio.core.testing.repository.FakePreferencesRepository
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.media.MediaRefreshRequester
+import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.data.provider.api.ProviderCredentialStore
 import io.morgan.mio.domain.account.AccountRepository
+import io.morgan.mio.domain.account.AccountSessionRepository
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.session.FakeProviderAccountSessionRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -65,6 +69,7 @@ internal class TestGraphBindings(
     private val mediaRepository: MediaRepository,
     private val collectionRepository: CollectionRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val accountSessionRepository: AccountSessionRepository,
 ) {
     @Provides
     fun provideDatabase(): MioDatabase = database
@@ -121,6 +126,9 @@ internal class TestGraphBindings(
     fun providePreferencesRepository(): PreferencesRepository = preferencesRepository
 
     @Provides
+    fun provideAccountSessionRepository(): AccountSessionRepository = accountSessionRepository
+
+    @Provides
     fun provideNavigationRegistry(
         onboardingDestination: OnboardingDestination,
         topLevelDestinations: Set<TopLevelDestination>,
@@ -136,6 +144,7 @@ internal class TestGraphBindings(
 internal class TestGraphFixture(
     context: Context,
     scheduler: TestCoroutineScheduler,
+    providerBinding: ProviderBinding = providerBindingFixture(),
 ) : AutoCloseable {
     val dispatcher: TestDispatcher = StandardTestDispatcher(scheduler)
     private val dataStoreScope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -157,7 +166,12 @@ internal class TestGraphFixture(
     val collectionRepository = FakeCollectionRepository()
     val preferencesRepository = FakePreferencesRepository()
     val logger: MioLogger = MioLogger.None
-    val providerCredentialStore: ProviderCredentialStore = FakeProviderCredentialStore()
+    val providerCredentialStore: FakeProviderCredentialStore = FakeProviderCredentialStore()
+    val accountSessionRepository: FakeProviderAccountSessionRepository =
+        FakeProviderAccountSessionRepository(
+            providerBinding = providerBinding,
+            providerCredentialStore = providerCredentialStore,
+        )
     val imageLoader: TrackingImageLoader = TrackingImageLoader(ImageLoader.Builder(context).build())
     val workerFactory: WorkerFactory =
         object : WorkerFactory() {
@@ -187,6 +201,7 @@ internal class TestGraphFixture(
             mediaRepository = mediaRepository,
             collectionRepository = collectionRepository,
             preferencesRepository = preferencesRepository,
+            accountSessionRepository = accountSessionRepository,
         )
 
     override fun close() {

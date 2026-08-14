@@ -89,6 +89,16 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun architecturalFileCohesion() {
+        enforceArchitecturalFileCohesion(productionFiles())
+    }
+
+    @Test
+    fun viewModelPresentationConvention() {
+        enforceViewModelPresentationConvention(productionFiles())
+    }
+
+    @Test
     fun globallyForbiddenImports() {
         enforceGloballyForbiddenImports(productionFiles())
     }
@@ -393,6 +403,27 @@ class ProductionArchitectureKonsistTest {
                     }
                 },
             "design-system components must not import navigation types",
+        )
+    }
+
+    @Test
+    fun taskTwelveOnboardingPresentationIsActuallyScanned() {
+        val files = productionFiles()
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:onboarding:impl" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "OnboardingViewModel" }
+            },
+            "production scan omitted OnboardingViewModel",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:onboarding:impl" &&
+                    ownedFile.file.text.contains("fun OnboardingRoute") &&
+                    ownedFile.file.text.contains("fun OnboardingScreen") &&
+                    ownedFile.file.imports.any { import -> import.name.endsWith("metroViewModel") }
+            },
+            "production scan omitted the Metro-backed onboarding Route/Screen",
         )
     }
 

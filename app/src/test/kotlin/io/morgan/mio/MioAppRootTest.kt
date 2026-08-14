@@ -76,6 +76,7 @@ class MioAppRootTest {
                 root = root.value,
                 navigationRegistry = registry,
                 imageLoader = imageLoader,
+                viewModelFactory = testMetroViewModelFactory,
             )
         }
 

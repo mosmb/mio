@@ -237,6 +237,36 @@ class DependencyRulesTest {
     }
 
     @Test
+    fun taskTwelveIntroducesNoProductionProjectEdge() {
+        assertEquals(43, DependencyRules.productionProjectDependencies.size)
+        assertTrue(
+            DependencyRules
+                .productionProjectDependencies
+                .getValue(":feature:onboarding:impl")
+                .containsAll(
+                    setOf(
+                        ":feature:onboarding:api",
+                        ":core:common",
+                        ":core:designsystem",
+                        ":core:ui",
+                        ":core:navigation",
+                        ":domain:account",
+                        ":domain:sync",
+                        ":domain:model",
+                    ),
+                ),
+        )
+        assertTrue(
+            DependencyRules
+                .violationsFor(
+                    owningProjectPath = ":feature:onboarding:impl",
+                    configurationName = "implementation",
+                    dependencies = listOf(DeclaredDependency(":app", projectPath = ":app")),
+                ).isNotEmpty(),
+        )
+    }
+
+    @Test
     fun testConfigurationsDoNotWidenTheProductionProjectMatrix() {
         assertTrue(
             violations(":domain:model", "testImplementation", ":data:progress").isEmpty(),

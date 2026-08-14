@@ -26,13 +26,15 @@ class MioApplicationTest {
             first.onCreate()
             second.onCreate()
 
-            assertNotNull(first.appGraph.accountGraphManager)
+            assertNotNull(first.appGraph.accountGraphLifecycle)
+            assertNotNull(first.appGraph.accountSessionRepository)
             assertNotNull(first.appGraph.database)
             assertNotNull(first.appGraph.preferencesRepository)
             assertSame(first.appGraph.workManagerConfiguration, first.workManagerConfiguration)
             assertSame(first.appGraph.workerFactory, first.workManagerConfiguration.workerFactory)
             assertSame(first.appGraph.logger, first.appGraph.logger)
             assertNotSame(first.appGraph, second.appGraph)
+            assertNotSame(first.appGraph.accountSessionRepository, second.appGraph.accountSessionRepository)
         } finally {
             first.appGraph.database.close()
             second.appGraph.database.close()

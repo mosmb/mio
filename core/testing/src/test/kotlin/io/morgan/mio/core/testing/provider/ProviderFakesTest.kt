@@ -1,6 +1,6 @@
 package io.morgan.mio.core.testing.provider
 
-import io.morgan.mio.data.provider.api.ProviderAuthorizationCallback
+import io.morgan.mio.data.provider.api.ProviderAuthorizationRedirect
 import io.morgan.mio.data.provider.api.ProviderAuthorizationRequest
 import io.morgan.mio.data.provider.api.ProviderAuthorizationTransaction
 import io.morgan.mio.data.provider.api.ProviderFailure
@@ -30,11 +30,11 @@ class ProviderFakesTest {
             assertEquals(listOf(request, request), fake.beginRequests)
 
             val transaction = ProviderAuthorizationTransaction("state", null)
-            val callback = ProviderAuthorizationCallback("https://callback.invalid/return?code=fixture")
+            val redirect = ProviderAuthorizationRedirect("https://callback.invalid/return?code=fixture")
             fake.enqueueCompleteAuthorization { _, _ -> ProviderResult.Success(providerCredentialsFixture()) }
-            fake.completeAuthorization(transaction, callback)
+            fake.completeAuthorization(transaction, redirect)
             assertEquals(transaction, fake.completeCalls.single().transaction)
-            assertEquals(callback, fake.completeCalls.single().callback)
+            assertEquals(redirect, fake.completeCalls.single().redirect)
 
             val credentials = providerCredentialsFixture()
             fake.enqueueRefresh { ProviderResult.Success(credentials) }

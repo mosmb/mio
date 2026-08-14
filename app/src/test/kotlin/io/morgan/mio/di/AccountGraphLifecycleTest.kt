@@ -34,8 +34,8 @@ class AccountGraphLifecycleTest {
     fun createReplaceDestroyAndRecreateManageOneActiveGraph() {
         val appGraph = createGraphFactory<AppGraph.Factory>().create(context)
         try {
-            val manager = appGraph.accountGraphManager
-            assertNull(manager.activeHandle())
+            val lifecycle = appGraph.accountGraphLifecycle
+            assertNull(lifecycle.activeHandle())
 
             val anilistBinding = providerBindingFixture(provider = ProviderKey.ANILIST)
             val accountRefreshCalls = mutableListOf<Unit>()
@@ -49,8 +49,8 @@ class AccountGraphLifecycleTest {
                     mediaRefreshCalls = mediaRefreshCalls,
                     collectionRefreshCalls = collectionRefreshCalls,
                 )
-            val first = manager.create(anilistRequest)
-            assertSame(first, manager.activeHandle())
+            val first = lifecycle.create(anilistRequest)
+            assertSame(first, lifecycle.activeHandle())
             first.withGraph { graph ->
                 assertEquals(anilistRequest.accountId, graph.accountId)
                 assertSame(anilistBinding, graph.providerBinding)
@@ -60,15 +60,15 @@ class AccountGraphLifecycleTest {
             }
 
             assertThrows(IllegalStateException::class.java) {
-                manager.create(request(anilistBinding, "second-account"))
+                lifecycle.create(request(anilistBinding, "second-account"))
             }
-            assertSame(first, manager.activeHandle())
+            assertSame(first, lifecycle.activeHandle())
 
             val myAnimeListBinding = providerBindingFixture(provider = ProviderKey.MY_ANIME_LIST)
             val replacementRequest = request(myAnimeListBinding, "myanimelist-account")
-            val second = manager.replace(replacementRequest)
+            val second = lifecycle.replace(replacementRequest)
             assertNotSame(first, second)
-            assertSame(second, manager.activeHandle())
+            assertSame(second, lifecycle.activeHandle())
             assertThrows(IllegalStateException::class.java) {
                 first.withGraph { }
             }
@@ -126,15 +126,15 @@ class AccountGraphLifecycleTest {
             assertTrue(mediaRefreshCalls.isEmpty())
             assertTrue(collectionRefreshCalls.isEmpty())
 
-            manager.destroy()
-            assertNull(manager.activeHandle())
+            lifecycle.destroy()
+            assertNull(lifecycle.activeHandle())
             assertThrows(IllegalStateException::class.java) {
                 second.withGraph { }
             }
-            manager.destroy()
-            val recreated = manager.create(request(anilistBinding, "recreated-account"))
-            assertSame(recreated, manager.activeHandle())
-            manager.destroy()
+            lifecycle.destroy()
+            val recreated = lifecycle.create(request(anilistBinding, "recreated-account"))
+            assertSame(recreated, lifecycle.activeHandle())
+            lifecycle.destroy()
         } finally {
             appGraph.database.close()
             appGraph.processCoroutineScope.cancel()
@@ -148,8 +148,8 @@ class AccountGraphLifecycleTest {
         try {
             var fail = false
             val expected = IllegalStateException("factory failed")
-            val manager =
-                AccountGraphManager(
+            val lifecycle =
+                AccountGraphLifecycle(
                     AccountGraph.Factory {
                         accountId,
                         providerBinding,
@@ -168,17 +168,17 @@ class AccountGraphLifecycleTest {
                     },
                 )
             val binding = providerBindingFixture()
-            val first = manager.create(request(binding, "stable-account"))
+            val first = lifecycle.create(request(binding, "stable-account"))
             fail = true
 
             val failure =
                 assertThrows(IllegalStateException::class.java) {
-                    manager.replace(request(binding, "replacement-account"))
+                    lifecycle.replace(request(binding, "replacement-account"))
                 }
             assertSame(expected, failure)
-            assertSame(first, manager.activeHandle())
+            assertSame(first, lifecycle.activeHandle())
             assertEquals(AccountId("stable-account"), first.withGraph { graph -> graph.accountId })
-            manager.destroy()
+            lifecycle.destroy()
         } finally {
             appGraph.database.close()
             appGraph.processCoroutineScope.cancel()
