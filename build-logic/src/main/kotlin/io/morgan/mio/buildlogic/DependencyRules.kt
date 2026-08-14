@@ -186,6 +186,7 @@ public object DependencyRules {
                     ":domain:sync",
                     ":domain:model",
                     ":core:database",
+                    ":core:common",
                     ":data:provider:api",
                 ),
             ":data:preferences" to
@@ -209,7 +210,7 @@ public object DependencyRules {
             ":domain:collection" to setOf(":domain:model"),
             ":domain:progress" to emptySet(),
             ":domain:queue" to emptySet(),
-            ":domain:sync" to emptySet(),
+            ":domain:sync" to setOf(":domain:model", ":domain:collection"),
             ":domain:preferences" to setOf(":domain:model"),
             ":data:provider:api" to emptySet(),
             ":core:common" to emptySet(),

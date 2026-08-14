@@ -6,6 +6,8 @@ import io.morgan.mio.core.database.model.StoredConnectedProvider
 import io.morgan.mio.core.database.model.StoredMediaFormat
 import io.morgan.mio.core.database.model.StoredMediaPublicationStatus
 import io.morgan.mio.core.database.model.StoredMediaType
+import io.morgan.mio.core.database.model.StoredPendingOperationKind
+import io.morgan.mio.core.database.model.StoredPendingOperationState
 import io.morgan.mio.core.database.model.StoredProgressUnit
 import io.morgan.mio.core.database.model.StoredReleaseTimeKind
 import org.junit.Assert.assertEquals
@@ -54,6 +56,16 @@ class MioTypeConvertersTest {
             assertEquals(value.serializedValue, converters.storedReleaseTimeKindToString(value))
             assertEquals(value, converters.stringToStoredReleaseTimeKind(value.serializedValue))
         }
+        StoredPendingOperationKind.entries.forEach { value ->
+            assertEquals(value, StoredPendingOperationKind.fromSerializedValue(value.serializedValue))
+            assertEquals(value.serializedValue, converters.storedPendingOperationKindToString(value))
+            assertEquals(value, converters.stringToStoredPendingOperationKind(value.serializedValue))
+        }
+        StoredPendingOperationState.entries.forEach { value ->
+            assertEquals(value, StoredPendingOperationState.fromSerializedValue(value.serializedValue))
+            assertEquals(value.serializedValue, converters.storedPendingOperationStateToString(value))
+            assertEquals(value, converters.stringToStoredPendingOperationState(value.serializedValue))
+        }
     }
 
     @Test
@@ -79,6 +91,12 @@ class MioTypeConvertersTest {
         assertThrows(IllegalArgumentException::class.java) {
             converters.stringToStoredReleaseTimeKind("never")
         }
+        assertThrows(IllegalArgumentException::class.java) {
+            converters.stringToStoredPendingOperationKind("unknown")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            converters.stringToStoredPendingOperationState("unknown")
+        }
     }
 
     @Test
@@ -87,6 +105,10 @@ class MioTypeConvertersTest {
         assertNull(converters.stringToStoredConnectedProvider(null))
         assertNull(converters.storedMediaFormatToString(null))
         assertNull(converters.stringToStoredMediaFormat(null))
+        assertNull(converters.storedPendingOperationKindToString(null))
+        assertNull(converters.stringToStoredPendingOperationKind(null))
+        assertNull(converters.storedPendingOperationStateToString(null))
+        assertNull(converters.stringToStoredPendingOperationState(null))
         assertNull(converters.instantToEpochMilliseconds(null))
         assertNull(converters.epochMillisecondsToInstant(null))
     }

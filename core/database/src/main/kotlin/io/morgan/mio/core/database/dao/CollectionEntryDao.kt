@@ -18,6 +18,9 @@ public abstract class CollectionEntryDao {
     @Query("SELECT * FROM collection_entry WHERE collection_entry_id = :entryId")
     public abstract fun observeEntry(entryId: String): Flow<CollectionEntryEntity?>
 
+    @Query("SELECT * FROM collection_entry WHERE collection_entry_id = :entryId")
+    public abstract suspend fun getEntry(entryId: String): CollectionEntryEntity?
+
     @Query(
         "SELECT * FROM collection_entry " +
             "WHERE account_id = :accountId AND media_id = :mediaId",

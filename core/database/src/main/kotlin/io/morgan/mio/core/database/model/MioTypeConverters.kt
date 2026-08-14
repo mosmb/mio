@@ -55,6 +55,21 @@ public class MioTypeConverters {
         value?.let(StoredReleaseTimeKind::fromSerializedValue)
 
     @TypeConverter
+    public fun storedPendingOperationKindToString(value: StoredPendingOperationKind?): String? = value?.serializedValue
+
+    @TypeConverter
+    public fun stringToStoredPendingOperationKind(value: String?): StoredPendingOperationKind? =
+        value?.let(StoredPendingOperationKind::fromSerializedValue)
+
+    @TypeConverter
+    public fun storedPendingOperationStateToString(value: StoredPendingOperationState?): String? =
+        value?.serializedValue
+
+    @TypeConverter
+    public fun stringToStoredPendingOperationState(value: String?): StoredPendingOperationState? =
+        value?.let(StoredPendingOperationState::fromSerializedValue)
+
+    @TypeConverter
     public fun instantToEpochMilliseconds(value: Instant?): Long? = value?.toEpochMilliseconds()
 
     @TypeConverter

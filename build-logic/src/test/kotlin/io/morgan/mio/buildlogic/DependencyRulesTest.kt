@@ -11,7 +11,7 @@ class DependencyRulesTest {
     fun matrixContainsAllCurrentLeafModulesAndRejectsUnknownPaths() {
         assertEquals(43, DependencyRules.productionProjectDependencies.size)
         assertEquals(
-            9,
+            8,
             DependencyRules.productionProjectDependencies.values.count { it.isEmpty() },
         )
         assertFalse(DependencyRules.productionProjectDependencies.containsKey(":new:module"))
@@ -42,11 +42,22 @@ class DependencyRulesTest {
 
     @Test
     fun enforcesDataDirectionAndProviderIsolationInTheGradleMatrix() {
+        assertTrue(violations(":data:collection", "implementation", ":data:sync").isEmpty())
         assertTrue(violations(":data:progress", "implementation", ":data:sync").isEmpty())
+        assertTrue(violations(":data:sync", "implementation", ":data:collection").isNotEmpty())
         assertTrue(violations(":data:sync", "implementation", ":data:progress").isNotEmpty())
+        assertTrue(violations(":data:sync", "implementation", ":core:common").isEmpty())
         assertTrue(violations(":data:progress", "implementation", ":data:provider:api").isEmpty())
         assertTrue(violations(":data:progress", "implementation", ":data:provider:anilist").isNotEmpty())
         assertTrue(violations(":domain:model", "implementation", ":core:common").isNotEmpty())
+    }
+
+    @Test
+    fun opensOnlyTheTaskElevenSyncDomainEdges() {
+        assertTrue(violations(":domain:sync", "implementation", ":domain:model").isEmpty())
+        assertTrue(violations(":domain:sync", "implementation", ":domain:collection").isEmpty())
+        assertTrue(violations(":domain:sync", "implementation", ":data:sync").isNotEmpty())
+        assertTrue(violations(":domain:sync", "implementation", ":core:database").isNotEmpty())
     }
 
     @Test

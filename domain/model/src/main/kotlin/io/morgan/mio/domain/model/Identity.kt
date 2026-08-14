@@ -35,3 +35,12 @@ public value class OperationId(
         require(value.isNotBlank())
     }
 }
+
+@JvmInline
+public value class OperationGroupId(
+    public val value: String,
+) {
+    init {
+        require(value.isNotBlank())
+    }
+}

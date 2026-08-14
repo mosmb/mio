@@ -1535,6 +1535,120 @@ internal fun enforceOneMechanismPerDataSource(files: List<OwnedKotlinFile>) {
     }
 }
 
+internal fun enforcePendingOperationBoundaries(files: List<OwnedKotlinFile>) {
+    val mutationModules = setOf(":data:collection", ":data:progress")
+    val forbiddenSyncImports =
+        listOf(
+            "io.morgan.mio.data.sync.local",
+            "io.morgan.mio.data.sync.mapper",
+            "io.morgan.mio.data.sync.delivery",
+            "io.morgan.mio.data.sync.reconciliation",
+            "io.morgan.mio.sync.work",
+            "androidx.work",
+        )
+    val writerDeclarations =
+        files.filter { ownedFile ->
+            ownedFile.file.declarations(true, true).any { declaration ->
+                (declaration as? KoNameProvider)?.name == "PendingOperationWriter"
+            }
+        }
+
+    assertNoViolations("Pending operation boundaries", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val syncImport =
+            if (ownedFile.modulePath in mutationModules) {
+                imports.firstOrNull { importName ->
+                    matchesPrefix(importName, "io.morgan.mio.data.sync") &&
+                        importName != "io.morgan.mio.data.sync.PendingOperationWriter"
+                }
+            } else {
+                null
+            }
+        val forbiddenMutationImport =
+            if (ownedFile.modulePath in mutationModules) {
+                imports.firstOrNull { importName -> matchesAnyPrefix(importName, forbiddenSyncImports) }
+            } else {
+                null
+            }
+        val forbiddenSyncOwnerImport =
+            if (ownedFile.modulePath == ":data:sync") {
+                imports.firstOrNull { importName ->
+                    matchesAnyPrefix(
+                        importName,
+                        listOf(
+                            "io.morgan.mio.data.collection",
+                            "io.morgan.mio.data.progress",
+                            "io.morgan.mio.sync.work",
+                            "androidx.work",
+                        ),
+                    )
+                }
+            } else {
+                null
+            }
+        val localDataSourceDeclaration =
+            ownedFile.file.classes(true, true).firstOrNull { declaration ->
+                declaration.name.endsWith("PendingOperationLocalDataSource")
+            }
+        val writerDeclaration =
+            ownedFile.file.declarations(true, true).firstOrNull { declaration ->
+                (declaration as? KoNameProvider)?.name == "PendingOperationWriter"
+            }
+        val writerIsInterface =
+            ownedFile.file.interfaces(true).any { declaration -> declaration.name == "PendingOperationWriter" }
+        val writerPublicApiIssue =
+            if (writerDeclaration != null) {
+                val forbiddenText =
+                    listOf(
+                        "androidx.room",
+                        "androidx.work",
+                        "Room",
+                        "Worker",
+                        "Provider",
+                        "Dao",
+                        "Entity",
+                        "LocalDataSource",
+                        "SyncRepository",
+                    ).firstOrNull { fragment -> ownedFile.file.text.contains(fragment) }
+                when {
+                    ownedFile.modulePath != ":data:sync" ->
+                        "PendingOperationWriter must be declared only in :data:sync"
+
+                    !writerIsInterface -> "PendingOperationWriter must be an interface"
+                    forbiddenText != null ->
+                        "PendingOperationWriter public API mentions forbidden type text '$forbiddenText'"
+
+                    else -> null
+                }
+            } else {
+                null
+            }
+
+        when {
+            syncImport != null ->
+                "mutation module may import only PendingOperationWriter from :data:sync; found '$syncImport'"
+
+            forbiddenMutationImport != null ->
+                "mutation module imported synchronization delivery internals through '$forbiddenMutationImport'"
+
+            forbiddenSyncOwnerImport != null ->
+                ":data:sync cannot import mutation data or Worker code '$forbiddenSyncOwnerImport'"
+
+            localDataSourceDeclaration != null && ownedFile.modulePath != ":data:sync" ->
+                "pending-operation local data source '${localDataSourceDeclaration.name}' must live in :data:sync"
+
+            writerPublicApiIssue != null -> writerPublicApiIssue
+            else -> null
+        }
+    }
+
+    if (writerDeclarations.any { ownedFile -> ownedFile.modulePath != ":data:sync" }) {
+        throw AssertionError(
+            "Pending operation boundaries: PendingOperationWriter declaration escaped :data:sync",
+        )
+    }
+}
+
 private fun matchesAnyPrefixFromList(
     imports: List<String>,
     prefixes: List<String>,

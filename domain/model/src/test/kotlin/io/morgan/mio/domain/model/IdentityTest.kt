@@ -13,6 +13,7 @@ class IdentityTest {
             { MediaId("   ") },
             { CollectionEntryId("\t\n") },
             { OperationId(" ") },
+            { OperationGroupId("\n") },
         ).forEach { create ->
             assertThrows<IllegalArgumentException> { create() }
         }
@@ -29,6 +30,7 @@ class IdentityTest {
             assertThrows<IllegalArgumentException> { MediaId(blank) }
             assertThrows<IllegalArgumentException> { CollectionEntryId(blank) }
             assertThrows<IllegalArgumentException> { OperationId(blank) }
+            assertThrows<IllegalArgumentException> { OperationGroupId(blank) }
         }
     }
 }

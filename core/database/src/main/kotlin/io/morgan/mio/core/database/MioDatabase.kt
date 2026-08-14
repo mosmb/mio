@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.withTransaction
 import io.morgan.mio.core.database.dao.CollectionEntryDao
 import io.morgan.mio.core.database.dao.MediaDao
+import io.morgan.mio.core.database.dao.PendingOperationDao
 import io.morgan.mio.core.database.dao.ProviderIdDao
 import io.morgan.mio.core.database.dao.ReleaseDao
 import io.morgan.mio.core.database.dao.SelectedAccountDao
@@ -15,6 +16,9 @@ import io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity
 import io.morgan.mio.core.database.entity.MediaEntity
 import io.morgan.mio.core.database.entity.MediaGenreEntity
 import io.morgan.mio.core.database.entity.MediaProviderIdEntity
+import io.morgan.mio.core.database.entity.PendingOperationDependencyEntity
+import io.morgan.mio.core.database.entity.PendingOperationEntity
+import io.morgan.mio.core.database.entity.PendingOperationGroupEntity
 import io.morgan.mio.core.database.entity.RelatedMediaEntity
 import io.morgan.mio.core.database.entity.ReleaseEntity
 import io.morgan.mio.core.database.entity.SelectedAccountEntity
@@ -31,8 +35,11 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         MediaProviderIdEntity::class,
         CollectionEntryEntity::class,
         CollectionEntryProviderIdEntity::class,
+        PendingOperationGroupEntity::class,
+        PendingOperationEntity::class,
+        PendingOperationDependencyEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -47,9 +54,11 @@ public abstract class MioDatabase : RoomDatabase() {
 
     public abstract fun providerIdDao(): ProviderIdDao
 
+    public abstract fun pendingOperationDao(): PendingOperationDao
+
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 1
+        public const val VERSION: Int = 2
     }
 }

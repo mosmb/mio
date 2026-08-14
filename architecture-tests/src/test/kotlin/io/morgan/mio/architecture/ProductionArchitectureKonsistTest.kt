@@ -124,6 +124,11 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun pendingOperationBoundaries() {
+        enforcePendingOperationBoundaries(productionFiles())
+    }
+
+    @Test
     fun metroBoundaries() {
         enforceMetroBoundaries(productionFiles())
     }
@@ -388,6 +393,56 @@ class ProductionArchitectureKonsistTest {
                     }
                 },
             "design-system components must not import navigation types",
+        )
+    }
+
+    @Test
+    fun taskElevenProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":domain:sync" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "PendingOperation" }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:sync" &&
+                    ownedFile.file.interfaces(true).any { declaration ->
+                        declaration.name == "PendingOperationWriter"
+                    }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:sync" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name == "DefaultPendingOperationWriter" &&
+                            declaration.hasAnnotationWithName("ContributesBinding")
+                    }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:sync" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name == "RoomPendingOperationLocalDataSource"
+                    }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:database" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name == "PendingOperationEntity"
+                    }
+            },
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:database" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "PendingOperationDao" }
+            },
         )
     }
 

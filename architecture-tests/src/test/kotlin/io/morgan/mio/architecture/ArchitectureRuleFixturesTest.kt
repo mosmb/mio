@@ -51,6 +51,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidProviderContract.kt" to ":data:provider:api",
                         "ValidProviderContractFake.kt" to ":core:testing",
                         "ValidCapabilityProviderConsumer.kt" to ":data:account",
+                        "ValidPendingOperationWriterConsumer.kt" to ":data:progress",
                         "ValidRouteScreen.kt" to ":feature:today:impl",
                         "ValidDesignSystemComponent.kt" to ":core:designsystem",
                     ),
@@ -76,6 +77,7 @@ class ArchitectureRuleFixturesTest {
         enforcePersistenceTypeOwnership(files)
         enforcePersistenceDoesNotEscape(files)
         enforceOneMechanismPerDataSource(files)
+        enforcePendingOperationBoundaries(files)
         enforceMetroBoundaries(files)
         enforceSharedUiOwnership(files)
         enforceRouteScreenConvention(files)
@@ -751,6 +753,47 @@ class ArchitectureRuleFixturesTest {
     }
 
     @Test
+    fun mutationDeliveryImportIsRejected() {
+        assertFixtureRejected(
+            "pending-operation-boundary",
+            "MutationImportsSyncDelivery.kt",
+            ":data:progress",
+            ::enforcePendingOperationBoundaries,
+        )
+    }
+
+    @Test
+    fun mutationRepositoryImportIsRejected() {
+        assertFixtureRejected(
+            "pending-operation-boundary",
+            "MutationImportsSyncRepository.kt",
+            ":data:progress",
+            ::enforcePendingOperationBoundaries,
+        )
+    }
+
+    @Test
+    fun syncMutationDataImportIsRejected() {
+        assertFixtureRejected(
+            "pending-operation-boundary",
+            "SyncImportsProgressData.kt",
+            ":data:sync",
+            ::enforcePendingOperationBoundaries,
+        )
+    }
+
+    @Test
+    fun validPendingOperationWriterConsumerPassesTheNarrowBoundary() {
+        val files =
+            loadFixtureDirectory(
+                directoryName = "valid",
+                ownerModule = ":data:progress",
+                filename = "ValidPendingOperationWriterConsumer.kt",
+            )
+        enforcePendingOperationBoundaries(files)
+    }
+
+    @Test
     fun graphOutsideAppIsRejected() {
         assertFixtureRejected(
             "metro-boundary",
@@ -870,6 +913,7 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforcePersistenceTypeOwnership -> "Persistence type ownership"
             rule == ::enforcePersistenceDoesNotEscape -> "Persistence escape"
             rule == ::enforceOneMechanismPerDataSource -> "One mechanism per data source"
+            rule == ::enforcePendingOperationBoundaries -> "Pending operation boundaries"
             rule == ::enforceMetroBoundaries -> "Metro boundaries"
             else -> fail("unknown architecture rule")
         }
