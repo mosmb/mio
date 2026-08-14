@@ -45,3 +45,14 @@ public annotation class IoDispatcher
     AnnotationTarget.VALUE_PARAMETER,
 )
 public annotation class MainDispatcher
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+@Target(
+    AnnotationTarget.FIELD,
+    AnnotationTarget.FUNCTION,
+    AnnotationTarget.PROPERTY,
+    AnnotationTarget.PROPERTY_GETTER,
+    AnnotationTarget.VALUE_PARAMETER,
+)
+public annotation class ProcessCoroutineScope

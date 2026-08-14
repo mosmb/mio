@@ -6,13 +6,13 @@ plugins {
 
 val productionKotlinSources =
     rootProject.fileTree(rootProject.projectDir) {
-        include("app/src/main/kotlin/**/*.kt")
-        include("feature/*/*/src/main/kotlin/**/*.kt")
-        include("domain/*/src/main/kotlin/**/*.kt")
-        include("data/*/src/main/kotlin/**/*.kt")
-        include("data/provider/*/src/main/kotlin/**/*.kt")
-        include("core/*/src/main/kotlin/**/*.kt")
-        include("sync/*/src/main/kotlin/**/*.kt")
+        include("app/src/{main,debug,release}/kotlin/**/*.kt")
+        include("feature/*/*/src/{main,debug,release}/kotlin/**/*.kt")
+        include("domain/*/src/{main,debug,release}/kotlin/**/*.kt")
+        include("data/*/src/{main,debug,release}/kotlin/**/*.kt")
+        include("data/provider/*/src/{main,debug,release}/kotlin/**/*.kt")
+        include("core/*/src/{main,debug,release}/kotlin/**/*.kt")
+        include("sync/*/src/{main,debug,release}/kotlin/**/*.kt")
     }
 
 val architectureFixtures = fileTree("src/test/fixtures") { include("**/*.kt") }

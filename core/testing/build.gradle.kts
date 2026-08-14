@@ -10,9 +10,9 @@ dependencies {
     implementation(project(":domain:preferences"))
     implementation(project(":data:provider:api"))
     implementation(libs.kotlinx.coroutines.core)
+    api(libs.kotlinx.coroutines.test)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
-    testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

@@ -4,17 +4,25 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.work.Configuration
+import androidx.work.ListenableWorker
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
+import coil3.ImageLoader
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.Provides
 import io.morgan.mio.core.common.di.DefaultDispatcher
 import io.morgan.mio.core.common.di.IoDispatcher
 import io.morgan.mio.core.common.di.MainDispatcher
+import io.morgan.mio.core.common.di.ProcessCoroutineScope
 import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.core.database.MioDatabaseFactory
+import io.morgan.mio.core.logging.MioLogger
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.OnboardingDestination
 import io.morgan.mio.core.navigation.TopLevelDestination
+import io.morgan.mio.core.testing.provider.FakeProviderCredentialStore
 import io.morgan.mio.core.testing.repository.FakeAccountRepository
 import io.morgan.mio.core.testing.repository.FakeCollectionRepository
 import io.morgan.mio.core.testing.repository.FakeMediaRepository
@@ -22,6 +30,7 @@ import io.morgan.mio.core.testing.repository.FakePreferencesRepository
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.media.MediaRefreshRequester
+import io.morgan.mio.data.provider.api.ProviderCredentialStore
 import io.morgan.mio.domain.account.AccountRepository
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.media.MediaRepository
@@ -46,6 +55,12 @@ internal class TestGraphBindings(
     private val defaultDispatcher: CoroutineDispatcher,
     private val ioDispatcher: CoroutineDispatcher,
     private val mainDispatcher: CoroutineDispatcher,
+    private val processCoroutineScope: CoroutineScope,
+    private val logger: MioLogger,
+    private val providerCredentialStore: ProviderCredentialStore,
+    private val imageLoader: ImageLoader,
+    private val workerFactory: WorkerFactory,
+    private val workManagerConfiguration: Configuration,
     private val accountRepository: AccountRepository,
     private val mediaRepository: MediaRepository,
     private val collectionRepository: CollectionRepository,
@@ -71,6 +86,25 @@ internal class TestGraphBindings(
     @Provides
     @MainDispatcher
     fun provideMainDispatcher(): CoroutineDispatcher = mainDispatcher
+
+    @Provides
+    @ProcessCoroutineScope
+    fun provideProcessCoroutineScope(): CoroutineScope = processCoroutineScope
+
+    @Provides
+    fun provideLogger(): MioLogger = logger
+
+    @Provides
+    fun provideProviderCredentialStore(): ProviderCredentialStore = providerCredentialStore
+
+    @Provides
+    fun provideImageLoader(): ImageLoader = imageLoader
+
+    @Provides
+    fun provideWorkerFactory(): WorkerFactory = workerFactory
+
+    @Provides
+    fun provideWorkManagerConfiguration(): Configuration = workManagerConfiguration
 
     @Provides
     fun provideAccountRepository(requester: AccountRefreshRequester): AccountRepository =
@@ -105,6 +139,7 @@ internal class TestGraphFixture(
 ) : AutoCloseable {
     val dispatcher: TestDispatcher = StandardTestDispatcher(scheduler)
     private val dataStoreScope = CoroutineScope(SupervisorJob() + dispatcher)
+    val processCoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
     private val temporaryDirectory: Path = Files.createTempDirectory("mio-task-six")
     val dataStoreFile: Path = temporaryDirectory.resolve("test.preferences_pb")
     val database: MioDatabase = MioDatabaseFactory.createInMemory(context)
@@ -121,6 +156,19 @@ internal class TestGraphFixture(
     val mediaRepository = FakeMediaRepository()
     val collectionRepository = FakeCollectionRepository()
     val preferencesRepository = FakePreferencesRepository()
+    val logger: MioLogger = MioLogger.None
+    val providerCredentialStore: ProviderCredentialStore = FakeProviderCredentialStore()
+    val imageLoader: TrackingImageLoader = TrackingImageLoader(ImageLoader.Builder(context).build())
+    val workerFactory: WorkerFactory =
+        object : WorkerFactory() {
+            override fun createWorker(
+                appContext: Context,
+                workerClassName: String,
+                workerParameters: WorkerParameters,
+            ): ListenableWorker? = null
+        }
+    val workManagerConfiguration: Configuration =
+        Configuration.Builder().setWorkerFactory(workerFactory).build()
     val bindings =
         TestGraphBindings(
             database = database,
@@ -129,6 +177,12 @@ internal class TestGraphFixture(
             defaultDispatcher = dispatcher,
             ioDispatcher = dispatcher,
             mainDispatcher = dispatcher,
+            processCoroutineScope = processCoroutineScope,
+            logger = logger,
+            providerCredentialStore = providerCredentialStore,
+            imageLoader = imageLoader,
+            workerFactory = workerFactory,
+            workManagerConfiguration = workManagerConfiguration,
             accountRepository = accountRepository,
             mediaRepository = mediaRepository,
             collectionRepository = collectionRepository,
@@ -138,7 +192,21 @@ internal class TestGraphFixture(
     override fun close() {
         database.close()
         dataStoreScope.cancel()
+        processCoroutineScope.cancel()
+        imageLoader.shutdown()
         Files.deleteIfExists(dataStoreFile)
         Files.deleteIfExists(temporaryDirectory)
+    }
+}
+
+internal class TrackingImageLoader(
+    private val delegate: ImageLoader,
+) : ImageLoader by delegate {
+    var shutdownCalls: Int = 0
+        private set
+
+    override fun shutdown() {
+        shutdownCalls += 1
+        delegate.shutdown()
     }
 }

@@ -11,7 +11,7 @@ class DependencyRulesTest {
     fun matrixContainsAllCurrentLeafModulesAndRejectsUnknownPaths() {
         assertEquals(43, DependencyRules.productionProjectDependencies.size)
         assertEquals(
-            10,
+            9,
             DependencyRules.productionProjectDependencies.values.count { it.isEmpty() },
         )
         assertFalse(DependencyRules.productionProjectDependencies.containsKey(":new:module"))
@@ -201,6 +201,28 @@ class DependencyRulesTest {
             violations(":feature:today:impl", "implementation", ":core:navigation").isEmpty(),
             "Expected the existing :feature:today:impl -> :core:navigation edge to remain allowed",
         )
+    }
+
+    @Test
+    fun opensOnlyTheTaskTenPlatformServiceEdges() {
+        assertTrue(violations(":app", "implementation", ":core:logging").isEmpty())
+        assertTrue(violations(":app", "implementation", ":core:ui").isEmpty())
+        assertTrue(violations(":core:logging", "implementation", ":core:common").isEmpty())
+        assertTrue(violations(":core:network", "implementation", ":core:logging").isEmpty())
+        assertTrue(violations(":sync:work", "implementation", ":core:common").isEmpty())
+
+        listOf(
+            ":core:logging" to ":core:network",
+            ":core:ui" to ":app",
+            ":feature:today:impl" to ":core:logging",
+            ":data:progress" to ":sync:work",
+            ":domain:model" to ":core:logging",
+        ).forEach { (owner, dependency) ->
+            assertTrue(
+                violations(owner, "implementation", dependency).isNotEmpty(),
+                "Expected $owner -> $dependency to remain forbidden",
+            )
+        }
     }
 
     @Test

@@ -36,6 +36,10 @@ class ArchitectureRuleFixturesTest {
                         "ValidCapabilityData.kt" to ":data:progress",
                         "ValidProvider.kt" to ":data:provider:anilist",
                         "ValidLogging.kt" to ":core:logging",
+                        "ProcessBindings.kt" to ":app",
+                        "ValidCredentialBoundary.kt" to ":data:account",
+                        "ValidArtwork.kt" to ":core:ui",
+                        "ValidWorkConfiguration.kt" to ":sync:work",
                         "ValidFeatureApi.kt" to ":feature:today:api",
                         "ValidRoomEntity.kt" to ":core:database",
                         "ValidRoomDao.kt" to ":core:database",
@@ -50,6 +54,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidRouteScreen.kt" to ":feature:today:impl",
                         "ValidDesignSystemComponent.kt" to ":core:designsystem",
                     ),
+                sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
             )
 
         enforcePackageOwnership(files)
@@ -61,6 +66,7 @@ class ArchitectureRuleFixturesTest {
         enforceNavigationBoundaries(files)
         enforceProviderContractOwnership(files)
         enforceProviderContractsDoNotEscape(files)
+        enforcePlatformServiceBoundaries(files)
         enforceLoggingBoundary(files)
         enforceSharedUiIsolation(files)
         enforceGloballyForbiddenImports(files)
@@ -357,6 +363,108 @@ class ArchitectureRuleFixturesTest {
             "TimberOutsideLogging.kt",
             ":feature:today:impl",
             ::enforceLoggingBoundary,
+        )
+    }
+
+    @Test
+    fun directSystemClockOutsideProcessBindingsIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "DirectSystemClockInData.kt",
+            ":data:account",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun directDispatcherOutsideProcessBindingsIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "DirectDispatcherInRepository.kt",
+            ":data:account",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun keystoreOutsideCredentialBoundaryIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "KeystoreOutsideCredentialBoundary.kt",
+            ":data:media",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun credentialStoreInFeatureIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "CredentialStoreInFeature.kt",
+            ":feature:today:impl",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun coilConfiguredInFeatureIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "CoilConfiguredInFeature.kt",
+            ":feature:today:impl",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun coilConfiguredOutsideAppCompositionOrDiIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "CoilConfiguredInAppRuntime.kt",
+            ":app",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun workManagerInDataIsRejected() {
+        assertFixtureRejected(
+            "platform-services",
+            "WorkManagerInData.kt",
+            ":data:sync",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun timberInReleaseIsRejected() {
+        assertFixtureRejected(
+            "logging-boundary",
+            "TimberInReleaseLogging.kt",
+            ":core:logging",
+            ::enforcePlatformServiceBoundaries,
+            sourceSet = "release",
+        )
+    }
+
+    @Test
+    fun androidLogOutsideLoggingIsRejected() {
+        assertFixtureRejected(
+            "logging-boundary",
+            "AndroidLogOutsideLogging.kt",
+            ":data:account",
+            ::enforcePlatformServiceBoundaries,
+        )
+    }
+
+    @Test
+    fun runtimeStringLoggerIsRejected() {
+        assertFixtureRejected(
+            "logging-boundary",
+            "RuntimeStringLogger.kt",
+            ":core:logging",
+            ::enforcePlatformServiceBoundaries,
+            sourceSet = "debug",
         )
     }
 
@@ -687,8 +795,15 @@ class ArchitectureRuleFixturesTest {
         filename: String,
         ownerModule: String,
         rule: (List<OwnedKotlinFile>) -> Unit,
+        sourceSet: String = "main",
     ) {
-        val files = loadFixtureDirectory(directoryName, ownerModule, filename = filename)
+        val files =
+            loadFixtureDirectory(
+                directoryName,
+                ownerModule,
+                filename = filename,
+                sourceSetByFilename = mapOf(filename to sourceSet),
+            )
         val failure = assertThrows<AssertionError> { rule(files) }
         val message = failure.message.orEmpty()
 
@@ -701,6 +816,7 @@ class ArchitectureRuleFixturesTest {
         ownerModule: String,
         filename: String? = null,
         ownerByFilename: Map<String, String> = emptyMap(),
+        sourceSetByFilename: Map<String, String> = emptyMap(),
     ): List<OwnedKotlinFile> {
         val fixtureDirectory =
             repositoryRoot
@@ -720,7 +836,11 @@ class ArchitectureRuleFixturesTest {
                         (filename == null || normalizedPath.substringAfterLast('/') == filename)
                 }.map { file ->
                     val filename = file.path.replace('\\', '/').substringAfterLast('/')
-                    OwnedKotlinFile(ownerByFilename[filename] ?: ownerModule, file)
+                    OwnedKotlinFile(
+                        modulePath = ownerByFilename[filename] ?: ownerModule,
+                        file = file,
+                        sourceSet = sourceSetByFilename[filename] ?: "main",
+                    )
                 }
 
         assertFalse(files.isEmpty(), "fixture directory is empty: $fixtureDirectory")
@@ -738,6 +858,7 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforceNavigationBoundaries -> "Navigation boundaries"
             rule == ::enforceProviderContractOwnership -> "Provider contract ownership"
             rule == ::enforceProviderContractsDoNotEscape -> "Provider contract escape"
+            rule == ::enforcePlatformServiceBoundaries -> "Platform service boundaries"
             rule == ::enforceLoggingBoundary -> "Logging boundary"
             rule == ::enforceSharedUiIsolation -> "Shared UI isolation"
             rule == ::enforceSharedUiOwnership -> "Shared UI ownership"

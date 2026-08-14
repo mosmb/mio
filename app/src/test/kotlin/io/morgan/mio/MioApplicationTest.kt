@@ -5,8 +5,10 @@ import android.content.ContextWrapper
 import androidx.test.core.app.ApplicationProvider
 import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.di.AppGraph
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,10 +29,17 @@ class MioApplicationTest {
             assertNotNull(first.appGraph.accountGraphManager)
             assertNotNull(first.appGraph.database)
             assertNotNull(first.appGraph.preferencesRepository)
+            assertSame(first.appGraph.workManagerConfiguration, first.workManagerConfiguration)
+            assertSame(first.appGraph.workerFactory, first.workManagerConfiguration.workerFactory)
+            assertSame(first.appGraph.logger, first.appGraph.logger)
             assertNotSame(first.appGraph, second.appGraph)
         } finally {
             first.appGraph.database.close()
             second.appGraph.database.close()
+            first.appGraph.processCoroutineScope.cancel()
+            second.appGraph.processCoroutineScope.cancel()
+            first.appGraph.imageLoader.shutdown()
+            second.appGraph.imageLoader.shutdown()
         }
     }
 

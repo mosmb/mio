@@ -18,6 +18,8 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":core:network"))
+    implementation(project(":core:logging"))
+    implementation(project(":core:ui"))
     implementation(project(":data:provider:api"))
     implementation(project(":domain:model"))
     implementation(project(":domain:account"))
@@ -46,6 +48,8 @@ dependencies {
     implementation(project(":sync:work"))
     implementation(libs.core.splashscreen)
     implementation(libs.navigation3.ui)
+    implementation(libs.work.runtime)
+    implementation(libs.coil.network.okhttp)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.room.testing)

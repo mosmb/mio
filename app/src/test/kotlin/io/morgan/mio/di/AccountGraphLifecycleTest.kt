@@ -12,6 +12,7 @@ import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.domain.model.AccountId
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
@@ -136,6 +137,8 @@ class AccountGraphLifecycleTest {
             manager.destroy()
         } finally {
             appGraph.database.close()
+            appGraph.processCoroutineScope.cancel()
+            appGraph.imageLoader.shutdown()
         }
     }
 
@@ -178,6 +181,8 @@ class AccountGraphLifecycleTest {
             manager.destroy()
         } finally {
             appGraph.database.close()
+            appGraph.processCoroutineScope.cancel()
+            appGraph.imageLoader.shutdown()
         }
     }
 

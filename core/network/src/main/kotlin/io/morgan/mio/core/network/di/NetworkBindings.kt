@@ -8,7 +8,9 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.common.di.ApplicationContext
+import io.morgan.mio.core.logging.MioLogger
 import io.morgan.mio.core.network.AndroidNetworkMonitor
+import io.morgan.mio.core.network.LoggingNetworkEventSink
 import io.morgan.mio.core.network.NetworkClientFactory
 import io.morgan.mio.core.network.NetworkMonitor
 
@@ -17,7 +19,8 @@ import io.morgan.mio.core.network.NetworkMonitor
 public object NetworkBindings {
     @Provides
     @SingleIn(AppScope::class)
-    public fun provideNetworkClientFactory(): NetworkClientFactory = NetworkClientFactory()
+    public fun provideNetworkClientFactory(logger: MioLogger): NetworkClientFactory =
+        NetworkClientFactory(eventSink = LoggingNetworkEventSink(logger))
 
     @Provides
     @SingleIn(AppScope::class)

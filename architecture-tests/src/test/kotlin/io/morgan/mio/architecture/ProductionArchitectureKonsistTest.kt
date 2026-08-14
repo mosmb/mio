@@ -64,6 +64,11 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun platformServiceBoundaries() {
+        enforcePlatformServiceBoundaries(productionFiles())
+    }
+
+    @Test
     fun loggingBoundary() {
         enforceLoggingBoundary(productionFiles())
     }
@@ -344,13 +349,19 @@ class ProductionArchitectureKonsistTest {
         }
 
         assertTrue(
-            files.none { ownedFile ->
+            files.any { ownedFile ->
                 ownedFile.modulePath == ":core:ui" &&
-                    ownedFile.file.path
-                        .replace('\\', '/')
-                        .contains("/src/main/")
+                    ownedFile.file.text.contains("MioArtwork") &&
+                    ownedFile.file.text.contains("MioPoster")
             },
-            ":core:ui must remain empty for task 09",
+            "production scan omitted Task 10 artwork boundary",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:ui" &&
+                    ownedFile.file.imports.any { import -> import.name == "coil3.ImageLoader" }
+            },
+            "production scan omitted explicit core-ui ImageLoader use",
         )
         assertTrue(
             files.any { ownedFile ->
@@ -382,24 +393,26 @@ class ProductionArchitectureKonsistTest {
 
     private fun productionFiles(): List<OwnedKotlinFile> =
         MioProductionModules.paths.flatMap { modulePath ->
-            val sourceDirectory =
-                repositoryRoot
-                    .resolve(modulePath.removePrefix(":").replace(':', '/'))
-                    .resolve("src/main/kotlin")
-                    .normalize()
+            listOf("main", "debug", "release").flatMap { sourceSet ->
+                val sourceDirectory =
+                    repositoryRoot
+                        .resolve(modulePath.removePrefix(":").replace(':', '/'))
+                        .resolve("src/$sourceSet/kotlin")
+                        .normalize()
 
-            if (!sourceDirectory.isDirectory()) {
-                emptyList()
-            } else {
-                Konsist
-                    .scopeFromExternalDirectory(sourceDirectory.toString())
-                    .files
-                    .filter { file ->
-                        val normalizedPath = file.path.replace('\\', '/')
-                        normalizedPath.startsWith("${sourceDirectory.toString().replace('\\', '/')}/") &&
-                            !normalizedPath.contains("/build/") &&
-                            !normalizedPath.contains("/generated/")
-                    }.map { file -> OwnedKotlinFile(modulePath, file) }
+                if (!sourceDirectory.isDirectory()) {
+                    emptyList()
+                } else {
+                    Konsist
+                        .scopeFromExternalDirectory(sourceDirectory.toString())
+                        .files
+                        .filter { file ->
+                            val normalizedPath = file.path.replace('\\', '/')
+                            normalizedPath.startsWith("${sourceDirectory.toString().replace('\\', '/')}/") &&
+                                !normalizedPath.contains("/build/") &&
+                                !normalizedPath.contains("/generated/")
+                        }.map { file -> OwnedKotlinFile(modulePath, file, sourceSet) }
+                }
             }
         }
 }

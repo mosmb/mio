@@ -12,6 +12,7 @@ import com.lemonappdev.konsist.api.provider.modifier.KoVisibilityModifierProvide
 data class OwnedKotlinFile(
     val modulePath: String,
     val file: KoFileDeclaration,
+    val sourceSet: String = "main",
 )
 
 internal object MioProductionModules {
@@ -555,6 +556,7 @@ private val taskSixScopeAndQualifierNames =
         "DefaultDispatcher",
         "IoDispatcher",
         "MainDispatcher",
+        "ProcessCoroutineScope",
     )
 
 private val taskSixGraphIntrinsicNames =
@@ -762,6 +764,8 @@ private val taskFiveCanonicalProviderDeclarations =
         "ProviderIdentityDataSource",
         "ProviderInitialImportDataSource",
         "ProviderBinding",
+        "ProviderCredentialStore",
+        "ProviderCredentialStorageException",
     )
 
 internal fun enforceProviderContractOwnership(files: List<OwnedKotlinFile>) {
@@ -856,7 +860,8 @@ internal fun enforceProviderContractsDoNotEscape(files: List<OwnedKotlinFile>) {
                 ownedFile.modulePath != ":data:provider:api" &&
                 !isProviderImplementation(ownedFile.modulePath) &&
                 ownedFile.modulePath != ":core:testing" &&
-                !(ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di")
+                !(ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di") &&
+                !isCredentialBoundaryFile(ownedFile)
             ) {
                 firstPublicProviderType(ownedFile, escapedTypeNames)
             } else {
@@ -875,6 +880,145 @@ internal fun enforceProviderContractsDoNotEscape(files: List<OwnedKotlinFile>) {
     }
 }
 
+internal fun enforcePlatformServiceBoundaries(files: List<OwnedKotlinFile>) {
+    val qualifierNames = taskSixScopeAndQualifierNames
+    val cryptoPrefixes = listOf("android.security.keystore", "java.security.KeyStore", "javax.crypto")
+    val credentialConstants =
+        listOf(
+            "mio.secure_credentials",
+            "io.morgan.mio.credentials.v1",
+            "credential.anilist",
+            "credential.myanimelist",
+        )
+    val providerCredentialNames =
+        setOf("ProviderCredentialStore", "ProviderCredentials", "ProviderCredentialStorageException")
+
+    assertNoViolations("Platform service boundaries", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val source = ownedFile.file.text
+        val declarations =
+            ownedFile.file
+                .declarations(true, true)
+                .mapNotNull { declaration -> (declaration as? KoNameProvider)?.name }
+        val isProcessBinding =
+            ownedFile.modulePath == ":app" &&
+                fileName(ownedFile.file.path) == "ProcessBindings.kt" &&
+                ownedFile.sourceSet == "main"
+        val isCredentialBoundary = isCredentialBoundaryFile(ownedFile)
+        val isProviderCredentialOwner =
+            ownedFile.sourceSet == "test" ||
+                ownedFile.modulePath == ":data:provider:api" ||
+                isProviderImplementation(ownedFile.modulePath) ||
+                ownedFile.modulePath == ":core:testing" ||
+                (ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di") ||
+                isCredentialBoundary
+        val misplacedQualifier =
+            declarations.firstOrNull { name ->
+                name in qualifierNames && ownedFile.modulePath != ":core:common"
+            }
+        val directClock =
+            Regex("\\bClock\\.System\\b").find(source)?.value?.takeUnless { isProcessBinding }
+        val directDispatcher =
+            Regex("\\bDispatchers\\.(?:Default|IO|Main|Unconfined)\\b")
+                .find(source)
+                ?.value
+                ?.takeUnless { isProcessBinding }
+        val cryptoImport =
+            imports
+                .firstOrNull { importName -> matchesAnyPrefix(importName, cryptoPrefixes) }
+                ?.takeUnless { isCredentialBoundary }
+        val credentialConstant =
+            credentialConstants
+                .firstOrNull { constant -> source.contains(constant) }
+                ?.takeUnless { isCredentialBoundary }
+        val codecEscape =
+            (
+                imports.firstOrNull { importName -> importName.endsWith(".CredentialRecordCodec") }
+                    ?: declarations.firstOrNull { name -> name == "CredentialRecordCodec" }
+            )?.takeUnless { isCredentialBoundary }
+        val providerCredentialImport =
+            imports
+                .firstOrNull { importName ->
+                    providerCredentialNames.any { name -> importName.endsWith(".$name") }
+                }?.takeUnless { isProviderCredentialOwner }
+        val coilImport =
+            imports
+                .firstOrNull { importName -> matchesPrefix(importName, "coil3") }
+                ?.takeUnless {
+                    ownedFile.sourceSet == "test" ||
+                        ownedFile.modulePath == ":core:ui" ||
+                        (
+                            ownedFile.modulePath == ":app" &&
+                                (
+                                    ownedFile.file.packagee?.name == "io.morgan.mio.di" ||
+                                        fileName(ownedFile.file.path) == "MainActivity.kt" ||
+                                        fileName(ownedFile.file.path) == "MioApp.kt"
+                                )
+                        )
+                }
+        val workImport =
+            imports
+                .firstOrNull { importName -> matchesPrefix(importName, "androidx.work") }
+                ?.takeUnless {
+                    ownedFile.sourceSet == "test" ||
+                        ownedFile.modulePath == ":sync:work" ||
+                        (
+                            ownedFile.modulePath == ":app" &&
+                                (
+                                    ownedFile.file.packagee?.name == "io.morgan.mio.di" ||
+                                        fileName(ownedFile.file.path) == "MioApplication.kt"
+                                )
+                        )
+                }
+        val timberImport =
+            imports
+                .firstOrNull { importName -> matchesPrefix(importName, "timber.log") }
+                ?.takeUnless {
+                    ownedFile.modulePath == ":core:logging" && ownedFile.sourceSet == "debug"
+                }
+        val runtimeTimberMessage =
+            Regex("""\bTimber\.(?:d|i|w|e)\s*\(\s*(?!event\.name\b|MioLogEvent\.[A-Z_]+\.name\b)[^)]""")
+                .find(source)
+                ?.value
+        val forbiddenConsoleUse =
+            when {
+                firstMatchingImport(ownedFile.file, listOf("android.util.Log")) != null ->
+                    firstMatchingImport(ownedFile.file, listOf("android.util.Log"))
+                Regex("\\bprintln\\s*\\(").containsMatchIn(source) -> "println"
+                Regex("\\bSystem\\.(?:out|err)\\b").containsMatchIn(source) -> "System.out/err"
+                else -> null
+            }
+
+        when {
+            misplacedQualifier != null ->
+                "scope or qualifier '$misplacedQualifier' must live in :core:common"
+            directClock != null ->
+                "Clock.System is app-owned by ProcessBindings.kt; found '$directClock'"
+            directDispatcher != null ->
+                "direct dispatcher '$directDispatcher' is app-owned by ProcessBindings.kt"
+            cryptoImport != null ->
+                "credential cryptography import '$cryptoImport' must stay in the account credential boundary"
+            credentialConstant != null ->
+                "credential storage constant '$credentialConstant' must stay in the account credential boundary"
+            codecEscape != null ->
+                "CredentialRecordCodec must stay in the account credential boundary"
+            providerCredentialImport != null ->
+                "provider credential type '$providerCredentialImport' escaped its allowed boundary"
+            coilImport != null ->
+                "Coil import '$coilImport' is limited to :core:ui, app composition, and tests"
+            workImport != null ->
+                "WorkManager import '$workImport' is limited to :sync:work, MioApplication, app DI, and tests"
+            timberImport != null ->
+                "Timber import '$timberImport' is limited to core/logging debug sources"
+            runtimeTimberMessage != null ->
+                "Timber may receive only closed event names; found '$runtimeTimberMessage'"
+            forbiddenConsoleUse != null ->
+                "production source cannot use '$forbiddenConsoleUse'"
+            else -> null
+        }
+    }
+}
+
 internal fun enforceLoggingBoundary(files: List<OwnedKotlinFile>) {
     assertNoViolations("Logging boundary", files) { ownedFile ->
         val imports = ownedFile.file.imports.map { it.name }
@@ -883,8 +1027,9 @@ internal fun enforceLoggingBoundary(files: List<OwnedKotlinFile>) {
             imports.firstOrNull { importName -> matchesPrefix(importName, "io.morgan.mio.core.logging") }
 
         when {
-            timberImport != null && ownedFile.modulePath != ":core:logging" ->
-                "only :core:logging may import Timber '$timberImport'"
+            timberImport != null &&
+                !(ownedFile.modulePath == ":core:logging" && ownedFile.sourceSet == "debug") ->
+                "only core/logging debug sources may import Timber '$timberImport'"
 
             loggingPackageImport != null && ownedFile.modulePath.startsWith(":domain:") ->
                 "domain code cannot import logging '$loggingPackageImport'"
@@ -1439,6 +1584,10 @@ private fun firstPublicProviderType(
         }
     }
 }
+
+private fun isCredentialBoundaryFile(ownedFile: OwnedKotlinFile): Boolean =
+    ownedFile.modulePath == ":data:account" &&
+        ownedFile.file.packagee?.name == "io.morgan.mio.data.account.credentials"
 
 private fun matchesAnyPrefix(
     value: String,

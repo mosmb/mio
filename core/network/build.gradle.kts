@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:logging"))
 
     api(libs.retrofit)
     api(libs.okhttp)

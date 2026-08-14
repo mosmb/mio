@@ -10,6 +10,8 @@ import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.domain.model.AccountId
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,8 +41,16 @@ class AppGraphTest {
             assertNotNull(graph.defaultDispatcher)
             assertNotNull(graph.ioDispatcher)
             assertNotNull(graph.mainDispatcher)
+            assertNotNull(graph.processCoroutineScope)
+            assertNotNull(graph.logger)
+            assertNotNull(graph.providerCredentialStore)
+            assertNotNull(graph.imageLoader)
+            assertNotNull(graph.workerFactory)
+            assertNotNull(graph.workManagerConfiguration)
         } finally {
             graph.database.close()
+            graph.processCoroutineScope.cancel()
+            graph.imageLoader.shutdown()
         }
     }
 
@@ -57,8 +67,16 @@ class AppGraphTest {
             assertSame(graph.defaultDispatcher, graph.defaultDispatcher)
             assertSame(graph.ioDispatcher, graph.ioDispatcher)
             assertSame(graph.mainDispatcher, graph.mainDispatcher)
+            assertSame(graph.processCoroutineScope, graph.processCoroutineScope)
+            assertSame(graph.logger, graph.logger)
+            assertSame(graph.providerCredentialStore, graph.providerCredentialStore)
+            assertSame(graph.imageLoader, graph.imageLoader)
+            assertSame(graph.workerFactory, graph.workerFactory)
+            assertSame(graph.workManagerConfiguration, graph.workManagerConfiguration)
         } finally {
             graph.database.close()
+            graph.processCoroutineScope.cancel()
+            graph.imageLoader.shutdown()
         }
     }
 
@@ -76,6 +94,12 @@ class AppGraphTest {
                 assertSame(fixture.dispatcher, graph.defaultDispatcher)
                 assertSame(fixture.dispatcher, graph.ioDispatcher)
                 assertSame(fixture.dispatcher, graph.mainDispatcher)
+                assertSame(fixture.processCoroutineScope, graph.processCoroutineScope)
+                assertSame(fixture.logger, graph.logger)
+                assertSame(fixture.providerCredentialStore, graph.providerCredentialStore)
+                assertSame(fixture.imageLoader, graph.imageLoader)
+                assertSame(fixture.workerFactory, graph.workerFactory)
+                assertSame(fixture.workManagerConfiguration, graph.workManagerConfiguration)
                 assertSame(fixture.preferencesRepository, graph.preferencesRepository)
 
                 val providerBinding = providerBindingFixture(provider = ProviderKey.ANILIST)
@@ -97,6 +121,8 @@ class AppGraphTest {
             } finally {
                 fixture.close()
             }
+            assertFalse(fixture.processCoroutineScope.isActive)
+            assertEquals(1, fixture.imageLoader.shutdownCalls)
         }
 
     @Test

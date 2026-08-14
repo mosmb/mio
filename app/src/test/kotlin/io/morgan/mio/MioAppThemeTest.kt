@@ -8,6 +8,8 @@ import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import androidx.test.core.app.ApplicationProvider
+import coil3.ImageLoader
 import io.morgan.mio.core.designsystem.theme.MioColors
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.MioNavigator
@@ -16,6 +18,7 @@ import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.OnboardingDestination
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -29,10 +32,18 @@ import kotlin.reflect.KClass
 @Config(sdk = [35])
 class MioAppThemeTest {
     private val activityRule = RobolectricActivityRule()
+    private val imageLoader by lazy {
+        ImageLoader.Builder(ApplicationProvider.getApplicationContext()).build()
+    }
 
     @get:Rule
     val composeRule: AndroidComposeTestRule<RobolectricActivityRule, *> =
         AndroidComposeTestRule(activityRule) { rule -> rule.activity }
+
+    @After
+    fun closeImageLoader() {
+        imageLoader.shutdown()
+    }
 
     @Test
     fun appThemeSuppliesLightAndDarkBackgroundAndContentColors() {
@@ -49,6 +60,7 @@ class MioAppThemeTest {
             MioApp(
                 root = rootState.value,
                 navigationRegistry = navigationRegistry,
+                imageLoader = imageLoader,
                 darkTheme = darkThemeState.value,
                 highContrastOverride = false,
             )

@@ -11,11 +11,12 @@ public class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val navigationRegistry = (application as MioApplication).appGraph.navigationRegistry
+        val graph = (application as MioApplication).appGraph
         setContent {
             MioApp(
                 root = AppRoot.ONBOARDING,
-                navigationRegistry = navigationRegistry,
+                navigationRegistry = graph.navigationRegistry,
+                imageLoader = graph.imageLoader,
             )
         }
     }

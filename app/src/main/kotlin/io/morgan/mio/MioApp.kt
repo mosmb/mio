@@ -11,11 +11,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.ui.NavDisplay
+import coil3.ImageLoader
 import io.morgan.mio.core.designsystem.layout.MioWindowInsets
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.rememberAuthenticatedNavigationState
 import io.morgan.mio.core.navigation.rememberOnboardingNavigationState
+import io.morgan.mio.core.ui.image.MioImageLoaderProvider
 
 internal enum class AppRoot {
     ONBOARDING,
@@ -26,6 +28,7 @@ internal enum class AppRoot {
 internal fun MioApp(
     root: AppRoot,
     navigationRegistry: NavigationRegistry,
+    imageLoader: ImageLoader,
     darkTheme: Boolean = isSystemInDarkTheme(),
     reducedMotionOverride: Boolean = false,
     hapticsEnabled: Boolean = true,
@@ -37,21 +40,23 @@ internal fun MioApp(
         hapticsEnabled = hapticsEnabled,
         highContrastOverride = highContrastOverride,
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MioTheme.colors.background,
-            contentColor = MioTheme.colors.text,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(MioWindowInsets.safeDrawing),
+        MioImageLoaderProvider(imageLoader) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MioTheme.colors.background,
+                contentColor = MioTheme.colors.text,
             ) {
-                key(root) {
-                    when (root) {
-                        AppRoot.ONBOARDING -> OnboardingRoot(navigationRegistry)
-                        AppRoot.AUTHENTICATED -> AuthenticatedRoot(navigationRegistry)
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(MioWindowInsets.safeDrawing),
+                ) {
+                    key(root) {
+                        when (root) {
+                            AppRoot.ONBOARDING -> OnboardingRoot(navigationRegistry)
+                            AppRoot.AUTHENTICATED -> AuthenticatedRoot(navigationRegistry)
+                        }
                     }
                 }
             }

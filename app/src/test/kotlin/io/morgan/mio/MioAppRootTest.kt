@@ -13,12 +13,15 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import androidx.test.core.app.ApplicationProvider
+import coil3.ImageLoader
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.OnboardingDestination
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -37,12 +40,20 @@ import kotlin.reflect.KClass
 @Config(sdk = [35])
 class MioAppRootTest {
     private val activityRule = RobolectricActivityRule()
+    private val imageLoader by lazy {
+        ImageLoader.Builder(ApplicationProvider.getApplicationContext()).build()
+    }
 
     @get:Rule
     val composeRule =
         AndroidComposeTestRule(activityRule) { rule ->
             rule.activity
         }
+
+    @After
+    fun closeImageLoader() {
+        imageLoader.shutdown()
+    }
 
     @Test
     fun switchingRootsReplacesNavigationSubtreesAndChrome() {
@@ -64,6 +75,7 @@ class MioAppRootTest {
             MioApp(
                 root = root.value,
                 navigationRegistry = registry,
+                imageLoader = imageLoader,
             )
         }
 

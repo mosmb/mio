@@ -7,6 +7,7 @@ import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.di.AppGraph
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -34,6 +35,8 @@ class NavigationRegistrationTest {
             )
         } finally {
             graph.database.close()
+            graph.processCoroutineScope.cancel()
+            graph.imageLoader.shutdown()
         }
     }
 
@@ -54,6 +57,8 @@ class NavigationRegistrationTest {
             assertThrows(Throwable::class.java) { provider(UnknownNavigationTestKey) }
         } finally {
             graph.database.close()
+            graph.processCoroutineScope.cancel()
+            graph.imageLoader.shutdown()
         }
     }
 
@@ -64,6 +69,8 @@ class NavigationRegistrationTest {
             assertSame(graph.navigationRegistry, graph.navigationRegistry)
         } finally {
             graph.database.close()
+            graph.processCoroutineScope.cancel()
+            graph.imageLoader.shutdown()
         }
     }
 
