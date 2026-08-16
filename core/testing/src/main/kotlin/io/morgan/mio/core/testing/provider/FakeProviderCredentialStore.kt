@@ -6,13 +6,6 @@ import io.morgan.mio.data.provider.api.ProviderCredentials
 import io.morgan.mio.data.provider.api.ProviderKey
 import java.util.EnumMap
 
-public enum class FakeProviderCredentialOperation {
-    READ,
-    WRITE,
-    DELETE,
-    DELETE_ALL,
-}
-
 public class FakeProviderCredentialStore : ProviderCredentialStore {
     private val lock = Any()
     private val values = EnumMap<ProviderKey, ProviderCredentials>(ProviderKey::class.java)

@@ -8,12 +8,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import io.morgan.mio.core.designsystem.theme.MioTheme
 
-public enum class MioHapticType {
-    ROUTINE_TICK,
-    CONFIRMATION,
-    REJECTED,
-}
-
 public interface MioHaptics {
     public fun perform(type: MioHapticType)
 }

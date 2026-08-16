@@ -17,12 +17,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.theme.MioTheme
 
-public enum class MioIconButtonStyle {
-    NEUTRAL,
-    PRIMARY,
-    SELECTED,
-}
-
 @Composable
 public fun MioIconButton(
     @DrawableRes iconRes: Int,

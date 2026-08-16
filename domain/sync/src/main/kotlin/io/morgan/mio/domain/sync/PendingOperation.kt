@@ -8,21 +8,6 @@ import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.model.ProgressValue
 import kotlin.time.Instant
 
-public enum class PendingOperationKind {
-    SET_PROGRESS_FORWARD,
-    SET_PROGRESS_CORRECTION,
-    SET_STATUS,
-}
-
-public enum class PendingOperationState {
-    ENQUEUED,
-    IN_FLIGHT,
-    RETRYABLE_FAILURE,
-    DELIVERED,
-    BLOCKED,
-    TERMINAL_FAILURE,
-}
-
 public sealed interface OperationValue {
     public data class Progress(
         public val value: ProgressValue,

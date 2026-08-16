@@ -30,8 +30,9 @@ class ArchitectureRuleFixturesTest {
                     mapOf(
                         "ValidDomain.kt" to ":domain:model",
                         "ValidDomainModel.kt" to ":domain:model",
-                        "ValidRepositoryContract.kt" to ":domain:account",
-                        "ValidFakeRepository.kt" to ":core:testing",
+                        "ValidMediaId.kt" to ":domain:model",
+                        "ValidAccountRepository.kt" to ":domain:account",
+                        "FakeValidRepository.kt" to ":core:testing",
                         "ValidFeatureImpl.kt" to ":feature:today:impl",
                         "ValidCapabilityData.kt" to ":data:progress",
                         "ValidProvider.kt" to ":data:provider:anilist",
@@ -45,7 +46,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidRoomDao.kt" to ":core:database",
                         "ValidRoomLocalDataSource.kt" to ":data:media",
                         "ValidDataStoreLocalDataSource.kt" to ":data:preferences",
-                        "ValidRepositoryImplementation.kt" to ":data:media",
+                        "ValidDataRepository.kt" to ":data:media",
                         "ValidMetroContribution.kt" to ":data:media",
                         "ValidNetworkFactory.kt" to ":core:network",
                         "ValidProviderContract.kt" to ":data:provider:api",
@@ -53,8 +54,13 @@ class ArchitectureRuleFixturesTest {
                         "ValidCapabilityProviderConsumer.kt" to ":data:account",
                         "ValidPendingOperationWriterConsumer.kt" to ":data:progress",
                         "ValidRouteScreen.kt" to ":feature:today:impl",
-                        "ValidViewModelPresentation.kt" to ":feature:today:impl",
+                        "ValidRouteUiEffect.kt" to ":feature:today:impl",
+                        "ValidRouteUiMapper.kt" to ":feature:today:impl",
+                        "ValidRouteUiState.kt" to ":feature:today:impl",
+                        "ValidRouteViewModel.kt" to ":feature:today:impl",
+                        "ValidUseCase.kt" to ":feature:today:impl",
                         "ValidDesignSystemComponent.kt" to ":core:designsystem",
+                        "MioValidComponent.kt" to ":core:designsystem",
                     ),
                 sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
             )
@@ -82,6 +88,7 @@ class ArchitectureRuleFixturesTest {
         enforceMetroBoundaries(files)
         enforceSharedUiOwnership(files)
         enforceRouteScreenConvention(files)
+        enforceArchitecturalFileCohesion(files)
         enforceViewModelPresentationConvention(files)
     }
 
@@ -565,6 +572,116 @@ class ArchitectureRuleFixturesTest {
     }
 
     @Test
+    fun viewModelRoleInMismatchedFileIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedViewModel.kt",
+            ":feature:today:impl",
+            ::enforceArchitecturalFileCohesion,
+        )
+    }
+
+    @Test
+    fun uiStateRoleInMismatchedFileIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedUiState.kt",
+            ":feature:today:impl",
+            ::enforceArchitecturalFileCohesion,
+        )
+    }
+
+    @Test
+    fun uiEffectRoleInMismatchedFileIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedUiEffect.kt",
+            ":feature:today:impl",
+            ::enforceArchitecturalFileCohesion,
+        )
+    }
+
+    @Test
+    fun uiMapperRoleInMismatchedReleaseSourceIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedUiMapper.kt",
+            ":feature:today:impl",
+            ::enforceArchitecturalFileCohesion,
+            sourceSet = "release",
+        )
+    }
+
+    @Test
+    fun objectArchitecturalRoleInMismatchedDebugSourceIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedObjectRole.kt",
+            ":feature:today:impl",
+            ::enforceArchitecturalFileCohesion,
+            sourceSet = "debug",
+        )
+    }
+
+    @Test
+    fun multipleArchitecturalRolesInOneFileAreRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MultipleRoles.kt",
+            ":feature:today:impl",
+            ::enforceArchitecturalFileCohesion,
+        )
+    }
+
+    @Test
+    fun groupedOrMismatchedEntitiesAreRejected() {
+        val files =
+            loadFixtureDirectory(
+                directoryName = "architecture-file-cohesion",
+                ownerModule = ":core:database",
+                filename = "GroupedEntity.kt",
+            )
+        val failure = assertThrows<AssertionError> { enforceArchitecturalFileCohesion(files) }
+        val message = failure.message.orEmpty()
+        assertTrue(message.contains("Architectural file cohesion"), message)
+        assertTrue(message.contains("GroupedEntity.kt"), message)
+        assertTrue(message.contains("entity 'AnotherEntity'"), message)
+    }
+
+    @Test
+    fun mismatchedPublicEnumIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedPublicEnum.kt",
+            ":domain:model",
+            ::enforceArchitecturalFileCohesion,
+            expectedReason = "public enum class",
+        )
+    }
+
+    @Test
+    fun mismatchedPublicValueWrapperIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "MismatchedPublicValue.kt",
+            ":domain:model",
+            ::enforceArchitecturalFileCohesion,
+            expectedReason = "public value class",
+        )
+    }
+
+    @Test
+    fun broadPublicTypedFileWithoutPrimaryDeclarationIsRejected() {
+        assertFixtureRejected(
+            "architecture-file-cohesion",
+            "BroadTypedFile.kt",
+            ":domain:model",
+            ::enforceArchitecturalFileCohesion,
+            expectedReason = "public top-level types",
+        )
+    }
+
+    @Test
     fun routeInAnotherFeatureModuleCannotSatisfyViewModelOwnership() {
         val files =
             loadFixtureDirectory(
@@ -910,6 +1027,7 @@ class ArchitectureRuleFixturesTest {
         ownerModule: String,
         rule: (List<OwnedKotlinFile>) -> Unit,
         sourceSet: String = "main",
+        expectedReason: String? = null,
     ) {
         val files =
             loadFixtureDirectory(
@@ -923,6 +1041,9 @@ class ArchitectureRuleFixturesTest {
 
         assertTrue(message.contains(filename), "failure should identify $filename: $message")
         assertTrue(message.contains(ruleLabel(rule)), "failure should identify its rule: $message")
+        expectedReason?.let { reason ->
+            assertTrue(message.contains(reason), "failure should identify '$reason': $message")
+        }
     }
 
     private fun loadFixtureDirectory(

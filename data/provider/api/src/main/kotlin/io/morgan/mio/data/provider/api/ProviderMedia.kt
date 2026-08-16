@@ -2,39 +2,6 @@ package io.morgan.mio.data.provider.api
 
 import kotlin.time.Instant
 
-public enum class ProviderMediaType {
-    ANIME,
-    MANGA,
-}
-
-public enum class ProviderMediaFormat {
-    TV,
-    MOVIE,
-    OVA,
-    ONA,
-    SPECIAL,
-    MUSIC,
-    MANGA,
-    NOVEL,
-    ONE_SHOT,
-    OTHER,
-}
-
-public enum class ProviderMediaPublicationStatus {
-    UPCOMING,
-    RELEASING,
-    FINISHED,
-    CANCELLED,
-    HIATUS,
-    UNKNOWN,
-}
-
-public enum class ProviderProgressUnit {
-    EPISODE,
-    CHAPTER,
-    VOLUME,
-}
-
 public data class ProviderMediaTotals(
     public val episodes: Int?,
     public val chapters: Int?,

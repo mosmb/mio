@@ -3,10 +3,8 @@ package io.morgan.mio.data.account.credentials
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
-import dev.zacsweers.metro.BindingContainer
-import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.common.di.ApplicationContext
@@ -19,6 +17,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
+@ContributesBinding(AppScope::class)
+@SingleIn(AppScope::class)
 internal class SecureProviderCredentialStore internal constructor(
     private val preferences: SharedPreferences,
     private val ioDispatcher: CoroutineDispatcher,
@@ -30,7 +30,7 @@ internal class SecureProviderCredentialStore internal constructor(
         @ApplicationContext context: Context,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         codec: CredentialRecordCodec,
-        cipher: CredentialCipher,
+        cipher: AndroidKeystoreCredentialCipher,
     ) : this(
         preferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
         ioDispatcher = ioDispatcher,
@@ -143,21 +143,4 @@ internal class SecureProviderCredentialStore internal constructor(
     private companion object {
         const val PREFERENCES_NAME: String = "mio.secure_credentials"
     }
-}
-
-@BindingContainer
-@ContributesTo(AppScope::class)
-public object CredentialBindings {
-    @Provides
-    @SingleIn(AppScope::class)
-    public fun provideProviderCredentialStore(
-        @ApplicationContext context: Context,
-        @IoDispatcher ioDispatcher: CoroutineDispatcher,
-    ): ProviderCredentialStore =
-        SecureProviderCredentialStore(
-            context = context,
-            ioDispatcher = ioDispatcher,
-            codec = CredentialRecordCodec(),
-            cipher = AndroidKeystoreCredentialCipher(),
-        )
 }

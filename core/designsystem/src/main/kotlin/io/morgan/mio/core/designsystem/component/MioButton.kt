@@ -22,11 +22,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.theme.MioTheme
 
-public enum class MioButtonStyle {
-    PRIMARY,
-    SECONDARY,
-}
-
 @Composable
 public fun MioButton(
     text: String,

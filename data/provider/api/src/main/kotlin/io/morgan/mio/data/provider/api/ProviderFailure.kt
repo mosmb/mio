@@ -12,12 +12,6 @@ public sealed interface ProviderResult<out T> {
     ) : ProviderResult<Nothing>
 }
 
-public enum class ProviderRecovery {
-    RETRY,
-    REAUTHENTICATE,
-    DO_NOT_RETRY,
-}
-
 public sealed interface ProviderFailure {
     public val recovery: ProviderRecovery
 

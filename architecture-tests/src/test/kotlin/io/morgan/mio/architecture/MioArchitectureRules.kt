@@ -1173,29 +1173,58 @@ internal fun enforceRouteScreenConvention(files: List<OwnedKotlinFile>) {
 }
 
 internal fun enforceArchitecturalFileCohesion(files: List<OwnedKotlinFile>) {
-    assertNoViolations(
-        "Architectural file cohesion",
-        files.filter { ownedFile -> ownedFile.sourceSet == "main" },
-    ) { ownedFile ->
-        val roleNames =
-            (
-                ownedFile.file
-                    .classes()
-                    .filter(::isPublicDeclaration)
-                    .map { declaration -> declaration.name } +
-                    ownedFile.file
-                        .interfaces()
-                        .filter(::isPublicDeclaration)
-                        .map { declaration -> declaration.name }
-            ).filter { name -> name.endsWith("Repository") || name.endsWith("UseCase") }
+    assertNoViolations("Architectural file cohesion", files) { ownedFile ->
         val actualFileName = fileName(ownedFile.file.path)
+        val roleNames =
+            topLevelArchitecturalDeclarations(ownedFile.file)
+                .map { declaration -> declaration.name }
+                .filter { name -> architecturalRoleSuffixes.any(name::endsWith) }
+        val mismatchedRole =
+            roleNames.firstOrNull { roleName -> actualFileName != "$roleName.kt" }
+        val mismatchedEntity =
+            ownedFile.file
+                .classes(includeNested = false, includeLocal = false)
+                .filter { declaration -> declaration.hasAnnotationWithName("Entity") }
+                .firstOrNull { declaration ->
+                    actualFileName != "${declaration.name}.kt" &&
+                        !isPendingOperationEntityAggregation(declaration.name, actualFileName)
+                }
+        val mismatchedPublicEnum =
+            topLevelPublicClasses(ownedFile.file)
+                .firstOrNull { declaration ->
+                    declaration.hasEnumModifier && actualFileName != "${declaration.name}.kt"
+                }
+        val mismatchedPublicValue =
+            topLevelPublicClasses(ownedFile.file)
+                .firstOrNull { declaration ->
+                    declaration.hasValueModifier && actualFileName != "${declaration.name}.kt"
+                }
+        val publicTypeDeclarations = topLevelPublicDeclarations(ownedFile.file)
+        val publicFunctionDeclarations = topLevelPublicFunctions(ownedFile.file)
+        val filenameStem = actualFileName.removeSuffix(".kt")
+        val missingPrimaryDeclaration =
+            publicTypeDeclarations.isNotEmpty() &&
+                publicTypeDeclarations.none { declaration -> declaration.name == filenameStem } &&
+                publicFunctionDeclarations.none { declaration -> declaration.name == filenameStem }
 
         when {
             roleNames.size > 1 ->
-                "file '$actualFileName' contains multiple public architectural roles: ${roleNames.joinToString()}"
+                "file '$actualFileName' contains multiple architectural roles: ${roleNames.joinToString()}"
 
-            roleNames.singleOrNull()?.let { roleName -> actualFileName != "$roleName.kt" } == true ->
-                "architectural role '${roleNames.single()}' must live in '${roleNames.single()}.kt'"
+            mismatchedRole != null ->
+                "architectural role '$mismatchedRole' must live in '$mismatchedRole.kt'"
+
+            mismatchedEntity != null ->
+                "entity '${mismatchedEntity.name}' must live in '${mismatchedEntity.name}.kt'"
+
+            mismatchedPublicEnum != null ->
+                "public enum class '${mismatchedPublicEnum.name}' must live in '${mismatchedPublicEnum.name}.kt'"
+
+            mismatchedPublicValue != null ->
+                "public value class '${mismatchedPublicValue.name}' must live in '${mismatchedPublicValue.name}.kt'"
+
+            missingPrimaryDeclaration ->
+                "file '$actualFileName' with public top-level types must match one public type or function declaration"
 
             else -> null
         }
@@ -1391,6 +1420,50 @@ private fun containsForbiddenScreenBody(text: String): Boolean =
     Regex(
         "\\b(?:ViewModel|Repository|DataSource|MioNavigator|NavKey|NavBackStack|NavigationState|BackStack|LocalUriHandler|UriHandler|repeatOnLifecycle|metroViewModel|collectAsStateWithLifecycle|AccountSessionState|ConnectedProvider|AccountId)\\b|\\b(?:openUri|collectAsStateWithLifecycle)\\s*\\(",
     ).containsMatchIn(text)
+
+private val architecturalRoleSuffixes =
+    listOf(
+        "Repository",
+        "UseCase",
+        "ViewModel",
+        "UiState",
+        "UiEffect",
+        "UiMapper",
+    )
+
+private fun topLevelArchitecturalDeclarations(file: KoFileDeclaration): List<KoClassAndInterfaceAndObjectDeclaration> =
+    file
+        .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+        .filter { declaration -> declaration.isTopLevel }
+
+private fun topLevelPublicDeclarations(file: KoFileDeclaration): List<KoClassAndInterfaceAndObjectDeclaration> =
+    topLevelArchitecturalDeclarations(file).filter(::isPublicDeclaration)
+
+private fun topLevelPublicClasses(file: KoFileDeclaration): List<KoClassDeclaration> =
+    file
+        .classes(includeNested = false, includeLocal = false)
+        .filter { declaration -> declaration.isTopLevel && isPublicDeclaration(declaration) }
+
+private fun topLevelPublicFunctions(file: KoFileDeclaration): List<KoFunctionDeclaration> =
+    file
+        .functions(includeNested = false, includeLocal = false)
+        .filter { declaration -> declaration.isTopLevel && isPublicDeclaration(declaration) }
+
+/**
+ * Task 11 intentionally aggregates exactly these two entities with PendingOperationEntity.
+ * Keep the exception constrained by both declaration and filename; other entities still need
+ * their own matching files.
+ */
+private fun isPendingOperationEntityAggregation(
+    declarationName: String,
+    actualFileName: String,
+): Boolean =
+    actualFileName == "PendingOperationEntity.kt" &&
+        declarationName in
+        setOf(
+            "PendingOperationGroupEntity",
+            "PendingOperationDependencyEntity",
+        )
 
 private fun isPublicDeclaration(declaration: Any): Boolean =
     (declaration as? KoVisibilityModifierProvider)?.hasPublicOrDefaultModifier == true

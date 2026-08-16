@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.metro)
 }
 
+metro {
+    generateContributionProviders.set(true)
+}
+
 dependencies {
     implementation(project(":domain:account"))
     implementation(project(":domain:model"))

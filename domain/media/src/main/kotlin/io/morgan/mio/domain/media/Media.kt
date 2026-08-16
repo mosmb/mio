@@ -6,28 +6,6 @@ import io.morgan.mio.domain.model.MediaTitle
 import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.UnitTotal
 
-public enum class MediaFormat {
-    TV,
-    MOVIE,
-    OVA,
-    ONA,
-    SPECIAL,
-    MUSIC,
-    MANGA,
-    NOVEL,
-    ONE_SHOT,
-    OTHER,
-}
-
-public enum class MediaPublicationStatus {
-    UPCOMING,
-    RELEASING,
-    FINISHED,
-    CANCELLED,
-    HIATUS,
-    UNKNOWN,
-}
-
 public data class Artwork(
     public val poster: ImageReference?,
     public val banner: ImageReference?,

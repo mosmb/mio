@@ -8,14 +8,6 @@ import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitTotal
 import kotlin.time.Instant
 
-public enum class CollectionStatus {
-    CURRENT,
-    PLANNED,
-    PAUSED,
-    COMPLETED,
-    DROPPED,
-}
-
 public data class CollectionEntry(
     public val id: CollectionEntryId,
     public val accountId: AccountId,

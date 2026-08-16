@@ -146,9 +146,22 @@ class ProductionArchitectureKonsistTest {
     @Test
     fun taskFourProductionPersistenceTypesAreActuallyScanned() {
         val files = productionFiles()
-        val source = files.map { ownedFile -> ownedFile.file.text }
-        assertTrue(source.any { text -> text.contains("@Entity") })
-        assertTrue(source.any { text -> text.contains("@Dao") })
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classes(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.hasAnnotationWithName("Entity") }
+            },
+            "production scan omitted every @Entity class",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classes(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.hasAnnotationWithName("Dao") }
+            },
+            "production scan omitted every @Dao class",
+        )
         assertTrue(
             files.any { ownedFile ->
                 ownedFile.modulePath.startsWith(":data:") &&
@@ -174,6 +187,67 @@ class ProductionArchitectureKonsistTest {
                         declaration.name == "DataStorePreferencesLocalDataSource"
                     }
             },
+        )
+    }
+
+    @Test
+    fun architecturalFileCohesionProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.name.endsWith("Repository") }
+            },
+            "production scan omitted every Repository role",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.name.endsWith("ViewModel") }
+            },
+            "production scan omitted every ViewModel role",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.name.endsWith("UiState") }
+            },
+            "production scan omitted every UiState role",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classes(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.hasPublicOrDefaultModifier && declaration.hasEnumModifier }
+            },
+            "production scan omitted every public enum class",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.file
+                    .classes(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.hasPublicOrDefaultModifier && declaration.hasValueModifier }
+            },
+            "production scan omitted every public value class",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.sourceSet == "debug" &&
+                    ownedFile.modulePath == ":core:logging" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "TimberMioLogger" }
+            },
+            "production scan omitted the debug source set",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.sourceSet == "release" &&
+                    ownedFile.modulePath == ":core:logging" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "ReleaseMioLogger" }
+            },
+            "production scan omitted the release source set",
         )
     }
 
