@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "node": {
+        "id": 999,
+        "title": null,
+        "main_picture": null,
+        "synopsis": null,
+        "media_type": null,
+        "status": null,
+        "num_episodes": null,
+        "genres": null
+      },
+      "list_status": {
+        "status": "completed",
+        "num_episodes_watched": 5,
+        "is_rewatching": null,
+        "updated_at": "2026-04-25T15:59:05+09:00"
+      }
+    }
+  ],
+  "paging": {
+    "next": null,
+    "previous": null
+  }
+}

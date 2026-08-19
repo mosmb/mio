@@ -1,0 +1,31 @@
+{
+  "data": [
+    {
+      "node": {
+        "id": 3,
+        "title": "Neon Genesis Evangelion",
+        "main_picture": {
+          "medium": "https://images.invalid/eva-medium.jpg",
+          "large": "https://images.invalid/eva-large.jpg"
+        },
+        "synopsis": "A young man is recruited to fight alien invaders.",
+        "media_type": "tv",
+        "status": "finished_airing",
+        "num_episodes": 26,
+        "genres": [
+          { "id": 4, "name": "Mecha" }
+        ]
+      },
+      "list_status": {
+        "status": "plan_to_watch",
+        "num_episodes_watched": 0,
+        "is_rewatching": false,
+        "updated_at": "2026-04-20T08:15:30+09:00"
+      }
+    }
+  ],
+  "paging": {
+    "next": null,
+    "previous": "https://api.myanimelist.net/v2/users/@me/animelist?offset=0&limit=100"
+  }
+}

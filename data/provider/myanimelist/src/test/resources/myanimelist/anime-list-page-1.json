@@ -1,0 +1,55 @@
+{
+  "data": [
+    {
+      "node": {
+        "id": 1,
+        "title": "Cowboy Bebop",
+        "main_picture": {
+          "medium": "https://images.invalid/cowboy-bebop-medium.jpg",
+          "large": "https://images.invalid/cowboy-bebop-large.jpg"
+        },
+        "synopsis": "A ragtag group of bounty hunters chases all the bugs in the solar system.",
+        "media_type": "tv",
+        "status": "finished_airing",
+        "num_episodes": 26,
+        "genres": [
+          { "id": 1, "name": "Action" },
+          { "id": 2, "name": "Adventure" }
+        ]
+      },
+      "list_status": {
+        "status": "completed",
+        "num_episodes_watched": 26,
+        "is_rewatching": false,
+        "updated_at": "2026-04-25T15:59:05+09:00"
+      }
+    },
+    {
+      "node": {
+        "id": 2,
+        "title": "Ghost in the Shell",
+        "main_picture": {
+          "medium": "https://images.invalid/gits-medium.jpg",
+          "large": "https://images.invalid/gits-large.jpg"
+        },
+        "synopsis": "A cyborg counter-intelligence agent.",
+        "media_type": "movie",
+        "status": "finished_airing",
+        "num_episodes": 1,
+        "genres": [
+          { "id": 3, "name": "Sci-Fi" }
+        ]
+      },
+      "list_status": {
+        "status": "watching",
+        "num_episodes_watched": 0,
+        "is_rewatching": true,
+        "updated_at": "2026-04-24T10:30:00+09:00"
+      }
+    }
+  ],
+  "paging": {
+    "next": "https://api.myanimelist.net/v2/users/@me/animelist?offset=2&limit=100",
+    "previous": null
+  }
+}

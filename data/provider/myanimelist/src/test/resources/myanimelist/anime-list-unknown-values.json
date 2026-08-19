@@ -1,0 +1,31 @@
+{
+  "data": [
+    {
+      "node": {
+        "id": 888,
+        "title": "Unknown Format Anime",
+        "main_picture": {
+          "medium": "https://images.invalid/unknown-medium.jpg",
+          "large": "https://images.invalid/unknown-large.jpg"
+        },
+        "synopsis": "An anime with unknown format.",
+        "media_type": "doujinshi",
+        "status": "unknown_status",
+        "num_episodes": 12,
+        "genres": [
+          { "id": 5, "name": "Comedy" }
+        ]
+      },
+      "list_status": {
+        "status": "unknown_list_status",
+        "num_episodes_watched": 5,
+        "is_rewatching": false,
+        "updated_at": "2026-04-25T15:59:05+09:00"
+      }
+    }
+  ],
+  "paging": {
+    "next": null,
+    "previous": null
+  }
+}

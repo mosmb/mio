@@ -62,6 +62,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidDesignSystemComponent.kt" to ":core:designsystem",
                         "MioValidComponent.kt" to ":core:designsystem",
                         "ValidAniListProvider.kt" to ":data:provider:anilist",
+                        "ValidMyAnimeListProvider.kt" to ":data:provider:myanimelist",
                         "ValidInitialImportPersistence.kt" to ":data:account",
                     ),
                 sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
@@ -387,6 +388,57 @@ class ArchitectureRuleFixturesTest {
             ":data:media",
             ::enforceProviderContractOwnership,
             expectedReason = "must be owned by :data:provider:anilist",
+        )
+    }
+
+    @Test
+    fun myAnimeListDtoInProviderApiIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "MyAnimeListDtoInProviderApi.kt",
+            ":data:provider:api",
+            ::enforceProviderContractOwnership,
+        )
+    }
+
+    @Test
+    fun myAnimeListOAuthServiceInCoreNetworkIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "MyAnimeListOAuthServiceInCoreNetwork.kt",
+            ":core:network",
+            ::enforceProviderContractOwnership,
+        )
+    }
+
+    @Test
+    fun myAnimeListMapperInCapabilityDataIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "MyAnimeListMapperInCapabilityData.kt",
+            ":data:collection",
+            ::enforceProviderContractOwnership,
+            expectedReason = "must be owned by :data:provider:myanimelist",
+        )
+    }
+
+    @Test
+    fun capabilityImportingMyAnimeListIsRejected() {
+        assertFixtureRejected(
+            "provider-isolation",
+            "CapabilityImportsMyAnimeList.kt",
+            ":data:account",
+            ::enforceProviderIsolation,
+        )
+    }
+
+    @Test
+    fun aniListImportingMyAnimeListServiceIsRejected() {
+        assertFixtureRejected(
+            "provider-isolation",
+            "AniListImportsMyAnimeListService.kt",
+            ":data:provider:anilist",
+            ::enforceProviderIsolation,
         )
     }
 

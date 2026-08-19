@@ -14,6 +14,7 @@ import io.morgan.mio.data.provider.api.ProviderMediaId
 import io.morgan.mio.data.provider.api.ProviderRelease
 import io.morgan.mio.data.provider.api.ProviderReleaseTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -195,6 +196,66 @@ class InitialImportPersistenceMappersTest {
 
         assertNotSame(import.media, snapshot.media)
         assertEquals(1, snapshot.media.size)
+    }
+
+    @Test
+    fun myAnimeListImportPersistenceMapping() {
+        val identity = providerIdentityFixture(provider = ProviderKey.MY_ANIME_LIST)
+        val media =
+            providerMediaFixture(
+                id = "anime/1",
+                releases = emptyList(),
+                relatedMediaIds = emptyList(),
+            )
+        val entry =
+            providerCollectionEntryFixture(
+                id = "anime/1",
+                accountId = identity.accountId,
+                mediaId = "anime/1",
+            )
+        val import =
+            completeProviderImportFixture(
+                provider = ProviderKey.MY_ANIME_LIST,
+                accountId = identity.accountId,
+                media = listOf(media),
+                entries = listOf(entry),
+            )
+
+        val snapshot = import.toInitialImportPersistence(identity)
+
+        val expectedAccountId =
+            ImportedIdentityFactory.accountId(StoredConnectedProvider.MY_ANIME_LIST, identity.accountId.value)
+        assertEquals(expectedAccountId, snapshot.accountId)
+        assertEquals(StoredConnectedProvider.MY_ANIME_LIST, snapshot.account.connectedProvider)
+        assertEquals(StoredConnectedProvider.MY_ANIME_LIST, snapshot.accountProviderId.provider)
+
+        val expectedMediaId = ImportedIdentityFactory.mediaId(StoredConnectedProvider.MY_ANIME_LIST, "anime/1")
+        assertEquals(1, snapshot.media.size)
+        assertEquals(expectedMediaId.value, snapshot.media.single().mediaId)
+
+        // The same remote values under AniList must allocate different local IDs.
+        assertNotEquals(
+            ImportedIdentityFactory.accountId(StoredConnectedProvider.ANILIST, identity.accountId.value),
+            expectedAccountId,
+        )
+        assertNotEquals(
+            ImportedIdentityFactory.mediaId(StoredConnectedProvider.ANILIST, "anime/1"),
+            expectedMediaId,
+        )
+
+        assertEquals(0, snapshot.releases.size)
+        assertEquals(0, snapshot.relatedMedia.size)
+
+        val expectedEntryId =
+            ImportedIdentityFactory.collectionEntryId(
+                StoredConnectedProvider.MY_ANIME_LIST,
+                "anime/1",
+            )
+        assertEquals(1, snapshot.entries.size)
+        val persistedEntry = snapshot.entries.single()
+        assertEquals(expectedEntryId.value, persistedEntry.collectionEntryId)
+        assertEquals(expectedMediaId.value, persistedEntry.mediaId)
+        assertEquals(persistedEntry.remoteStatus, persistedEntry.effectiveStatus)
     }
 
     @Test

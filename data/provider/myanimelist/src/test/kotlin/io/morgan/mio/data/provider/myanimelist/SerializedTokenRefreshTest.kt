@@ -1,0 +1,82 @@
+package io.morgan.mio.data.provider.myanimelist
+
+import io.morgan.mio.data.provider.api.ProviderCredentials
+import io.morgan.mio.data.provider.api.ProviderKey
+import io.morgan.mio.data.provider.api.ProviderResult
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicInteger
+
+class SerializedTokenRefreshTest {
+    private val credentials =
+        ProviderCredentials(
+            provider = ProviderKey.MY_ANIME_LIST,
+            accessToken = "fixture-access-value",
+            refreshToken = "fixture-refresh-value",
+            expiresAt = null,
+            tokenType = "Bearer",
+        )
+
+    @Test
+    fun concurrentRefreshCallsNeverOverlap() =
+        runTest {
+            val inFlight = AtomicInteger(0)
+            val maxObserved = AtomicInteger(0)
+            val refresh =
+                SerializedTokenRefresh { input ->
+                    val current = inFlight.incrementAndGet()
+                    maxObserved.updateAndGet { previous -> maxOf(previous, current) }
+                    assertEquals(1, current)
+                    inFlight.decrementAndGet()
+                    ProviderResult.Success(input)
+                }
+
+            val deferredResults =
+                List(20) {
+                    async { refresh.refresh(credentials) }
+                }
+            val results = deferredResults.map { deferred -> deferred.await() }
+
+            assertTrue(results.all { result -> result == ProviderResult.Success(credentials) })
+            assertEquals(1, maxObserved.get())
+        }
+
+    @Test
+    fun everyCallerReceivesTheAttemptResult() =
+        runTest {
+            val refreshed =
+                ProviderCredentials(
+                    provider = ProviderKey.MY_ANIME_LIST,
+                    accessToken = "fixture-rotated-access-value",
+                    refreshToken = "fixture-rotated-refresh-value",
+                    expiresAt = null,
+                    tokenType = "Bearer",
+                )
+            val refresh = SerializedTokenRefresh { ProviderResult.Success(refreshed) }
+
+            val results = List(5) { refresh.refresh(credentials) }
+
+            assertTrue(results.all { result -> result == ProviderResult.Success(refreshed) })
+        }
+
+    @Test
+    fun cancellationFromTheAttemptPropagatesUnchanged() =
+        runTest {
+            val cancellation = CancellationException("fixture-cancellation")
+            val refresh = SerializedTokenRefresh { throw cancellation }
+
+            val thrown =
+                try {
+                    refresh.refresh(credentials)
+                    null
+                } catch (caught: CancellationException) {
+                    caught
+                }
+
+            assertTrue(thrown === cancellation)
+        }
+}

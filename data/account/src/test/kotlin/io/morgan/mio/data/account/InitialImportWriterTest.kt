@@ -16,10 +16,13 @@ import io.morgan.mio.core.database.model.StoredMediaPublicationStatus
 import io.morgan.mio.core.database.model.StoredMediaType
 import io.morgan.mio.core.database.model.StoredProgressUnit
 import io.morgan.mio.core.testing.provider.completeProviderImportFixture
+import io.morgan.mio.core.testing.provider.providerCollectionEntryFixture
 import io.morgan.mio.core.testing.provider.providerIdentityFixture
+import io.morgan.mio.core.testing.provider.providerMediaFixture
 import io.morgan.mio.data.account.local.RoomInitialImportLocalDataSource
 import io.morgan.mio.data.account.mapper.ImportedIdentityFactory
 import io.morgan.mio.data.account.mapper.InitialImportPersistenceSnapshot
+import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.domain.model.AccountId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -133,6 +136,63 @@ class InitialImportWriterTest {
             assertEquals(0, countAccountRows("account-b"))
         }
 
+    @Test
+    fun myAnimeListImportCommitsEveryTableWithZeroReleases() =
+        runTest {
+            val myAnimeListIdentity = providerIdentityFixture(provider = ProviderKey.MY_ANIME_LIST)
+            val import =
+                completeProviderImportFixture(
+                    provider = ProviderKey.MY_ANIME_LIST,
+                    accountId = myAnimeListIdentity.accountId,
+                    media = listOf(providerMediaFixture(releases = emptyList())),
+                    entries = listOf(providerCollectionEntryFixture(accountId = myAnimeListIdentity.accountId)),
+                )
+
+            val accountId = writer.commit(myAnimeListIdentity, import)
+
+            val expectedAccountId =
+                ImportedIdentityFactory.accountId(
+                    StoredConnectedProvider.MY_ANIME_LIST,
+                    myAnimeListIdentity.accountId.value,
+                )
+            assertEquals(expectedAccountId, accountId)
+            assertEquals(1, countRows("selected_account"))
+            assertEquals(1, countRows("account_provider_id"))
+            assertEquals(1, countRows("media"))
+            assertEquals(1, countRows("media_provider_id"))
+            assertEquals(0, countRows("release"))
+            assertEquals(0, countRows("related_media"))
+            assertEquals(1, countRows("collection_entry"))
+            assertEquals(1, countRows("collection_entry_provider_id"))
+        }
+
+    @Test
+    fun myAnimeListCommitWithMissingMediaThrowsAndRollsBack() =
+        runTest {
+            val accountA = seedAccountWithEntries("account-a")
+
+            val badSnapshot =
+                brokenSnapshotReferencingMissingMedia(
+                    remoteAccountId = "account-b",
+                    provider = StoredConnectedProvider.MY_ANIME_LIST,
+                )
+
+            val localDataSource = RoomInitialImportLocalDataSource(database)
+            var thrown: Throwable? = null
+            try {
+                localDataSource.commit(badSnapshot)
+            } catch (failure: SQLiteConstraintException) {
+                thrown = failure
+            }
+
+            assertNotNull(thrown)
+            assertEquals(1, countRows("selected_account"))
+            val remainingAccount = database.selectedAccountDao().observeSelectedAccount().first()
+            assertEquals(accountA.value, remainingAccount?.accountId)
+            assertEquals(1, countRows("collection_entry"))
+            assertEquals(0, countAccountRows("account-b"))
+        }
+
     private fun countAccountRows(remoteAccountId: String): Int =
         database.openHelper.readableDatabase
             .query("SELECT COUNT(*) FROM account_provider_id WHERE remote_account_id = ?", arrayOf(remoteAccountId))
@@ -198,10 +258,13 @@ class InitialImportWriterTest {
         return localAccountId
     }
 
-    private fun brokenSnapshotReferencingMissingMedia(remoteAccountId: String): InitialImportPersistenceSnapshot {
-        val localAccountId = ImportedIdentityFactory.accountId(StoredConnectedProvider.ANILIST, remoteAccountId)
-        val danglingMediaId = ImportedIdentityFactory.mediaId(StoredConnectedProvider.ANILIST, "missing-media")
-        val localEntryId = ImportedIdentityFactory.collectionEntryId(StoredConnectedProvider.ANILIST, "orphan-entry")
+    private fun brokenSnapshotReferencingMissingMedia(
+        remoteAccountId: String,
+        provider: StoredConnectedProvider = StoredConnectedProvider.ANILIST,
+    ): InitialImportPersistenceSnapshot {
+        val localAccountId = ImportedIdentityFactory.accountId(provider, remoteAccountId)
+        val danglingMediaId = ImportedIdentityFactory.mediaId(provider, "missing-media")
+        val localEntryId = ImportedIdentityFactory.collectionEntryId(provider, "orphan-entry")
 
         return InitialImportPersistenceSnapshot(
             accountId = localAccountId,
@@ -209,14 +272,14 @@ class InitialImportWriterTest {
                 SelectedAccountEntity(
                     selectionKey = SELECTED_ACCOUNT_KEY,
                     accountId = localAccountId.value,
-                    connectedProvider = StoredConnectedProvider.ANILIST,
+                    connectedProvider = provider,
                     displayName = "Account B",
                     avatarReference = null,
                 ),
             accountProviderId =
                 AccountProviderIdEntity(
                     accountId = localAccountId.value,
-                    provider = StoredConnectedProvider.ANILIST,
+                    provider = provider,
                     remoteAccountId = remoteAccountId,
                 ),
             media = emptyList(),
@@ -244,7 +307,7 @@ class InitialImportWriterTest {
             entryProviderIds =
                 listOf(
                     CollectionEntryProviderIdEntity(
-                        provider = StoredConnectedProvider.ANILIST,
+                        provider = provider,
                         remoteCollectionEntryId = "orphan-entry",
                         collectionEntryId = localEntryId.value,
                     ),

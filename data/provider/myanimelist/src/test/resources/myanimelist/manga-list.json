@@ -1,0 +1,83 @@
+{
+  "data": [
+    {
+      "node": {
+        "id": 1,
+        "title": "One Piece",
+        "main_picture": {
+          "medium": "https://images.invalid/one-piece-medium.jpg",
+          "large": "https://images.invalid/one-piece-large.jpg"
+        },
+        "synopsis": "A young man seeks to become the Pirate King.",
+        "media_type": "manga",
+        "status": "currently_publishing",
+        "num_chapters": 1122,
+        "num_volumes": 112,
+        "genres": [
+          { "id": 1, "name": "Action" }
+        ]
+      },
+      "list_status": {
+        "status": "reading",
+        "num_chapters_read": 1100,
+        "num_volumes_read": 0,
+        "is_rereading": false,
+        "updated_at": "2026-04-25T15:59:05+09:00"
+      }
+    },
+    {
+      "node": {
+        "id": 2,
+        "title": "Fullmetal Alchemist",
+        "main_picture": {
+          "medium": "https://images.invalid/fma-medium.jpg",
+          "large": "https://images.invalid/fma-large.jpg"
+        },
+        "synopsis": "Two brothers seek the Philosopher's Stone.",
+        "media_type": "manga",
+        "status": "finished",
+        "num_chapters": 116,
+        "num_volumes": 27,
+        "genres": [
+          { "id": 6, "name": "Drama" }
+        ]
+      },
+      "list_status": {
+        "status": "completed",
+        "num_chapters_read": 116,
+        "num_volumes_read": 27,
+        "is_rereading": true,
+        "updated_at": "2026-04-24T12:00:00+09:00"
+      }
+    },
+    {
+      "node": {
+        "id": 1,
+        "title": "Cowboy Bebop Volume Edition",
+        "main_picture": {
+          "medium": "https://images.invalid/bebop-novel-medium.jpg",
+          "large": "https://images.invalid/bebop-novel-large.jpg"
+        },
+        "synopsis": "Light novel adaptation.",
+        "media_type": "light_novel",
+        "status": "finished",
+        "num_chapters": 50,
+        "num_volumes": 5,
+        "genres": [
+          { "id": 1, "name": "Action" }
+        ]
+      },
+      "list_status": {
+        "status": "on_hold",
+        "num_chapters_read": 30,
+        "num_volumes_read": 3,
+        "is_rereading": false,
+        "updated_at": "2026-04-23T09:15:20+09:00"
+      }
+    }
+  ],
+  "paging": {
+    "next": null,
+    "previous": null
+  }
+}

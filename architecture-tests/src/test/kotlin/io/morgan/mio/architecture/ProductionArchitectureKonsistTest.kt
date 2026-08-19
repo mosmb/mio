@@ -623,6 +623,57 @@ class ProductionArchitectureKonsistTest {
         }
     }
 
+    @Test
+    fun taskFourteenProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val myAnimeListFiles = files.filter { ownedFile -> ownedFile.modulePath == ":data:provider:myanimelist" }
+
+        listOf(
+            "MyAnimeListAuthenticator",
+            "MyAnimeListIdentityDataSource",
+            "MyAnimeListInitialImportDataSource",
+            "MyAnimeListTokenExchange",
+            "MyAnimeListProviderFactory",
+        ).forEach { typeName ->
+            assertTrue(
+                myAnimeListFiles.any { ownedFile ->
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == typeName }
+                },
+                "production scan omitted $typeName",
+            )
+        }
+        assertTrue(
+            myAnimeListFiles.any { ownedFile ->
+                ownedFile.file.interfaces(true).any { declaration -> declaration.name == "MyAnimeListApiService" }
+            },
+            "production scan omitted MyAnimeListApiService",
+        )
+        assertTrue(
+            myAnimeListFiles.any { ownedFile ->
+                ownedFile.file.interfaces(true).any { declaration -> declaration.name == "MyAnimeListOAuthService" }
+            },
+            "production scan omitted MyAnimeListOAuthService",
+        )
+        assertTrue(
+            myAnimeListFiles.any { ownedFile ->
+                ownedFile.file.classes(true, true).any { declaration -> declaration.name.endsWith("Dto") }
+            },
+            "production scan omitted every MyAnimeList DTO",
+        )
+        assertTrue(
+            myAnimeListFiles.none { ownedFile ->
+                ownedFile.file.imports.any { import -> import.name.startsWith("android.net") }
+            },
+            "a MyAnimeList production file imports android.net",
+        )
+        assertTrue(
+            myAnimeListFiles.none { ownedFile ->
+                ownedFile.file.imports.any { import -> import.name.startsWith("io.morgan.mio.data.provider.anilist") }
+            },
+            "a MyAnimeList production file imports AniList package",
+        )
+    }
+
     private fun productionFiles(): List<OwnedKotlinFile> =
         MioProductionModules.paths.flatMap { modulePath ->
             listOf("main", "debug", "release").flatMap { sourceSet ->
