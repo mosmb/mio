@@ -69,6 +69,12 @@ class MioTypeConvertersTest {
     }
 
     @Test
+    fun repeatingCollectionStatusHasTheExactSerializedValueAndTheEnumHasSixConstants() {
+        assertEquals("repeating", StoredCollectionStatus.REPEATING.serializedValue)
+        assertEquals(6, StoredCollectionStatus.entries.size)
+    }
+
+    @Test
     fun unknownEnumValuesAreRejected() {
         assertThrows(IllegalArgumentException::class.java) {
             StoredConnectedProvider.fromSerializedValue("unknown")

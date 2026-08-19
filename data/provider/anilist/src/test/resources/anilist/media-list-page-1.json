@@ -1,0 +1,48 @@
+{
+  "data": {
+    "Page": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": true
+      },
+      "mediaList": [
+        {
+          "id": 1001,
+          "status": "CURRENT",
+          "progress": 5,
+          "progressVolumes": null,
+          "updatedAt": 1700000000,
+          "createdAt": 1690000000,
+          "media": {
+            "id": 2001,
+            "type": "ANIME",
+            "format": "TV",
+            "status": "RELEASING",
+            "episodes": 12,
+            "chapters": null,
+            "volumes": null,
+            "description": "Synopsis text",
+            "bannerImage": "https://images.invalid/banner.png",
+            "genres": ["Action", "Drama"],
+            "title": {
+              "userPreferred": "Fixture Anime",
+              "romaji": "Fikusuchua Anime",
+              "english": "Fixture Anime EN",
+              "native": "フィクスチャ"
+            },
+            "coverImage": {
+              "extraLarge": "https://images.invalid/xl.png",
+              "large": "https://images.invalid/l.png",
+              "medium": "https://images.invalid/m.png"
+            },
+            "airingSchedule": {
+              "nodes": [
+                { "episode": 6, "airingAt": 1700100000 }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

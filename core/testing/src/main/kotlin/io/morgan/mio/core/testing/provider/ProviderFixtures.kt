@@ -47,6 +47,16 @@ public fun providerMediaFixture(
     id: String = "media-fixture",
     providerMediaType: ProviderMediaType = ProviderMediaType.ANIME,
     relatedMediaIds: List<String> = emptyList(),
+    totals: ProviderMediaTotals = ProviderMediaTotals(episodes = 12, chapters = null, volumes = null),
+    releases: List<ProviderRelease> =
+        listOf(
+            ProviderRelease(
+                mediaId = ProviderMediaId(id),
+                unit = ProviderProgressUnit.EPISODE,
+                number = 1,
+                time = ProviderReleaseTime.Unknown,
+            ),
+        ),
 ): ProviderMedia =
     ProviderMedia(
         id = ProviderMediaId(id),
@@ -57,33 +67,28 @@ public fun providerMediaFixture(
         synopsis = null,
         poster = ProviderImageReference("https://images.invalid/poster.png"),
         banner = null,
-        totals = ProviderMediaTotals(episodes = 12, chapters = null, volumes = null),
+        totals = totals,
         genres = listOf("Adventure", "Drama"),
         relatedMediaIds = relatedMediaIds.map(::ProviderMediaId),
-        releases =
-            listOf(
-                ProviderRelease(
-                    mediaId = ProviderMediaId(id),
-                    unit = ProviderProgressUnit.EPISODE,
-                    number = 1,
-                    time = ProviderReleaseTime.Unknown,
-                ),
-            ),
+        releases = releases,
     )
 
 public fun providerCollectionEntryFixture(
     id: String = "entry-fixture",
     accountId: ProviderAccountId = ProviderAccountId("account-fixture"),
     mediaId: String = "media-fixture",
+    status: ProviderCollectionStatus = ProviderCollectionStatus.CURRENT,
+    progressUnit: ProviderProgressUnit = ProviderProgressUnit.EPISODE,
+    total: Int? = 12,
 ): ProviderCollectionEntry =
     ProviderCollectionEntry(
         id = ProviderCollectionEntryId(id),
         accountId = accountId,
         mediaId = ProviderMediaId(mediaId),
-        status = ProviderCollectionStatus.CURRENT,
+        status = status,
         progress = 1,
-        progressUnit = ProviderProgressUnit.EPISODE,
-        total = 12,
+        progressUnit = progressUnit,
+        total = total,
         updatedAt = Instant.parse("2026-01-02T00:00:00Z"),
     )
 

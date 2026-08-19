@@ -31,6 +31,8 @@ Task 11's pending-operation writer/outbox ownership boundary is implemented: mut
 
 Task 05's network and canonical provider-contract ownership rules are implemented. Tasks 13 and 14 must extend the DTO/service ownership fixtures when those first concrete provider types appear.
 
+Task 13's AniList declaration-ownership (the `AniList`-prefixed name must live in `:data:provider:anilist`), provider-isolation, and initial-import contract-escape rules are implemented, with passing and failing fixtures and a production non-vacuity assertion covering `:data:provider:anilist` and the `:data:account` initial-import writer. Task 14 must add the matching `MyAnimeList`-prefixed fixtures when the MyAnimeList provider module's first concrete types appear; the ownership rule already enforces the `MyAnimeList` prefix, but no MyAnimeList fixture proves it yet.
+
 Task 06's Metro graph ownership, constructor-injection, graph-creation, and no-static-holder rules are implemented. Task 10's clock, dispatcher, credential, image, WorkManager-construction, and logging boundary rules are now implemented; task 12 must evolve the ViewModel injection boundary.
 
 Task 07's navigation key ownership, serialization/payload, entry-builder ownership, app-only display, and back-stack ownership rules are implemented. Task 09 must evolve the navigation rules for the Route/Screen convention, and task 12 must extend them for complete destinations and ViewModels.

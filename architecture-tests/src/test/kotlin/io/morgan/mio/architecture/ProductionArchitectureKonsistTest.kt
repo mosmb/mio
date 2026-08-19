@@ -551,6 +551,78 @@ class ProductionArchitectureKonsistTest {
         )
     }
 
+    @Test
+    fun taskThirteenProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val aniListFiles = files.filter { ownedFile -> ownedFile.modulePath == ":data:provider:anilist" }
+
+        listOf(
+            "AniListAuthenticator",
+            "AniListIdentityDataSource",
+            "AniListInitialImportDataSource",
+            "AniListProviderFactory",
+        ).forEach { typeName ->
+            assertTrue(
+                aniListFiles.any { ownedFile ->
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == typeName }
+                },
+                "production scan omitted $typeName",
+            )
+        }
+        assertTrue(
+            aniListFiles.any { ownedFile ->
+                ownedFile.file.interfaces(true).any { declaration -> declaration.name == "AniListGraphQlService" }
+            },
+            "production scan omitted AniListGraphQlService",
+        )
+        assertTrue(
+            aniListFiles.any { ownedFile ->
+                ownedFile.file.classes(true, true).any { declaration -> declaration.name.endsWith("Dto") }
+            },
+            "production scan omitted every AniList DTO",
+        )
+        assertTrue(
+            aniListFiles.none { ownedFile ->
+                ownedFile.file.imports.any { import -> import.name.startsWith("android.net") }
+            },
+            "an AniList production file imports android.net",
+        )
+
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:account" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name == "RoomInitialImportLocalDataSource"
+                    }
+            },
+            "production scan omitted RoomInitialImportLocalDataSource",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:account" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "InitialImportWriter" }
+            },
+            "production scan omitted InitialImportWriter",
+        )
+
+        listOf(
+            ":data:provider:api" to "ProviderCollectionStatus.kt",
+            ":domain:collection" to "CollectionStatus.kt",
+            ":core:database" to "StoredCollectionStatus.kt",
+        ).forEach { (modulePath, filename) ->
+            assertTrue(
+                files.any { ownedFile ->
+                    ownedFile.modulePath == modulePath &&
+                        ownedFile.file.path
+                            .replace('\\', '/')
+                            .substringAfterLast('/') == filename &&
+                        ownedFile.file.text.contains("REPEATING")
+                },
+                "$filename in $modulePath does not contain REPEATING",
+            )
+        }
+    }
+
     private fun productionFiles(): List<OwnedKotlinFile> =
         MioProductionModules.paths.flatMap { modulePath ->
             listOf("main", "debug", "release").flatMap { sourceSet ->

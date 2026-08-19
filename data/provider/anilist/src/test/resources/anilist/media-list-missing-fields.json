@@ -1,0 +1,40 @@
+{
+  "data": {
+    "Page": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": false
+      },
+      "mediaList": [
+        {
+          "id": 5001,
+          "status": "CURRENT",
+          "progress": null,
+          "progressVolumes": null,
+          "updatedAt": 1700500000,
+          "createdAt": null,
+          "media": {
+            "id": 6001,
+            "type": "ANIME",
+            "format": null,
+            "status": null,
+            "episodes": null,
+            "chapters": null,
+            "volumes": null,
+            "description": null,
+            "bannerImage": null,
+            "genres": null,
+            "title": {
+              "userPreferred": null,
+              "romaji": null,
+              "english": null,
+              "native": null
+            },
+            "coverImage": null,
+            "airingSchedule": null
+          }
+        }
+      ]
+    }
+  }
+}

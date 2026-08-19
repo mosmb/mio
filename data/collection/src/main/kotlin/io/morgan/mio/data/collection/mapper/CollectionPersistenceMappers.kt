@@ -85,6 +85,7 @@ private fun CollectionStatus.toStoredValue(): StoredCollectionStatus =
         CollectionStatus.PAUSED -> StoredCollectionStatus.PAUSED
         CollectionStatus.COMPLETED -> StoredCollectionStatus.COMPLETED
         CollectionStatus.DROPPED -> StoredCollectionStatus.DROPPED
+        CollectionStatus.REPEATING -> StoredCollectionStatus.REPEATING
     }
 
 private fun StoredCollectionStatus.toDomain(): CollectionStatus =
@@ -94,4 +95,5 @@ private fun StoredCollectionStatus.toDomain(): CollectionStatus =
         StoredCollectionStatus.PAUSED -> CollectionStatus.PAUSED
         StoredCollectionStatus.COMPLETED -> CollectionStatus.COMPLETED
         StoredCollectionStatus.DROPPED -> CollectionStatus.DROPPED
+        StoredCollectionStatus.REPEATING -> CollectionStatus.REPEATING
     }

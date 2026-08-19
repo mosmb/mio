@@ -6,4 +6,5 @@ public enum class ProviderCollectionStatus {
     PAUSED,
     COMPLETED,
     DROPPED,
+    REPEATING,
 }

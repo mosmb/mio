@@ -8,6 +8,7 @@ public enum class StoredCollectionStatus(
     PAUSED("paused"),
     COMPLETED("completed"),
     DROPPED("dropped"),
+    REPEATING("repeating"),
     ;
 
     public companion object {

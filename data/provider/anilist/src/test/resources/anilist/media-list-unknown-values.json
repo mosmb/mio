@@ -1,0 +1,40 @@
+{
+  "data": {
+    "Page": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": false
+      },
+      "mediaList": [
+        {
+          "id": 7001,
+          "status": "CURRENT",
+          "progress": 1,
+          "progressVolumes": null,
+          "updatedAt": 1700600000,
+          "createdAt": 1690600000,
+          "media": {
+            "id": 8001,
+            "type": "ANIME",
+            "format": "UNKNOWN_FORMAT",
+            "status": "UNKNOWN_PUBLICATION_STATUS",
+            "episodes": 12,
+            "chapters": null,
+            "volumes": null,
+            "description": null,
+            "bannerImage": null,
+            "genres": [],
+            "title": {
+              "userPreferred": "Unknown Values",
+              "romaji": null,
+              "english": null,
+              "native": null
+            },
+            "coverImage": null,
+            "airingSchedule": null
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "data": {
+    "Page": {
+      "pageInfo": {
+        "currentPage": 2,
+        "hasNextPage": false
+      },
+      "mediaList": [
+        {
+          "id": 1002,
+          "status": "COMPLETED",
+          "progress": 24,
+          "progressVolumes": null,
+          "updatedAt": 1700200000,
+          "createdAt": 1690200000,
+          "media": {
+            "id": 2002,
+            "type": "ANIME",
+            "format": "MOVIE",
+            "status": "FINISHED",
+            "episodes": 24,
+            "chapters": null,
+            "volumes": null,
+            "description": null,
+            "bannerImage": null,
+            "genres": [],
+            "title": {
+              "userPreferred": "Second Fixture",
+              "romaji": null,
+              "english": null,
+              "native": null
+            },
+            "coverImage": {
+              "extraLarge": null,
+              "large": null,
+              "medium": null
+            },
+            "airingSchedule": {
+              "nodes": []
+            }
+          }
+        }
+      ]
+    }
+  }
+}

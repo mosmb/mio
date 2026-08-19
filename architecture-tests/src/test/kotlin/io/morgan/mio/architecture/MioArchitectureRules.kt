@@ -818,6 +818,18 @@ internal fun enforceProviderContractOwnership(files: List<OwnedKotlinFile>) {
                     name.endsWith("GraphQlService") ||
                     name.endsWith("OAuthService")
             }
+        val classifierNames =
+            ownedFile.file
+                .classesAndInterfacesAndObjects(includeNested = true, includeLocal = false)
+                .mapNotNull { declaration -> (declaration as? KoNameProvider)?.name }
+        val misplacedAniListDeclaration =
+            classifierNames.firstOrNull { name ->
+                name.startsWith("AniList") && ownedFile.modulePath != ":data:provider:anilist"
+            }
+        val misplacedMyAnimeListDeclaration =
+            classifierNames.firstOrNull { name ->
+                name.startsWith("MyAnimeList") && ownedFile.modulePath != ":data:provider:myanimelist"
+            }
         val forbiddenApiImport =
             if (ownedFile.modulePath == ":data:provider:api") {
                 firstMatchingImport(ownedFile.file, forbiddenApiImports)
@@ -835,6 +847,12 @@ internal fun enforceProviderContractOwnership(files: List<OwnedKotlinFile>) {
             misplacedRemoteDeclaration != null &&
                 misplacedRemoteDeclaration in duplicatedProviderSpecificDeclarations ->
                 "provider DTO/service declaration '$misplacedRemoteDeclaration' must live in exactly one concrete provider module"
+
+            misplacedAniListDeclaration != null ->
+                "declaration '$misplacedAniListDeclaration' must be owned by :data:provider:anilist"
+
+            misplacedMyAnimeListDeclaration != null ->
+                "declaration '$misplacedMyAnimeListDeclaration' must be owned by :data:provider:myanimelist"
 
             forbiddenApiImport != null ->
                 ":data:provider:api cannot import '$forbiddenApiImport'"

@@ -161,6 +161,31 @@ class PendingOperationWriterTest {
         }
 
     @Test
+    fun statusGroupTargetingRepeatingPersists() =
+        runTest {
+            val repeatingOperation =
+                PendingOperation(
+                    id = OperationId("operation-repeating"),
+                    groupId = OperationGroupId("group-repeating"),
+                    accountId = ACCOUNT_ID,
+                    collectionEntryId = ENTRY_ID,
+                    kind = PendingOperationKind.SET_STATUS,
+                    base = OperationValue.Status(CollectionStatus.CURRENT),
+                    target = OperationValue.Status(CollectionStatus.REPEATING),
+                    positionInGroup = 0,
+                    dependsOn = emptySet(),
+                    state = PendingOperationState.ENQUEUED,
+                    attemptCount = 0,
+                    lastAttemptAt = null,
+                )
+            writer.enqueue(group("group-repeating", operations = listOf(repeatingOperation)))
+
+            val stored = database.pendingOperationDao().getOperation("operation-repeating")
+            assertEquals(StoredCollectionStatus.CURRENT, stored?.baseStatus)
+            assertEquals(StoredCollectionStatus.REPEATING, stored?.targetStatus)
+        }
+
+    @Test
     fun externalPredecessorMustExistAndMatchTheAccount() =
         runTest {
             val predecessorId = OperationId("operation-predecessor")

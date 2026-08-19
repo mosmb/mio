@@ -61,6 +61,8 @@ class ArchitectureRuleFixturesTest {
                         "ValidUseCase.kt" to ":feature:today:impl",
                         "ValidDesignSystemComponent.kt" to ":core:designsystem",
                         "MioValidComponent.kt" to ":core:designsystem",
+                        "ValidAniListProvider.kt" to ":data:provider:anilist",
+                        "ValidInitialImportPersistence.kt" to ":data:account",
                     ),
                 sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
             )
@@ -183,6 +185,26 @@ class ArchitectureRuleFixturesTest {
             "provider-isolation",
             "ProviderImportsRepositoryImpl.kt",
             ":data:provider:anilist",
+            ::enforceProviderIsolation,
+        )
+    }
+
+    @Test
+    fun capabilityImportingAniListIsRejected() {
+        assertFixtureRejected(
+            "provider-isolation",
+            "CapabilityImportsAniList.kt",
+            ":data:account",
+            ::enforceProviderIsolation,
+        )
+    }
+
+    @Test
+    fun myAnimeListImportingAniListServiceIsRejected() {
+        assertFixtureRejected(
+            "provider-isolation",
+            "MyAnimeListImportsAniListService.kt",
+            ":data:provider:myanimelist",
             ::enforceProviderIsolation,
         )
     }
@@ -348,6 +370,27 @@ class ArchitectureRuleFixturesTest {
     }
 
     @Test
+    fun aniListDtoInProviderApiIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "AniListDtoInProviderApi.kt",
+            ":data:provider:api",
+            ::enforceProviderContractOwnership,
+        )
+    }
+
+    @Test
+    fun aniListMapperInCapabilityDataIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-ownership",
+            "AniListMapperInCapabilityData.kt",
+            ":data:media",
+            ::enforceProviderContractOwnership,
+            expectedReason = "must be owned by :data:provider:anilist",
+        )
+    }
+
+    @Test
     fun providerResultEscapeIsRejected() {
         assertFixtureRejected(
             "provider-contract-escape",
@@ -362,6 +405,16 @@ class ArchitectureRuleFixturesTest {
         assertFixtureRejected(
             "provider-contract-escape",
             "RepositoryReturnsProviderCredentials.kt",
+            ":data:account",
+            ::enforceProviderContractsDoNotEscape,
+        )
+    }
+
+    @Test
+    fun accountExposingCompleteProviderImportIsRejected() {
+        assertFixtureRejected(
+            "provider-contract-escape",
+            "AccountExposesCompleteProviderImport.kt",
             ":data:account",
             ::enforceProviderContractsDoNotEscape,
         )

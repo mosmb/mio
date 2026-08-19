@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":data:provider:api"))
     implementation(libs.kotlinx.coroutines.core)
 
+    testImplementation(project(":core:testing"))
     testImplementation(libs.room.runtime)
     testImplementation(libs.room.testing)
     testImplementation(libs.androidx.test.core)

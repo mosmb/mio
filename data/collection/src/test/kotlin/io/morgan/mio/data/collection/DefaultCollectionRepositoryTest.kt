@@ -164,6 +164,39 @@ class DefaultCollectionRepositoryTest {
         }
 
     @Test
+    fun repeatingEntryIsObservedAsRepeatingStatus() =
+        runTest {
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    CollectionEntryEntity(
+                        collectionEntryId = "entry-1",
+                        accountId = accountId.value,
+                        mediaId = mediaOneId.value,
+                        progressUnit = StoredProgressUnit.EPISODE,
+                        remoteStatus = StoredCollectionStatus.REPEATING,
+                        remoteProgress = 1,
+                        remoteTotal = 12,
+                        remoteUpdatedAtUtcMs = TIME,
+                        effectiveStatus = StoredCollectionStatus.REPEATING,
+                        effectiveProgress = 1,
+                        effectiveTotal = 12,
+                        effectiveUpdatedAtUtcMs = TIME,
+                    ),
+                ),
+            )
+            val repository =
+                DefaultCollectionRepository(
+                    localDataSource = localDataSource,
+                    refreshRequester = CollectionRefreshRequester {},
+                )
+
+            assertEquals(
+                CollectionStatus.REPEATING,
+                repository.observeEntry(CollectionEntryId("entry-1")).first()?.status,
+            )
+        }
+
+    @Test
     fun batchRejectsProviderMappingOwnedByAnotherEntry() =
         runTest {
             val entryOne = entry("entry-1", mediaOneId, progress = 1)

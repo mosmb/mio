@@ -75,6 +75,21 @@ class ProviderModelsTest {
     }
 
     @Test
+    fun collectionStatusHasExactlySixConstants() {
+        assertEquals(
+            listOf(
+                ProviderCollectionStatus.CURRENT,
+                ProviderCollectionStatus.PLANNED,
+                ProviderCollectionStatus.PAUSED,
+                ProviderCollectionStatus.COMPLETED,
+                ProviderCollectionStatus.DROPPED,
+                ProviderCollectionStatus.REPEATING,
+            ),
+            ProviderCollectionStatus.entries,
+        )
+    }
+
+    @Test
     fun releaseTimeTrustStatesRemainDistinct() {
         val trusted = ProviderReleaseTime.Trusted(instant)
         val untrusted = ProviderReleaseTime.Untrusted(instant)

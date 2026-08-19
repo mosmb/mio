@@ -90,4 +90,5 @@ private fun CollectionStatus.toStoredCollectionStatus(): StoredCollectionStatus 
         CollectionStatus.PAUSED -> StoredCollectionStatus.PAUSED
         CollectionStatus.COMPLETED -> StoredCollectionStatus.COMPLETED
         CollectionStatus.DROPPED -> StoredCollectionStatus.DROPPED
+        CollectionStatus.REPEATING -> StoredCollectionStatus.REPEATING
     }

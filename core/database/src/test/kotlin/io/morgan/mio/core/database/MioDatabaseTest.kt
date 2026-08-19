@@ -161,6 +161,27 @@ class MioDatabaseTest {
         }
 
     @Test
+    fun repeatingStatusRoundTripsThroughRemoteAndEffectiveColumns() =
+        runTest {
+            database.selectedAccountDao().replaceSelectedAccount(account("account-1"), accountMapping("account-1"))
+            database.mediaDao().upsertMedia(listOf(media("media-1")))
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    collectionEntry(
+                        entryId = "entry-1",
+                        remoteStatus = StoredCollectionStatus.REPEATING,
+                        effectiveStatus = StoredCollectionStatus.REPEATING,
+                    ),
+                ),
+            )
+
+            val stored = database.collectionEntryDao().observeEntry("entry-1").first()
+            assertNotNull(stored)
+            assertEquals(StoredCollectionStatus.REPEATING, stored?.remoteStatus)
+            assertEquals(StoredCollectionStatus.REPEATING, stored?.effectiveStatus)
+        }
+
+    @Test
     fun deletingMediaCascadesAllMediaOwnedChildrenAndCollectionEntries() =
         runTest {
             database.selectedAccountDao().replaceSelectedAccount(account("account-1"), accountMapping("account-1"))

@@ -1,0 +1,12 @@
+{
+  "data": {
+    "Viewer": {
+      "id": 42,
+      "name": "Fixture Viewer",
+      "avatar": {
+        "large": "https://images.invalid/large.png",
+        "medium": "https://images.invalid/medium.png"
+      }
+    }
+  }
+}

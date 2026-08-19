@@ -6,4 +6,5 @@ public enum class CollectionStatus {
     PAUSED,
     COMPLETED,
     DROPPED,
+    REPEATING,
 }

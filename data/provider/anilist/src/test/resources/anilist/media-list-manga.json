@@ -1,0 +1,72 @@
+{
+  "data": {
+    "Page": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": false
+      },
+      "mediaList": [
+        {
+          "id": 3001,
+          "status": "CURRENT",
+          "progress": 10,
+          "progressVolumes": 0,
+          "updatedAt": 1700300000,
+          "createdAt": 1690300000,
+          "media": {
+            "id": 4001,
+            "type": "MANGA",
+            "format": "MANGA",
+            "status": "RELEASING",
+            "episodes": null,
+            "chapters": 50,
+            "volumes": 5,
+            "description": "Chapter tracked manga",
+            "bannerImage": null,
+            "genres": ["Comedy"],
+            "title": {
+              "userPreferred": "Chapter Manga",
+              "romaji": null,
+              "english": null,
+              "native": null
+            },
+            "coverImage": {
+              "extraLarge": null,
+              "large": "https://images.invalid/manga-l.png",
+              "medium": null
+            },
+            "airingSchedule": null
+          }
+        },
+        {
+          "id": 3002,
+          "status": "PAUSED",
+          "progress": 0,
+          "progressVolumes": 3,
+          "updatedAt": 1700400000,
+          "createdAt": 1690400000,
+          "media": {
+            "id": 4002,
+            "type": "MANGA",
+            "format": "NOVEL",
+            "status": "HIATUS",
+            "episodes": null,
+            "chapters": null,
+            "volumes": 8,
+            "description": "Volume tracked manga",
+            "bannerImage": null,
+            "genres": [],
+            "title": {
+              "userPreferred": "Volume Manga",
+              "romaji": null,
+              "english": null,
+              "native": null
+            },
+            "coverImage": null,
+            "airingSchedule": null
+          }
+        }
+      ]
+    }
+  }
+}
