@@ -1,5 +1,7 @@
 package io.morgan.mio
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -7,9 +9,16 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import dev.zacsweers.metro.createDynamicGraphFactory
+import io.morgan.mio.core.testing.provider.FakeProviderAuthenticator
+import io.morgan.mio.core.testing.provider.FakeProviderIdentityDataSource
+import io.morgan.mio.core.testing.provider.FakeProviderInitialImportDataSource
+import io.morgan.mio.core.testing.provider.completeProviderImportFixture
 import io.morgan.mio.core.testing.provider.providerBindingFixture
+import io.morgan.mio.core.testing.provider.providerCredentialsFixture
+import io.morgan.mio.core.testing.provider.providerIdentityFixture
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
+import io.morgan.mio.data.provider.api.ProviderResult
 import io.morgan.mio.di.AccountGraphRequest
 import io.morgan.mio.di.AppGraph
 import io.morgan.mio.di.TestGraphFixture
@@ -25,6 +34,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -78,6 +88,7 @@ class MainActivitySessionTest {
     @Test
     fun restorationSuccessSelectsAuthenticatedTodayRootWithoutOnboardingSuccessUi() {
         activityRule.fixture.accountSessionRepository.restoreOverride = {
+            activityRule.activateAccountGraph("fixture-account")
             AccountSessionState.Authenticated(
                 accountId = AccountId("fixture-account"),
                 provider = ConnectedProvider.ANILIST,
@@ -123,6 +134,70 @@ class MainActivitySessionTest {
     }
 
     @Test
+    fun completedImportShowsTransientFeedbackButRestorationDoesNotReplayIt() {
+        activityRule.scheduler.runCurrent()
+        activityRule.fixture.accountSessionRepository.setStateForTest(
+            AccountSessionState.Importing(ConnectedProvider.ANILIST),
+        )
+        activityRule.scheduler.runCurrent()
+        composeRule.waitForIdle()
+
+        activityRule.activateAccountGraph("fixture-account")
+        activityRule.fixture.accountSessionRepository.setStateForTest(
+            AccountSessionState.Authenticated(
+                accountId = AccountId("fixture-account"),
+                provider = ConnectedProvider.ANILIST,
+            ),
+        )
+        activityRule.scheduler.runCurrent()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Library imported").assertIsDisplayed()
+        activityRule.scheduler.advanceTimeBy(4_001)
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("Library imported").assertCountEquals(0)
+
+        activityRule.configurationChange()
+        activityRule.scheduler.runCurrent()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("Library imported").assertCountEquals(0)
+    }
+
+    @Test
+    fun matchingOAuthIntentCompletesThePendingProviderAuthorization() {
+        activityRule.scheduler.runCurrent()
+        val repository = activityRule.fixture.accountSessionRepository
+        val binding = repository.providerBinding
+        val authenticator = binding.authenticator as FakeProviderAuthenticator
+        val identity = binding.identityDataSource as FakeProviderIdentityDataSource
+        val initialImport = binding.initialImportDataSource as FakeProviderInitialImportDataSource
+        authenticator.enqueueBeginAuthorization {
+            ProviderResult.Success(
+                io.morgan.mio.core.testing.provider
+                    .providerAuthorizationLaunchFixture(),
+            )
+        }
+        authenticator.enqueueCompleteAuthorization { _, _ ->
+            ProviderResult.Success(providerCredentialsFixture())
+        }
+        identity.enqueue { ProviderResult.Success(providerIdentityFixture()) }
+        initialImport.enqueue { _, accountId ->
+            ProviderResult.Success(completeProviderImportFixture(accountId = accountId))
+        }
+        kotlinx.coroutines.runBlocking {
+            repository.startConnection(ConnectedProvider.ANILIST)
+        }
+
+        activityRule.deliverIntent(
+            Intent(Intent.ACTION_VIEW, Uri.parse("mio://oauth/anilist#access_token=fixture-sensitive-value")),
+        )
+        activityRule.scheduler.runCurrent()
+
+        assertTrue(repository.state.value is AccountSessionState.Authenticated)
+        assertFalse(repository.operations.toString().contains("fixture-sensitive-value"))
+    }
+
+    @Test
     fun onboardingViewModelSurvivesConfigurationAndIsRecreatedAfterRootDisposal() {
         activityRule.scheduler.runCurrent()
         composeRule.waitForIdle()
@@ -140,6 +215,7 @@ class MainActivitySessionTest {
                 provider = ConnectedProvider.ANILIST,
             ),
         )
+        activityRule.activateAccountGraph("fixture-account")
         activityRule.scheduler.runCurrent()
         composeRule.waitForIdle()
         composeRule.onAllNodesWithText("Today").assertCountEquals(2)
@@ -198,6 +274,23 @@ class MainActivityRule : TestRule {
     fun configurationChange() {
         controller.configurationChange()
         activity = controller.get()
+    }
+
+    fun deliverIntent(intent: Intent) {
+        controller.newIntent(intent)
+        activity = controller.get()
+    }
+
+    fun activateAccountGraph(accountId: String) {
+        if (graph.accountGraphLifecycle.activeHandle() != null) return
+        graph.accountGraphLifecycle.create(
+            AccountGraphRequest(
+                accountId = AccountId(accountId),
+                providerBinding = providerBindingFixture(),
+                accountRefreshRequester = AccountRefreshRequester {},
+                collectionRefreshRequester = CollectionRefreshRequester {},
+            ),
+        )
     }
 
     private fun replaceGraph(graph: AppGraph) {

@@ -15,6 +15,8 @@ import androidx.navigation3.ui.NavDisplay
 import coil3.ImageLoader
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
+import io.morgan.mio.core.designsystem.component.MioSnackbarHost
+import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
 import io.morgan.mio.core.designsystem.layout.MioWindowInsets
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.NavigationRegistry
@@ -37,6 +39,8 @@ internal fun MioApp(
     reducedMotionOverride: Boolean = false,
     hapticsEnabled: Boolean = true,
     highContrastOverride: Boolean? = null,
+    snackbar: MioSnackbarMessage? = null,
+    onSnackbarAction: (String) -> Unit = {},
 ) {
     CompositionLocalProvider(
         LocalMetroViewModelFactory provides viewModelFactory,
@@ -62,7 +66,12 @@ internal fun MioApp(
                         key(root) {
                             when (root) {
                                 AppRoot.ONBOARDING -> OnboardingRoot(navigationRegistry)
-                                AppRoot.AUTHENTICATED -> AuthenticatedRoot(navigationRegistry)
+                                AppRoot.AUTHENTICATED ->
+                                    AuthenticatedRoot(
+                                        navigationRegistry = navigationRegistry,
+                                        snackbar = snackbar,
+                                        onSnackbarAction = onSnackbarAction,
+                                    )
                             }
                         }
                     }
@@ -89,7 +98,11 @@ private fun OnboardingRoot(navigationRegistry: NavigationRegistry) {
 }
 
 @Composable
-private fun AuthenticatedRoot(navigationRegistry: NavigationRegistry) {
+private fun AuthenticatedRoot(
+    navigationRegistry: NavigationRegistry,
+    snackbar: MioSnackbarMessage?,
+    onSnackbarAction: (String) -> Unit,
+) {
     val state = rememberAuthenticatedNavigationState(navigationRegistry.topLevelDestinations)
     val navigator = state.navigator
     val entryProvider = remember(navigator) { navigationRegistry.entryProvider(navigator) }
@@ -108,5 +121,10 @@ private fun AuthenticatedRoot(navigationRegistry: NavigationRegistry) {
                 onSelected = { destination -> navigator.navigate(destination.key) },
             )
         }
+        MioSnackbarHost(
+            snackbar = snackbar,
+            bottomNavigationVisible = state.isRootNavigationVisible,
+            onAction = onSnackbarAction,
+        )
     }
 }

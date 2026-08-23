@@ -75,7 +75,7 @@ internal class MediaDetailViewModel(
     @AssistedFactory
     @ContributesIntoMap(AccountScope::class)
     @ManualViewModelAssistedFactoryKey
-    internal fun interface Factory : ManualViewModelAssistedFactory {
+    public fun interface Factory : ManualViewModelAssistedFactory {
         fun create(
             @Assisted mediaId: MediaId,
         ): MediaDetailViewModel

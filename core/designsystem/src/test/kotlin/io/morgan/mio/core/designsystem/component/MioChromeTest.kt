@@ -109,8 +109,17 @@ class MioChromeTest {
                     .fetchSemanticsNode()
                     .boundsInRoot.width
             }
+        val heights =
+            listOf("Today", "Library", "Discover", "You").map { label ->
+                composeRule
+                    .onNodeWithText(label)
+                    .fetchSemanticsNode()
+                    .boundsInRoot.height
+            }
         assertTrue(widths.all { width -> kotlin.math.abs(width - widths.first()) <= 0.5f })
         assertTrue(widths.all { width -> width >= composeRule.density.run { 48.dp.toPx() } })
+        assertTrue(heights.all { height -> height >= composeRule.density.run { 54.dp.toPx() } })
+        assertTrue(heights.all { height -> height <= composeRule.density.run { 68.dp.toPx() } })
 
         composeRule.onNodeWithText("Library").performClick()
         composeRule.waitForIdle()

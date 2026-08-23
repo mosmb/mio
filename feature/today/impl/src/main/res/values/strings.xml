@@ -1,0 +1,29 @@
+<resources>
+    <string name="today_title">Today</string>
+    <string name="today_now">Now</string>
+    <string name="today_loading">Loading Today</string>
+    <string name="today_open_details">Open %1$s details</string>
+    <string name="today_media_type_anime">Anime</string>
+    <string name="today_media_type_manga">Manga</string>
+    <string name="today_next_episode">Next episode %1$d</string>
+    <string name="today_next_chapter">Next chapter %1$d</string>
+    <string name="today_next_volume">Next volume %1$d</string>
+    <plurals name="today_available_episodes">
+        <item quantity="one">%1$d episode ready</item>
+        <item quantity="other">%1$d episodes ready</item>
+    </plurals>
+    <plurals name="today_available_chapters">
+        <item quantity="one">%1$d chapter ready</item>
+        <item quantity="other">%1$d chapters ready</item>
+    </plurals>
+    <plurals name="today_available_volumes">
+        <item quantity="one">%1$d volume ready</item>
+        <item quantity="other">%1$d volumes ready</item>
+    </plurals>
+    <string name="today_progress_episode_known">Episode %1$d of %2$d</string>
+    <string name="today_progress_episode_unknown">Episode %1$d</string>
+    <string name="today_progress_chapter_known">Chapter %1$d of %2$d</string>
+    <string name="today_progress_chapter_unknown">Chapter %1$d</string>
+    <string name="today_progress_volume_known">Volume %1$d of %2$d</string>
+    <string name="today_progress_volume_unknown">Volume %1$d</string>
+</resources>

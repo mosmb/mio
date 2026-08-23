@@ -675,6 +675,37 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun taskFifteenProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+
+        listOf(
+            ":data:provider:api" to "ProviderBindingResolver",
+            ":data:account" to "AuthenticatedAccountSessionActivator",
+            ":data:account" to "ProductionAccountSessionRepository",
+            ":app" to "ProductionProviderBindingResolver",
+            ":app" to "MetroAuthenticatedAccountSessionActivator",
+        ).forEach { (modulePath, typeName) ->
+            assertTrue(
+                files.any { ownedFile ->
+                    ownedFile.modulePath == modulePath &&
+                        ownedFile.file
+                            .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+                            .any { declaration -> declaration.name == typeName }
+                },
+                "production scan omitted $typeName from $modulePath",
+            )
+        }
+        assertTrue(
+            files.none { ownedFile ->
+                ownedFile.file
+                    .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+                    .any { declaration -> declaration.name == "UnavailableAccountSessionRepository" }
+            },
+            "the unavailable account-session placeholder remains in production",
+        )
+    }
+
+    @Test
     fun taskSixteenProductionTypesAreActuallyScanned() {
         val files = productionFiles()
         assertTrue(
@@ -778,6 +809,58 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.text.contains("MIGRATION_2_3")
             },
             "production scan omitted the 2-to-3 media migration",
+        )
+    }
+
+    @Test
+    fun taskSeventeenTodayQueueAndAccountPresentationAreActuallyScanned() {
+        val files = productionFiles()
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":domain:queue" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name == "ObserveTodayQueueUseCase"
+                    } &&
+                    ownedFile.file.text.contains("flatMapLatest") &&
+                    ownedFile.file.imports.any { import ->
+                        import.name == "io.morgan.mio.domain.collection.CollectionRepository"
+                    } &&
+                    ownedFile.file.imports.any { import ->
+                        import.name == "io.morgan.mio.domain.media.MediaRepository"
+                    }
+            },
+            "production scan omitted the Room-flow-backed Today queue use case",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:today:impl" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "TodayViewModel" } &&
+                    ownedFile.file.text.contains("@ContributesIntoMap(AccountScope::class)") &&
+                    ownedFile.file.text.contains("@ViewModelKey")
+            },
+            "production scan omitted the AccountScope Today ViewModel contribution",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:today:impl" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/TodayScreen.kt") &&
+                    ownedFile.file.text.contains("metroViewModel<TodayViewModel>") &&
+                    ownedFile.file.text.contains("MediaId(mediaId)")
+            },
+            "production scan omitted the Today Route-to-typed-media navigation seam",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:today:impl" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/TodayNowCard.kt") &&
+                    ownedFile.file.text.contains("requiredHeightIn(min = 332.dp)") &&
+                    ownedFile.file.text.contains("mergeDescendants = true")
+            },
+            "production scan omitted the bounded, merged-semantic Now card",
         )
     }
 

@@ -64,6 +64,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidAniListProvider.kt" to ":data:provider:anilist",
                         "ValidMyAnimeListProvider.kt" to ":data:provider:myanimelist",
                         "ValidInitialImportPersistence.kt" to ":data:account",
+                        "ValidProviderComposition.kt" to ":app",
                     ),
                 sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
             ).filterNot { ownedFile -> ownedFile.file.path.endsWith("/ValidAccountAssistedViewModel.kt") }
@@ -428,6 +429,16 @@ class ArchitectureRuleFixturesTest {
             "provider-isolation",
             "CapabilityImportsMyAnimeList.kt",
             ":data:account",
+            ::enforceProviderIsolation,
+        )
+    }
+
+    @Test
+    fun appProviderImportOutsideCompositionPackageIsRejected() {
+        assertFixtureRejected(
+            "provider-isolation",
+            "AppImportsAniListOutsideDi.kt",
+            ":app",
             ::enforceProviderIsolation,
         )
     }

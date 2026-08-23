@@ -11,7 +11,7 @@ class DependencyRulesTest {
     fun matrixContainsAllCurrentLeafModulesAndRejectsUnknownPaths() {
         assertEquals(43, DependencyRules.productionProjectDependencies.size)
         assertEquals(
-            8,
+            7,
             DependencyRules.productionProjectDependencies.values.count { it.isEmpty() },
         )
         assertFalse(DependencyRules.productionProjectDependencies.containsKey(":new:module"))
@@ -58,6 +58,35 @@ class DependencyRulesTest {
         assertTrue(violations(":domain:sync", "implementation", ":domain:collection").isEmpty())
         assertTrue(violations(":domain:sync", "implementation", ":data:sync").isNotEmpty())
         assertTrue(violations(":domain:sync", "implementation", ":core:database").isNotEmpty())
+    }
+
+    @Test
+    fun opensOnlyTheTaskSeventeenTodayQueueEdges() {
+        listOf(":domain:media", ":domain:collection", ":domain:model").forEach { dependency ->
+            assertTrue(
+                violations(":domain:queue", "implementation", dependency).isEmpty(),
+                "Expected :domain:queue -> $dependency to be allowed",
+            )
+        }
+        assertTrue(
+            violations(":feature:today:impl", "implementation", ":domain:media").isEmpty(),
+            "Expected :feature:today:impl -> :domain:media to be allowed",
+        )
+        listOf(
+            ":data:media",
+            ":core:database",
+            ":feature:today:impl",
+            ":domain:queue",
+        ).forEach { dependency ->
+            assertTrue(
+                violations(":domain:queue", "implementation", dependency).isNotEmpty(),
+                "Expected :domain:queue -> $dependency to remain forbidden",
+            )
+        }
+        assertTrue(
+            violations(":domain:media", "implementation", ":domain:queue").isNotEmpty(),
+            "Expected the inverse :domain:media -> :domain:queue edge to remain forbidden",
+        )
     }
 
     @Test

@@ -182,10 +182,12 @@ internal fun enforceProviderIsolation(files: List<OwnedKotlinFile>) {
     assertNoViolations("Provider isolation", files) { ownedFile ->
         val imports = ownedFile.file.imports.map { it.name }
         val providerImports = imports.filter { importName -> matchesPrefix(importName, "io.morgan.mio.data.provider") }
+        val isAppProviderComposition =
+            ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di"
         val forbiddenProviderImport =
             when {
                 isFeatureOrDomainModule(ownedFile.modulePath) -> providerImports.firstOrNull()
-                !isProviderModule(ownedFile.modulePath) ->
+                !isProviderModule(ownedFile.modulePath) && !isAppProviderComposition ->
                     providerImports.firstOrNull { importName ->
                         !matchesPrefix(importName, "io.morgan.mio.data.provider.api")
                     }
@@ -335,6 +337,17 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
             "String",
         )
     val stateOwnerModules = setOf(":app", ":core:navigation")
+    val focusedFeatureApiImports =
+        files
+            .filter { ownedFile -> isFeatureApi(ownedFile.modulePath) }
+            .flatMap { ownedFile ->
+                val packageName = ownedFile.file.packagee?.name ?: return@flatMap emptyList()
+                ownedFile.file
+                    .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
+                    .filter { declaration ->
+                        declaration.text.substringBefore('{').contains(": FocusedDestination")
+                    }.map { declaration -> "$packageName.${declaration.name}" }
+            }.toSet()
     val navigationStateImports =
         listOf(
             "androidx.navigation3.runtime.NavBackStack",
@@ -501,7 +514,8 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
                     segments.size > 5 &&
                         segments.take(4) == listOf("io", "morgan", "mio", "feature") &&
                         segments[5] == "api" &&
-                        segments[4] != implementationFeature
+                        segments[4] != implementationFeature &&
+                        importName !in focusedFeatureApiImports
                 }
             } else {
                 null
@@ -788,6 +802,7 @@ private val taskFiveCanonicalProviderDeclarations =
         "ProviderIdentityDataSource",
         "ProviderInitialImportDataSource",
         "ProviderBinding",
+        "ProviderBindingResolver",
         "ProviderCredentialStore",
         "ProviderCredentialStorageException",
     )
@@ -952,6 +967,7 @@ internal fun enforcePlatformServiceBoundaries(files: List<OwnedKotlinFile>) {
                 ownedFile.modulePath == ":data:provider:api" ||
                 isProviderImplementation(ownedFile.modulePath) ||
                 ownedFile.modulePath == ":data:media" ||
+                ownedFile.modulePath == ":data:account" ||
                 ownedFile.modulePath == ":core:testing" ||
                 (ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di") ||
                 isCredentialBoundary
@@ -992,6 +1008,11 @@ internal fun enforcePlatformServiceBoundaries(files: List<OwnedKotlinFile>) {
                         ownedFile.modulePath == ":core:ui" ||
                         (
                             ownedFile.modulePath == ":feature:media:impl" &&
+                                it == "coil3.ImageLoader"
+                        ) ||
+                        (
+                            ownedFile.modulePath == ":feature:today:impl" &&
+                                fileName(ownedFile.file.path) == "TodayScreen.kt" &&
                                 it == "coil3.ImageLoader"
                         ) ||
                         (
@@ -1323,6 +1344,14 @@ internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>
                             declarationText,
                         ) &&
                         Regex("fun\\s+interface\\s+Factory\\b").containsMatchIn(declarationText)
+                val accountScopedStandardViewModel =
+                    Regex("@ContributesIntoMap\\s*\\(\\s*AccountScope::class\\s*\\)").containsMatchIn(source) &&
+                        ownedFile.file.imports.any { import ->
+                            import.name == "io.morgan.mio.domain.model.AccountId"
+                        }
+                val contributesIntoAllowedScope =
+                    Regex("@ContributesIntoMap\\s*\\(\\s*AppScope::class\\s*\\)").containsMatchIn(source) ||
+                        accountScopedStandardViewModel
                 when {
                     !Regex("\\bViewModel\\s*\\(").containsMatchIn(declarationText) ->
                         "ViewModel '${declaration.name}' must extend androidx.lifecycle.ViewModel"
@@ -1334,7 +1363,7 @@ internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>
                         "ViewModel '${declaration.name}' must have @ViewModelKey"
 
                     !assistedViewModel &&
-                        !Regex("@ContributesIntoMap\\s*\\(\\s*AppScope::class\\s*\\)").containsMatchIn(source) ->
+                        !contributesIntoAllowedScope ->
                         "ViewModel '${declaration.name}' must contribute into AppScope"
 
                     assistedViewModel && declaration.hasAnnotationWithName("ViewModelKey") ->

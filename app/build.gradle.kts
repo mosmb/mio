@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("mio.android.application.compose")
     alias(libs.plugins.metro)
@@ -7,7 +9,40 @@ metro {
     generateContributionProviders.set(true)
 }
 
+val mioLocalProperties =
+    Properties().apply {
+        val propertiesFile = rootProject.file("local.properties")
+        if (propertiesFile.isFile) {
+            propertiesFile.inputStream().use(::load)
+        }
+    }
+
+fun oauthClientId(
+    gradlePropertyName: String,
+    environmentVariableName: String,
+): String =
+    providers.gradleProperty(gradlePropertyName).orNull
+        ?: providers.environmentVariable(environmentVariableName).orNull
+        ?: mioLocalProperties.getProperty(gradlePropertyName).orEmpty()
+
+fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 android {
+    buildFeatures {
+        buildConfig = true
+    }
+    defaultConfig {
+        buildConfigField(
+            "String",
+            "MIO_ANILIST_CLIENT_ID",
+            oauthClientId("mio.anilist.clientId", "MIO_ANILIST_CLIENT_ID").asBuildConfigString(),
+        )
+        buildConfigField(
+            "String",
+            "MIO_MYANIMELIST_CLIENT_ID",
+            oauthClientId("mio.myanimelist.clientId", "MIO_MYANIMELIST_CLIENT_ID").asBuildConfigString(),
+        )
+    }
     lint {
         // Task 08 deliberately keeps the v26 adaptive-icon source beside its v33 overlay.
         disable += setOf("ObsoleteSdkInt")

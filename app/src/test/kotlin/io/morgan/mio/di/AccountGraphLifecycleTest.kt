@@ -9,7 +9,9 @@ import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
+import io.morgan.mio.data.provider.api.ProviderBindingResolver
 import io.morgan.mio.data.provider.api.ProviderKey
+import io.morgan.mio.domain.account.ConnectedProvider
 import io.morgan.mio.domain.model.AccountId
 import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
@@ -54,6 +56,14 @@ class AccountGraphLifecycleTest {
                 assertSame(graph.accountRepository, graph.accountRepository)
                 assertSame(graph.mediaRepository, graph.mediaRepository)
                 assertSame(graph.collectionRepository, graph.collectionRepository)
+                assertTrue(
+                    "io.morgan.mio.feature.today.impl.TodayViewModel" in
+                        graph.metroViewModelFactory.providerKeys("getViewModelProviders"),
+                )
+                assertTrue(
+                    "io.morgan.mio.feature.media.impl.MediaDetailViewModel.Factory" in
+                        graph.metroViewModelFactory.providerKeys("getManualAssistedFactoryProviders"),
+                )
             }
 
             assertThrows(IllegalStateException::class.java) {
@@ -178,6 +188,48 @@ class AccountGraphLifecycleTest {
         }
     }
 
+    @Test
+    fun authenticatedSessionActivationIsIdempotentAndReplacesOnlyForAnotherAccount() {
+        val appGraph = createGraphFactory<AppGraph.Factory>().create(context)
+        try {
+            val aniListBinding = providerBindingFixture(ProviderKey.ANILIST)
+            val myAnimeListBinding = providerBindingFixture(ProviderKey.MY_ANIME_LIST)
+            val activator =
+                MetroAuthenticatedAccountSessionActivator(
+                    accountGraphLifecycle = appGraph.accountGraphLifecycle,
+                    bindingResolver =
+                        ProviderBindingResolver { provider ->
+                            when (provider) {
+                                ProviderKey.ANILIST -> aniListBinding
+                                ProviderKey.MY_ANIME_LIST -> myAnimeListBinding
+                            }
+                        },
+                )
+
+            activator.activate(AccountId("account-a"), ConnectedProvider.ANILIST)
+            val first = appGraph.accountGraphLifecycle.activeHandle()
+            activator.activate(AccountId("account-a"), ConnectedProvider.ANILIST)
+            assertSame(first, appGraph.accountGraphLifecycle.activeHandle())
+            first?.withGraph { graph -> assertSame(aniListBinding, graph.providerBinding) }
+
+            activator.activate(AccountId("account-b"), ConnectedProvider.MY_ANIME_LIST)
+            val second = appGraph.accountGraphLifecycle.activeHandle()
+            assertNotSame(first, second)
+            assertThrows(IllegalStateException::class.java) { first?.withGraph { } }
+            second?.withGraph { graph ->
+                assertEquals(AccountId("account-b"), graph.accountId)
+                assertSame(myAnimeListBinding, graph.providerBinding)
+            }
+
+            activator.destroy()
+            assertNull(appGraph.accountGraphLifecycle.activeHandle())
+        } finally {
+            appGraph.database.close()
+            appGraph.processCoroutineScope.cancel()
+            appGraph.imageLoader.shutdown()
+        }
+    }
+
     private fun request(
         providerBinding: ProviderBinding,
         accountId: String,
@@ -190,4 +242,14 @@ class AccountGraphLifecycleTest {
             accountRefreshRequester = AccountRefreshRequester { accountRefreshCalls += Unit },
             collectionRefreshRequester = CollectionRefreshRequester { collectionRefreshCalls += Unit },
         )
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun dev.zacsweers.metrox.viewmodel.MetroViewModelFactory.providerKeys(getterName: String): Set<String> {
+    val getter =
+        dev.zacsweers.metrox.viewmodel.MetroViewModelFactory::class.java
+            .getDeclaredMethod(getterName)
+            .apply { isAccessible = true }
+    val providers = getter.invoke(this) as Map<kotlin.reflect.KClass<*>, *>
+    return providers.keys.mapNotNull { key -> key.qualifiedName }.toSet()
 }

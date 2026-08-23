@@ -3,10 +3,6 @@ plugins {
     alias(libs.plugins.metro)
 }
 
-metro {
-    generateContributionProviders.set(true)
-}
-
 dependencies {
     api(project(":feature:media:api"))
     implementation(project(":core:common"))

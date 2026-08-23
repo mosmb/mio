@@ -343,7 +343,7 @@ Feature modules SHOULD depend on fewer modules when possible. The following matr
 | Feature implementation | Own API | Other feature APIs allowed | Domain capabilities allowed |
 |---|---|---|---|
 | `onboarding` | `onboarding:api` | none; authenticated-root transition is owned by app | `account`, `sync`, `model` |
-| `today` | `today:api` | `media:api`, `library:api` | `queue`, `progress`, `collection`, `preferences`, `model` |
+| `today` | `today:api` | `media:api`, `library:api` | `queue`, `media`, `progress`, `collection`, `preferences`, `model` |
 | `library` | `library:api` | `media:api`, `progress:api` | `collection`, `progress`, `preferences`, `model` |
 | `discover` | `discover:api` | `media:api` | `media`, `collection`, `model` |
 | `you` | `you:api` | none | `account`, `sync`, `preferences`, `model` |
@@ -351,6 +351,8 @@ Feature modules SHOULD depend on fewer modules when possible. The following matr
 | `progress` | `progress:api` | none | `progress`, `collection`, `sync`, `model` |
 
 Every feature API may depend only on `:core:navigation`, `:domain:model` for typed IDs, Kotlin serialization, and Navigation 3 runtime APIs required to define keys. It MUST NOT depend on its implementation or on broader domain capabilities.
+
+`:domain:queue` MAY depend on `:domain:media`, `:domain:collection`, and `:domain:model` so its pure Today rules and `ObserveTodayQueue` use case can combine Room-backed media, release, and collection repository contracts. It MUST NOT depend on feature, data, provider, Android, or persistence modules. `:feature:today` may inject those domain contracts only through its account-scoped composition; it still MUST NOT query Room or provider code directly.
 
 ### 5.2 Initial data dependency matrix
 
@@ -740,6 +742,7 @@ AppGraph
 `AccountGraph` is a Metro graph extension created only after an account is connected. It owns selected-provider bindings, account-scoped repositories/sync objects, authenticated feature dependencies, and account-scoped resources.
 
 - Provider selection happens when `AccountGraph` is created.
+- During initial connection, authentication and the complete atomic Room import finish while onboarding remains visible. The App-scoped account-session repository then asks an App-owned, provider-neutral activation port to create the selected-provider `AccountGraph` before it publishes the authenticated session. No tentative graph exists before the import commit, and restoration activates the graph from the persisted account selection without repeating provider work.
 - Sign out destroys the account graph and runs the ordered best-effort account cleanup defined in section 10.4.
 - Connecting another provider creates a new account graph.
 - Workers reconstruct a short-lived account graph from persisted account selection.
