@@ -7,6 +7,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import dev.zacsweers.metro.createDynamicGraphFactory
+import io.morgan.mio.core.testing.provider.providerBindingFixture
+import io.morgan.mio.data.account.AccountRefreshRequester
+import io.morgan.mio.data.collection.CollectionRefreshRequester
+import io.morgan.mio.di.AccountGraphRequest
 import io.morgan.mio.di.AppGraph
 import io.morgan.mio.di.TestGraphFixture
 import io.morgan.mio.domain.account.AccountSessionState
@@ -50,6 +54,7 @@ class MainActivitySessionTest {
 
     @Test
     fun restorationKeepsTheOnboardingRootUntilControlledCompletion() {
+        assertTrue(activityRule.graph.accountGraphLifecycle.activeHandle() == null)
         val releaseRestore = CompletableDeferred<AccountSessionState?>()
         var restoreStarted = false
         activityRule.fixture.accountSessionRepository.restoreOverride = {
@@ -88,6 +93,36 @@ class MainActivitySessionTest {
     }
 
     @Test
+    fun recreationUsesActiveAccountFactoryWhileInitialShellUsesAppFallback() {
+        assertTrue(activityRule.graph.accountGraphLifecycle.activeHandle() == null)
+        activityRule.fixture.accountSessionRepository.setStateForTest(
+            AccountSessionState.Authenticated(
+                accountId = AccountId("fixture-account"),
+                provider = ConnectedProvider.ANILIST,
+            ),
+        )
+        val activeHandle =
+            activityRule.graph.accountGraphLifecycle.create(
+                AccountGraphRequest(
+                    accountId = AccountId("fixture-account"),
+                    providerBinding = providerBindingFixture(),
+                    accountRefreshRequester = AccountRefreshRequester {},
+                    collectionRefreshRequester = CollectionRefreshRequester {},
+                ),
+            )
+
+        activityRule.configurationChange()
+        activityRule.scheduler.runCurrent()
+        composeRule.waitForIdle()
+
+        assertTrue(activityRule.graph.accountGraphLifecycle.activeHandle() === activeHandle)
+        activeHandle.withGraph { accountGraph ->
+            assertTrue(accountGraph.metroViewModelFactory !== activityRule.graph.metroViewModelFactory)
+        }
+        composeRule.onAllNodesWithText("Today").assertCountEquals(2)
+    }
+
+    @Test
     fun onboardingViewModelSurvivesConfigurationAndIsRecreatedAfterRootDisposal() {
         activityRule.scheduler.runCurrent()
         composeRule.waitForIdle()
@@ -122,6 +157,8 @@ class MainActivitySessionTest {
 class MainActivityRule : TestRule {
     val scheduler = TestCoroutineScheduler()
     internal val fixture: TestGraphFixture
+    internal val graph: AppGraph
+        get() = application.appGraph
     lateinit var activity: MainActivity
     private lateinit var controller: ActivityController<MainActivity>
 
@@ -151,6 +188,7 @@ class MainActivityRule : TestRule {
                     if (::activity.isInitialized) {
                         activity.finish()
                     }
+                    application.appGraph.accountGraphLifecycle.destroy()
                     replaceGraph(previousGraph)
                     fixture.close()
                 }

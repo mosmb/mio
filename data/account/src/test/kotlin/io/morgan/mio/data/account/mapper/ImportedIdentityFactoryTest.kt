@@ -68,4 +68,12 @@ class ImportedIdentityFactoryTest {
 
         assertTrue(!result.value.contains(remoteId))
     }
+
+    @Test
+    fun existingMediaIdsRemainStableAfterHashExtraction() {
+        assertEquals(
+            "6287a3fe1ff569e5bd40f004c4d6bacd",
+            ImportedIdentityFactory.mediaId(StoredConnectedProvider.ANILIST, "9876543210").value,
+        )
+    }
 }

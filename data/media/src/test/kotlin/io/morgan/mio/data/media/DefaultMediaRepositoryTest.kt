@@ -67,6 +67,7 @@ class DefaultMediaRepositoryTest {
 
             assertNull(repository.observeMedia(mediaId).first())
             assertEquals(emptyList<Release>(), repository.observeReleases(mediaId).first())
+            assertEquals(emptyList<Media>(), repository.observeRelatedMedia(mediaId).first())
 
             localDataSource.replaceInitialMediaSnapshot(
                 MediaPersistenceSnapshot(

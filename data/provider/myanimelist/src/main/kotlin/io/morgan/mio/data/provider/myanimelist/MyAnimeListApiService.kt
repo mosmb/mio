@@ -3,6 +3,7 @@ package io.morgan.mio.data.provider.myanimelist
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 internal interface MyAnimeListApiService {
@@ -28,4 +29,18 @@ internal interface MyAnimeListApiService {
         @Query("offset") offset: Int,
         @Query("nsfw") nsfw: Boolean,
     ): Response<MyAnimeListMangaListResponseDto>
+
+    @GET("anime/{id}")
+    suspend fun animeDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+        @Query("fields") fields: String,
+    ): Response<MyAnimeListMediaDetailsResponseDto>
+
+    @GET("manga/{id}")
+    suspend fun mangaDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+        @Query("fields") fields: String,
+    ): Response<MyAnimeListMediaDetailsResponseDto>
 }

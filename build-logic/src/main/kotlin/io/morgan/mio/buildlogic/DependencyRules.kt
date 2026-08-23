@@ -128,6 +128,7 @@ public object DependencyRules {
                 setOf(
                     ":feature:media:api",
                     ":feature:progress:api",
+                    ":core:common",
                     ":core:designsystem",
                     ":core:ui",
                     ":core:navigation",

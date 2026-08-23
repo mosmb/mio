@@ -5,7 +5,6 @@ import dev.zacsweers.metro.SingleIn
 import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
-import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.domain.model.AccountId
 
@@ -13,7 +12,6 @@ internal data class AccountGraphRequest(
     val accountId: AccountId,
     val providerBinding: ProviderBinding,
     val accountRefreshRequester: AccountRefreshRequester,
-    val mediaRefreshRequester: MediaRefreshRequester,
     val collectionRefreshRequester: CollectionRefreshRequester,
 )
 
@@ -73,7 +71,6 @@ internal class AccountGraphLifecycle(
             accountId = request.accountId,
             providerBinding = request.providerBinding,
             accountRefreshRequester = request.accountRefreshRequester,
-            mediaRefreshRequester = request.mediaRefreshRequester,
             collectionRefreshRequester = request.collectionRefreshRequester,
         )
 }

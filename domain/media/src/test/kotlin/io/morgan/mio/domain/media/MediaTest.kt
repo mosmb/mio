@@ -16,6 +16,8 @@ class MediaTest {
         assertEquals(null, media.synopsis)
         assertEquals(Artwork(null, null), media.artwork)
         assertEquals(MediaTotals(null, null, null), media.totals)
+        assertEquals(null, media.releaseYear)
+        assertEquals(null, media.score)
     }
 
     @Test
@@ -53,10 +55,28 @@ class MediaTest {
         assertEquals(media, media(genres = listOf("Action"), relatedMediaIds = listOf(MediaId("related"))))
     }
 
+    @Test
+    fun mediaIncludesOptionalYearAndScoreInEquality() {
+        val withMetadata = media(releaseYear = 2026, score = MediaScore(87))
+        val withoutMetadata = media()
+
+        assertEquals(2026, withMetadata.releaseYear)
+        assertEquals(MediaScore(87), withMetadata.score)
+        assertEquals(false, withMetadata == withoutMetadata)
+        assertEquals(withMetadata, media(releaseYear = 2026, score = MediaScore(87)))
+    }
+
+    @Test
+    fun mediaRejectsNonPositiveReleaseYear() {
+        assertThrows<IllegalArgumentException> { media(releaseYear = 0) }
+    }
+
     private fun media(
         synopsis: String? = null,
         genres: List<String> = emptyList(),
         relatedMediaIds: List<MediaId> = emptyList(),
+        releaseYear: Int? = null,
+        score: MediaScore? = null,
     ): Media =
         Media(
             id = MediaId("media-1"),
@@ -69,5 +89,7 @@ class MediaTest {
             totals = MediaTotals(null, null, null),
             genres = genres,
             relatedMediaIds = relatedMediaIds,
+            releaseYear = releaseYear,
+            score = score,
         )
 }

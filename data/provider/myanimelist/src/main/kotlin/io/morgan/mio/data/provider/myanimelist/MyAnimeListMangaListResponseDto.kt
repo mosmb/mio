@@ -25,6 +25,9 @@ internal data class MyAnimeListMangaDto(
     val status: String? = null,
     @SerialName("num_chapters") val numChapters: Int? = null,
     @SerialName("num_volumes") val numVolumes: Int? = null,
+    val mean: Double? = null,
+    @SerialName("start_date") val startDate: String? = null,
+    @SerialName("start_season") val startSeason: MyAnimeListStartSeasonDto? = null,
     val genres: List<MyAnimeListGenreDto?>? = null,
 )
 

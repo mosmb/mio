@@ -49,6 +49,8 @@ internal data class AniListMediaDto(
     @SerialName("description") val description: String?,
     @SerialName("bannerImage") val bannerImage: String?,
     @SerialName("genres") val genres: List<String?>?,
+    @SerialName("seasonYear") val seasonYear: Int? = null,
+    @SerialName("averageScore") val averageScore: Int? = null,
     @SerialName("title") val title: AniListMediaTitleDto?,
     @SerialName("coverImage") val coverImage: AniListCoverImageDto?,
     @SerialName("airingSchedule") val airingSchedule: AniListAiringScheduleConnectionDto?,
@@ -56,26 +58,26 @@ internal data class AniListMediaDto(
 
 @Serializable
 internal data class AniListMediaTitleDto(
-    @SerialName("userPreferred") val userPreferred: String?,
-    @SerialName("romaji") val romaji: String?,
-    @SerialName("english") val english: String?,
-    @SerialName("native") val native: String?,
+    @SerialName("userPreferred") val userPreferred: String? = null,
+    @SerialName("romaji") val romaji: String? = null,
+    @SerialName("english") val english: String? = null,
+    @SerialName("native") val native: String? = null,
 )
 
 @Serializable
 internal data class AniListCoverImageDto(
-    @SerialName("extraLarge") val extraLarge: String?,
-    @SerialName("large") val large: String?,
-    @SerialName("medium") val medium: String?,
+    @SerialName("extraLarge") val extraLarge: String? = null,
+    @SerialName("large") val large: String? = null,
+    @SerialName("medium") val medium: String? = null,
 )
 
 @Serializable
 internal data class AniListAiringScheduleConnectionDto(
-    @SerialName("nodes") val nodes: List<AniListAiringScheduleNodeDto?>?,
+    @SerialName("nodes") val nodes: List<AniListAiringScheduleNodeDto?>? = null,
 )
 
 @Serializable
 internal data class AniListAiringScheduleNodeDto(
-    @SerialName("episode") val episode: Int?,
-    @SerialName("airingAt") val airingAt: Long?,
+    @SerialName("episode") val episode: Int? = null,
+    @SerialName("airingAt") val airingAt: Long? = null,
 )

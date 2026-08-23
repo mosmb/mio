@@ -51,12 +51,17 @@ class AniListInitialImportDataSourceTest {
 
             assertEquals(4, result.value.entries.size)
             assertEquals(4, result.value.media.size)
+            assertTrue(result.value.media.all { media -> media.relatedMediaIds.isEmpty() })
 
-            val recordedPages =
+            val requestBodies =
                 listOf(server.takeRequest(), server.takeRequest(), server.takeRequest()).map { recorded ->
-                    Regex("\"page\":(\\d+)").find(recorded.body?.utf8() ?: "")?.groupValues?.get(1)
+                    recorded.body?.utf8().orEmpty()
                 }
+            val recordedPages =
+                requestBodies.map { body -> Regex("\"page\":(\\d+)").find(body)?.groupValues?.get(1) }
             assertEquals(listOf("1", "2", "1"), recordedPages)
+            assertTrue(requestBodies.all { body -> body.contains("seasonYear") && body.contains("averageScore") })
+            assertTrue(requestBodies.none { body -> body.contains("relations") })
         }
 
     @Test

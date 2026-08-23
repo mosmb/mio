@@ -110,6 +110,28 @@ class MioDatabaseTest {
         }
 
     @Test
+    fun relatedMediaFlowIsOrderedAndEmptyWhenNoRelationsExist() =
+        runTest {
+            database.mediaDao().upsertMedia(listOf(media("media-1"), media("media-2"), media("media-3")))
+            database.mediaDao().upsertRelatedMedia(
+                listOf(
+                    RelatedMediaEntity("media-1", "media-3", 1),
+                    RelatedMediaEntity("media-1", "media-2", 0),
+                ),
+            )
+
+            assertEquals(
+                listOf("media-2", "media-3"),
+                database
+                    .mediaDao()
+                    .observeRelatedMedia("media-1")
+                    .first()
+                    .map { item -> item.media.mediaId },
+            )
+            assertEquals(emptyList<Any>(), database.mediaDao().observeRelatedMedia("media-2").first())
+        }
+
+    @Test
     fun collectionUniquenessIsAccountAndMediaScoped() =
         runTest {
             database.selectedAccountDao().replaceSelectedAccount(account("account-1"), accountMapping("account-1"))

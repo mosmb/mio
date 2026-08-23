@@ -5,6 +5,7 @@ import io.morgan.mio.data.provider.api.ProviderAuthorizationRequest
 import io.morgan.mio.data.provider.api.ProviderAuthorizationTransaction
 import io.morgan.mio.data.provider.api.ProviderFailure
 import io.morgan.mio.data.provider.api.ProviderKey
+import io.morgan.mio.data.provider.api.ProviderMediaId
 import io.morgan.mio.data.provider.api.ProviderResult
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -99,7 +100,33 @@ class ProviderFakesTest {
         assertEquals(ProviderKey.ANILIST, binding.provider)
         assertEquals("ProviderCredentials([REDACTED])", providerCredentialsFixture().toString())
         assertEquals(1, completeProviderImportFixture().media.size)
+        assertEquals(ProviderKey.ANILIST, binding.mediaDetailDataSource.provider)
     }
+
+    @Test
+    fun mediaDetailFakeRecordsCallsUsesFifoAndRejectsMismatchedResults() =
+        runTest {
+            val fake = FakeProviderMediaDetailDataSource(ProviderKey.ANILIST)
+            val credentials = providerCredentialsFixture()
+            val details = providerMediaDetailsFixture()
+            fake.enqueue { _, _ -> ProviderResult.Success(details) }
+
+            assertEquals(
+                ProviderResult.Success(details),
+                fake.fetchMediaDetails(credentials, ProviderMediaId("101")),
+            )
+            assertEquals(ProviderMediaId("101"), fake.calls.single().mediaId)
+            assertEquals(credentials, fake.calls.single().credentials)
+
+            fake.enqueue { _, _ ->
+                ProviderResult.Success(
+                    providerMediaDetailsFixture(provider = ProviderKey.MY_ANIME_LIST),
+                )
+            }
+            assertThrows<IllegalStateException> {
+                fake.fetchMediaDetails(credentials, ProviderMediaId("101"))
+            }
+        }
 
     @Test
     fun fakesRejectCrossProviderInputsAndScriptedSuccesses() =

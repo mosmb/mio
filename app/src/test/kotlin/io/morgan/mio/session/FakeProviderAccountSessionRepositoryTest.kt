@@ -3,6 +3,7 @@ package io.morgan.mio.session
 import io.morgan.mio.core.testing.provider.FakeProviderAuthenticator
 import io.morgan.mio.core.testing.provider.FakeProviderIdentityDataSource
 import io.morgan.mio.core.testing.provider.FakeProviderInitialImportDataSource
+import io.morgan.mio.core.testing.provider.FakeProviderMediaDetailDataSource
 import io.morgan.mio.core.testing.provider.completeProviderImportFixture
 import io.morgan.mio.core.testing.provider.providerAuthorizationLaunchFixture
 import io.morgan.mio.core.testing.provider.providerCredentialsFixture
@@ -115,6 +116,7 @@ class FakeProviderAccountSessionRepositoryTest {
             val authenticator = FakeProviderAuthenticator(ProviderKey.ANILIST)
             val identity = FakeProviderIdentityDataSource(ProviderKey.ANILIST)
             val initialImport = FakeProviderInitialImportDataSource(ProviderKey.ANILIST)
+            val mediaDetails = FakeProviderMediaDetailDataSource(ProviderKey.ANILIST)
             val release = kotlinx.coroutines.CompletableDeferred<Unit>()
             authenticator.enqueueBeginAuthorization {
                 release.await()
@@ -133,6 +135,7 @@ class FakeProviderAccountSessionRepositoryTest {
                             authenticator = authenticator,
                             identityDataSource = identity,
                             initialImportDataSource = initialImport,
+                            mediaDetailDataSource = mediaDetails,
                         ),
                 )
             repository.restore()
@@ -324,6 +327,7 @@ class FakeProviderAccountSessionRepositoryTest {
         val authenticator = FakeProviderAuthenticator(providerKey)
         val identity = FakeProviderIdentityDataSource(providerKey)
         val initialImport = FakeProviderInitialImportDataSource(providerKey)
+        val mediaDetails = FakeProviderMediaDetailDataSource(providerKey)
         authenticator.enqueueBeginAuthorization { ProviderResult.Success(providerAuthorizationLaunchFixture()) }
         authenticator.enqueueBeginAuthorization { ProviderResult.Success(providerAuthorizationLaunchFixture()) }
         authenticator.enqueueCompleteAuthorization {
@@ -337,7 +341,7 @@ class FakeProviderAccountSessionRepositoryTest {
             assertEquals(ProviderAccountId("account-fixture"), accountId)
             ProviderResult.Success(completeProviderImportFixture(provider = providerKey, accountId = accountId))
         }
-        return repository(providerKey, authenticator, identity, initialImport)
+        return repository(providerKey, authenticator, identity, initialImport, mediaDetails)
     }
 
     private fun repository(
@@ -345,6 +349,7 @@ class FakeProviderAccountSessionRepositoryTest {
         authenticator: FakeProviderAuthenticator,
         identity: FakeProviderIdentityDataSource,
         initialImport: FakeProviderInitialImportDataSource,
+        mediaDetails: FakeProviderMediaDetailDataSource = FakeProviderMediaDetailDataSource(providerKey),
     ): FakeProviderAccountSessionRepository =
         FakeProviderAccountSessionRepository(
             providerBinding =
@@ -353,6 +358,7 @@ class FakeProviderAccountSessionRepositoryTest {
                     authenticator = authenticator,
                     identityDataSource = identity,
                     initialImportDataSource = initialImport,
+                    mediaDetailDataSource = mediaDetails,
                 ),
         )
 }

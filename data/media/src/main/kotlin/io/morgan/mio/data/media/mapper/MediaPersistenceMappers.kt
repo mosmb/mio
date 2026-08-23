@@ -16,6 +16,7 @@ import io.morgan.mio.domain.media.Artwork
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.MediaFormat
 import io.morgan.mio.domain.media.MediaPublicationStatus
+import io.morgan.mio.domain.media.MediaScore
 import io.morgan.mio.domain.media.MediaTotals
 import io.morgan.mio.domain.media.Release
 import io.morgan.mio.domain.media.ReleaseTime
@@ -56,6 +57,8 @@ internal fun Media.toEntity(): MediaEntity =
         episodeTotal = totals.episodes?.value,
         chapterTotal = totals.chapters?.value,
         volumeTotal = totals.volumes?.value,
+        releaseYear = releaseYear,
+        scorePercent = score?.percent,
     )
 
 internal fun Media.toGenreEntities(): List<MediaGenreEntity> =
@@ -115,6 +118,8 @@ internal fun MediaAggregate.toDomain(): Media {
             ),
         genres = orderedGenres.toList(),
         relatedMediaIds = orderedRelatedMediaIds.toList(),
+        releaseYear = media.releaseYear,
+        score = media.scorePercent?.let(::MediaScore),
     )
 }
 

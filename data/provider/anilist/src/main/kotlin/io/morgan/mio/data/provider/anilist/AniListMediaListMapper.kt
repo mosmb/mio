@@ -191,6 +191,8 @@ internal object AniListMediaListMapper {
                         genres = genres,
                         relatedMediaIds = emptyList(),
                         releases = releases,
+                        releaseYear = mediaDto.seasonYear?.takeIf { value -> value > 0 },
+                        scorePercent = mediaDto.averageScore?.takeIf { value -> value in 1..100 },
                     )
             }
 

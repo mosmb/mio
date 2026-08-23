@@ -67,9 +67,11 @@ class RepositoryFakesTest {
 
             assertNull(fake.observeMedia(mediaA.id).first())
             assertEquals(emptyList<Release>(), fake.observeReleases(mediaA.id).first())
+            assertEquals(emptyList<Media>(), fake.observeRelatedMedia(mediaA.id).first())
 
             fake.setMedia(mutableMedia)
             fake.setReleases(mutableReleases)
+            fake.setRelatedMedia(mediaA.id, listOf(mediaB))
             mutableMedia.clear()
             mutableReleases.clear()
 
@@ -78,6 +80,7 @@ class RepositoryFakesTest {
                 listOf(release(mediaA.id, 2), release(mediaA.id, 1)),
                 fake.observeReleases(mediaA.id).first(),
             )
+            assertEquals(listOf(mediaB), fake.observeRelatedMedia(mediaA.id).first())
 
             fake.setMedia(listOf(mediaB))
             assertNull(fake.observeMedia(mediaA.id).first())
@@ -87,6 +90,24 @@ class RepositoryFakesTest {
 
             (fake.refreshedMediaIds as MutableList).clear()
             assertEquals(listOf(mediaB.id, mediaA.id), fake.refreshedMediaIds)
+        }
+
+    @Test
+    fun mediaFakeConsumesOneRefreshFailureThenContinuesRecordingCalls() =
+        runTest {
+            val fake = FakeMediaRepository()
+            val media = media("media")
+            val failure = IllegalStateException("fixture")
+            fake.failNextRefresh(media.id, failure)
+
+            try {
+                fake.refreshMedia(media.id)
+            } catch (actual: IllegalStateException) {
+                assertEquals(failure, actual)
+            }
+            fake.refreshMedia(media.id)
+
+            assertEquals(listOf(media.id, media.id), fake.refreshedMediaIds)
         }
 
     @Test

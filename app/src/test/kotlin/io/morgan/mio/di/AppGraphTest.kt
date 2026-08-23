@@ -7,7 +7,6 @@ import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
-import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.domain.model.AccountId
 import kotlinx.coroutines.cancel
@@ -114,7 +113,6 @@ class AppGraphTest {
                         accountId = AccountId("dynamic-account"),
                         providerBinding = providerBinding,
                         accountRefreshRequester = AccountRefreshRequester {},
-                        mediaRefreshRequester = MediaRefreshRequester {},
                         collectionRefreshRequester = CollectionRefreshRequester {},
                     )
 

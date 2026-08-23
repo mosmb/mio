@@ -199,10 +199,12 @@ class DependencyRulesTest {
             ":feature:progress:impl",
             ":feature:today:api",
         ).forEach { owner ->
-            assertTrue(
-                violations(owner, "implementation", ":core:common").isNotEmpty(),
-                "Expected $owner -> :core:common to remain forbidden",
-            )
+            val violations = violations(owner, "implementation", ":core:common")
+            if (owner == ":feature:media:impl") {
+                assertTrue(violations.isEmpty(), "Expected task sixteen media common edge to be allowed")
+            } else {
+                assertTrue(violations.isNotEmpty(), "Expected $owner -> :core:common to remain forbidden")
+            }
         }
         assertTrue(
             violations(":app", "implementation", ":feature:today:api").isNotEmpty(),

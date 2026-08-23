@@ -12,6 +12,7 @@ import io.morgan.mio.data.provider.api.ProviderIdentity
 import io.morgan.mio.data.provider.api.ProviderImageReference
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.data.provider.api.ProviderMedia
+import io.morgan.mio.data.provider.api.ProviderMediaDetails
 import io.morgan.mio.data.provider.api.ProviderMediaFormat
 import io.morgan.mio.data.provider.api.ProviderMediaId
 import io.morgan.mio.data.provider.api.ProviderMediaPublicationStatus
@@ -57,6 +58,8 @@ public fun providerMediaFixture(
                 time = ProviderReleaseTime.Unknown,
             ),
         ),
+    releaseYear: Int? = null,
+    scorePercent: Int? = null,
 ): ProviderMedia =
     ProviderMedia(
         id = ProviderMediaId(id),
@@ -71,7 +74,15 @@ public fun providerMediaFixture(
         genres = listOf("Adventure", "Drama"),
         relatedMediaIds = relatedMediaIds.map(::ProviderMediaId),
         releases = releases,
+        releaseYear = releaseYear,
+        scorePercent = scorePercent,
     )
+
+public fun providerMediaDetailsFixture(
+    provider: ProviderKey = ProviderKey.ANILIST,
+    root: ProviderMedia = providerMediaFixture(id = "101", relatedMediaIds = listOf("102")),
+    related: List<ProviderMedia> = listOf(providerMediaFixture(id = "102")),
+): ProviderMediaDetails = ProviderMediaDetails(provider, root, related)
 
 public fun providerCollectionEntryFixture(
     id: String = "entry-fixture",
@@ -112,11 +123,13 @@ public fun providerBindingFixture(
     val authenticator = FakeProviderAuthenticator(provider)
     val identityDataSource = FakeProviderIdentityDataSource(provider)
     val initialImportDataSource = FakeProviderInitialImportDataSource(provider)
+    val mediaDetailDataSource = FakeProviderMediaDetailDataSource(provider)
     return io.morgan.mio.data.provider.api.ProviderBinding(
         provider = provider,
         authenticator = authenticator,
         identityDataSource = identityDataSource,
         initialImportDataSource = initialImportDataSource,
+        mediaDetailDataSource = mediaDetailDataSource,
     )
 }
 

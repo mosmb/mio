@@ -18,6 +18,15 @@ public abstract class MediaDao {
     @Query("SELECT * FROM media WHERE media_id = :mediaId")
     public abstract fun observeMedia(mediaId: String): Flow<MediaAggregate?>
 
+    @Transaction
+    @Query(
+        "SELECT media.* FROM related_media " +
+            "JOIN media ON media.media_id = related_media.related_media_id " +
+            "WHERE related_media.media_id = :mediaId " +
+            "ORDER BY related_media.position",
+    )
+    public abstract fun observeRelatedMedia(mediaId: String): Flow<List<MediaAggregate>>
+
     @Upsert
     public abstract suspend fun upsertMedia(media: List<MediaEntity>)
 

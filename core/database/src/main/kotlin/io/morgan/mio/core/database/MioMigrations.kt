@@ -94,5 +94,13 @@ public object MioMigrations {
             }
         }
 
-    public val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    public val MIGRATION_2_3: Migration =
+        object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `media` ADD COLUMN `release_year` INTEGER")
+                db.execSQL("ALTER TABLE `media` ADD COLUMN `score_percent` INTEGER")
+            }
+        }
+
+    public val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

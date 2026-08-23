@@ -20,6 +20,8 @@ public class DefaultMediaRepository(
 ) : MediaRepository {
     override fun observeMedia(mediaId: MediaId): Flow<Media?> = localDataSource.observeMedia(mediaId)
 
+    override fun observeRelatedMedia(mediaId: MediaId): Flow<List<Media>> = localDataSource.observeRelatedMedia(mediaId)
+
     override fun observeReleases(mediaId: MediaId): Flow<List<Release>> = localDataSource.observeReleases(mediaId)
 
     override suspend fun refreshMedia(mediaId: MediaId) {

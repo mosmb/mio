@@ -32,11 +32,15 @@ public class MainActivity : ComponentActivity() {
                 } else {
                     AppRoot.ONBOARDING
                 }
+            val viewModelFactory =
+                graph.accountGraphLifecycle.activeHandle()?.withGraph { accountGraph ->
+                    accountGraph.metroViewModelFactory
+                } ?: graph.metroViewModelFactory
             MioApp(
                 root = root,
                 navigationRegistry = graph.navigationRegistry,
                 imageLoader = graph.imageLoader,
-                viewModelFactory = graph.metroViewModelFactory,
+                viewModelFactory = viewModelFactory,
             )
         }
     }

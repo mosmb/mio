@@ -23,6 +23,7 @@ class AniListProviderFactoryTest {
         assertEquals(ProviderKey.ANILIST, binding.authenticator.provider)
         assertEquals(ProviderKey.ANILIST, binding.identityDataSource.provider)
         assertEquals(ProviderKey.ANILIST, binding.initialImportDataSource.provider)
+        assertEquals(ProviderKey.ANILIST, binding.mediaDetailDataSource.provider)
     }
 
     @Test
@@ -36,5 +37,6 @@ class AniListProviderFactoryTest {
         assertNotSame(first.authenticator, second.authenticator)
         assertNotSame(first.identityDataSource, second.identityDataSource)
         assertNotSame(first.initialImportDataSource, second.initialImportDataSource)
+        assertNotSame(first.mediaDetailDataSource, second.mediaDetailDataSource)
     }
 }

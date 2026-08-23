@@ -26,6 +26,9 @@ class ProviderModelsTest {
         assertThrows<IllegalArgumentException> {
             media(relatedMediaIds = listOf(ProviderMediaId("related"), ProviderMediaId("related")))
         }
+        assertThrows<IllegalArgumentException> { media(releaseYear = 0) }
+        assertThrows<IllegalArgumentException> { media(scorePercent = 0) }
+        assertThrows<IllegalArgumentException> { media(scorePercent = 101) }
         assertThrows<IllegalArgumentException> { media(relatedMediaIds = listOf(mediaId)) }
         assertThrows<IllegalArgumentException> {
             media(
@@ -106,6 +109,8 @@ class ProviderModelsTest {
         genres: List<String> = emptyList(),
         relatedMediaIds: List<ProviderMediaId> = emptyList(),
         releases: List<ProviderRelease> = emptyList(),
+        releaseYear: Int? = null,
+        scorePercent: Int? = null,
     ): ProviderMedia =
         ProviderMedia(
             id = mediaId,
@@ -120,6 +125,8 @@ class ProviderModelsTest {
             genres = genres,
             relatedMediaIds = relatedMediaIds,
             releases = releases,
+            releaseYear = releaseYear,
+            scorePercent = scorePercent,
         )
 
     private fun entry(

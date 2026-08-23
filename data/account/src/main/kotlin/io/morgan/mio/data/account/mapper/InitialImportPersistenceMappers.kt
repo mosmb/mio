@@ -76,6 +76,8 @@ internal fun CompleteProviderImport.toInitialImportPersistence(
                 episodeTotal = item.totals.episodes,
                 chapterTotal = item.totals.chapters,
                 volumeTotal = item.totals.volumes,
+                releaseYear = item.releaseYear,
+                scorePercent = item.scorePercent,
             )
 
         item.genres.forEachIndexed { position, genre ->

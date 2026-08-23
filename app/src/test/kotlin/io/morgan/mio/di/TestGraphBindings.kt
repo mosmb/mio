@@ -30,7 +30,6 @@ import io.morgan.mio.core.testing.repository.FakeMediaRepository
 import io.morgan.mio.core.testing.repository.FakePreferencesRepository
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
-import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.data.provider.api.ProviderCredentialStore
 import io.morgan.mio.domain.account.AccountRepository
@@ -116,7 +115,7 @@ internal class TestGraphBindings(
         requester.let { accountRepository }
 
     @Provides
-    fun provideMediaRepository(requester: MediaRefreshRequester): MediaRepository = requester.let { mediaRepository }
+    fun provideMediaRepository(): MediaRepository = mediaRepository
 
     @Provides
     fun provideCollectionRepository(requester: CollectionRefreshRequester): CollectionRepository =

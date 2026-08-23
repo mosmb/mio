@@ -28,6 +28,7 @@ class MyAnimeListProviderFactoryTest {
         assertEquals(ProviderKey.MY_ANIME_LIST, binding.authenticator.provider)
         assertEquals(ProviderKey.MY_ANIME_LIST, binding.identityDataSource.provider)
         assertEquals(ProviderKey.MY_ANIME_LIST, binding.initialImportDataSource.provider)
+        assertEquals(ProviderKey.MY_ANIME_LIST, binding.mediaDetailDataSource.provider)
     }
 
     @Test
@@ -40,5 +41,6 @@ class MyAnimeListProviderFactoryTest {
         assertNotSame(first.authenticator, second.authenticator)
         assertNotSame(first.identityDataSource, second.identityDataSource)
         assertNotSame(first.initialImportDataSource, second.initialImportDataSource)
+        assertNotSame(first.mediaDetailDataSource, second.mediaDetailDataSource)
     }
 }

@@ -39,7 +39,7 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         PendingOperationEntity::class,
         PendingOperationDependencyEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -59,6 +59,6 @@ public abstract class MioDatabase : RoomDatabase() {
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 2
+        public const val VERSION: Int = 3
     }
 }

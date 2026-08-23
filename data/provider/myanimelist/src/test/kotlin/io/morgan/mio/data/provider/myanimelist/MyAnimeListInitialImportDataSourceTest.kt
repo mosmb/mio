@@ -91,6 +91,7 @@ class MyAnimeListInitialImportDataSourceTest {
             assertTrue(targets[0].contains("list_status"))
             assertTrue(targets[2].contains("num_chapters"))
             assertTrue(targets[2].contains("num_volumes"))
+            assertTrue(targets.none { target -> target.contains("related_anime") || target.contains("related_manga") })
         }
 
     @Test

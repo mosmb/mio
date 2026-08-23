@@ -28,6 +28,8 @@ public class Media(
     public val totals: MediaTotals,
     genres: List<String>,
     relatedMediaIds: List<MediaId>,
+    public val releaseYear: Int? = null,
+    public val score: MediaScore? = null,
 ) {
     public val genres: List<String> = genres.toList()
     public val relatedMediaIds: List<MediaId> = relatedMediaIds.toList()
@@ -38,6 +40,7 @@ public class Media(
         require(this.genres.distinct().size == this.genres.size)
         require(this.relatedMediaIds.distinct().size == this.relatedMediaIds.size)
         require(id !in this.relatedMediaIds)
+        require(releaseYear == null || releaseYear > 0)
     }
 
     override fun equals(other: Any?): Boolean =
@@ -53,7 +56,9 @@ public class Media(
                     artwork == other.artwork &&
                     totals == other.totals &&
                     genres == other.genres &&
-                    relatedMediaIds == other.relatedMediaIds
+                    relatedMediaIds == other.relatedMediaIds &&
+                    releaseYear == other.releaseYear &&
+                    score == other.score
             )
 
     override fun hashCode(): Int {
@@ -67,11 +72,13 @@ public class Media(
         result = 31 * result + totals.hashCode()
         result = 31 * result + genres.hashCode()
         result = 31 * result + relatedMediaIds.hashCode()
+        result = 31 * result + (releaseYear ?: 0)
+        result = 31 * result + (score?.hashCode() ?: 0)
         return result
     }
 
     override fun toString(): String =
         "Media(id=$id, type=$type, title=$title, format=$format, publicationStatus=$publicationStatus, " +
             "synopsis=$synopsis, artwork=$artwork, totals=$totals, genres=$genres, " +
-            "relatedMediaIds=$relatedMediaIds)"
+            "relatedMediaIds=$relatedMediaIds, releaseYear=$releaseYear, score=$score)"
 }

@@ -15,10 +15,24 @@ internal object AniListQueries {
             "mediaList(userId: \$userId, type: \$type, sort: [MEDIA_ID]) { " +
             "id status progress progressVolumes updatedAt createdAt " +
             "media { " +
-            "id type format status episodes chapters volumes description bannerImage genres " +
+            "id type format status episodes chapters volumes description bannerImage genres seasonYear averageScore " +
             "title { userPreferred romaji english native } " +
             "coverImage { extraLarge large medium } " +
             "airingSchedule(notYetAired: false, perPage: $AIRING_SCHEDULE_PAGE_SIZE) " +
             "{ nodes { episode airingAt } } " +
+            "} } } }"
+
+    internal const val MEDIA_DETAILS: String =
+        "query MioMediaDetails(\$id: Int!) { " +
+            "Media(id: \$id) { " +
+            "id type format status episodes chapters volumes description bannerImage genres seasonYear averageScore " +
+            "title { userPreferred romaji english native } " +
+            "coverImage { extraLarge large medium } " +
+            "airingSchedule(notYetAired: false, perPage: $AIRING_SCHEDULE_PAGE_SIZE) " +
+            "{ nodes { episode airingAt } } " +
+            "relations { nodes { " +
+            "id type format status episodes chapters volumes description bannerImage genres seasonYear averageScore " +
+            "title { userPreferred romaji english native } " +
+            "coverImage { extraLarge large medium } " +
             "} } } }"
 }

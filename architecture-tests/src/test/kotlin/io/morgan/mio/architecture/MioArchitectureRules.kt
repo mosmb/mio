@@ -254,7 +254,12 @@ internal fun enforceNetworkBoundary(files: List<OwnedKotlinFile>) {
                 matchesAnyPrefix(importName, serializationPrefixes) &&
                     !isNetworkOwner &&
                     !isConcreteProvider &&
-                    !(isNavigationFeatureApi && importName == "kotlinx.serialization.Serializable")
+                    !(isNavigationFeatureApi && importName == "kotlinx.serialization.Serializable") &&
+                    !(
+                        ownedFile.modulePath == ":feature:media:api" &&
+                            fileName(ownedFile.file.path) == "MediaKey.kt" &&
+                            ownedFile.file.text.contains("private object MediaIdSerializer")
+                    )
             }
         val forbiddenAndroidNetworkImport =
             imports.firstOrNull { importName ->
@@ -353,7 +358,9 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
         val keyDeclarations =
             parentNamesByDeclaration
                 .filter { (declaration, parentNames) ->
-                    "NavKey" in parentNames || "FocusedDestination" in parentNames
+                    "NavKey" in parentNames ||
+                        "FocusedDestination" in parentNames ||
+                        (ownedFile.modulePath == ":feature:media:api" && declaration.name == "MediaKey")
                 }.keys
                 .filterNot { declaration -> declaration == markerDeclaration }
         val entryBuilderDeclarations =
@@ -403,11 +410,17 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
             if (isFeatureApi(ownedFile.modulePath)) {
                 imports.firstOrNull { importName ->
                     matchesPrefix(importName, "kotlinx.serialization") &&
-                        importName != "kotlinx.serialization.Serializable"
+                        importName != "kotlinx.serialization.Serializable" &&
+                        !isPrivateFocusedKeySerializer(ownedFile, keyDeclarations)
                 }
             } else {
                 null
             }
+        val privateFocusedKeySerializerIssue =
+            keyDeclarations
+                .firstOrNull { declaration -> declaration.name == "MediaKey" }
+                ?.takeIf { !isPrivateFocusedKeySerializer(ownedFile, keyDeclarations) }
+                ?.name
         val keyPayloadIssue =
             keyDeclarations
                 .asSequence()
@@ -523,6 +536,9 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
             wrongFocusedOwner != null ->
                 "FocusedDestination implementation '$wrongFocusedOwner' must live in a feature API module"
 
+            privateFocusedKeySerializerIssue != null ->
+                "focused key '$privateFocusedKeySerializerIssue' must use a private MediaIdSerializer"
+
             forbiddenFeatureApiImport != null ->
                 "feature API cannot own entry builders or Compose/navigation UI types; found '$forbiddenFeatureApiImport'"
 
@@ -534,6 +550,14 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
     }
 }
 
+private fun isPrivateFocusedKeySerializer(
+    ownedFile: OwnedKotlinFile,
+    keyDeclarations: List<KoClassAndInterfaceAndObjectDeclaration>,
+): Boolean =
+    keyDeclarations.any { declaration -> declaration.name == "MediaKey" } &&
+        ownedFile.file.text.contains(Regex("\\bprivate\\s+object\\s+MediaIdSerializer\\b")) &&
+        ownedFile.file.text.contains("KSerializer<MediaId>")
+
 private fun navigationDeclarations(file: KoFileDeclaration): List<KoClassAndInterfaceAndObjectDeclaration> =
     file
         .declarations(true, true)
@@ -542,8 +566,8 @@ private fun navigationDeclarations(file: KoFileDeclaration): List<KoClassAndInte
 private fun navigationParentNames(declaration: KoClassAndInterfaceAndObjectDeclaration): Set<String> {
     val header = declaration.text.substringBefore('{').substringBefore('=')
     return setOf("NavKey", "FocusedDestination", "NavEntryBuilder").filterTo(mutableSetOf()) { parentName ->
-        Regex("\\)\\s*:\\s*[^\\n]*\\b$parentName\\b").containsMatchIn(header) ||
-            Regex("\\b(?:class|object|interface)\\s+\\w+\\s*:\\s*[^\\n]*\\b$parentName\\b")
+        Regex("\\)\\s*:\\s*[^\\{=]*\\b$parentName\\b").containsMatchIn(header) ||
+            Regex("\\b(?:class|object|interface)\\s+\\w+\\s*:\\s*[^\\{=]*\\b$parentName\\b")
                 .containsMatchIn(header)
     }
 }
@@ -927,6 +951,7 @@ internal fun enforcePlatformServiceBoundaries(files: List<OwnedKotlinFile>) {
             ownedFile.sourceSet == "test" ||
                 ownedFile.modulePath == ":data:provider:api" ||
                 isProviderImplementation(ownedFile.modulePath) ||
+                ownedFile.modulePath == ":data:media" ||
                 ownedFile.modulePath == ":core:testing" ||
                 (ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di") ||
                 isCredentialBoundary
@@ -965,6 +990,10 @@ internal fun enforcePlatformServiceBoundaries(files: List<OwnedKotlinFile>) {
                 ?.takeUnless {
                     ownedFile.sourceSet == "test" ||
                         ownedFile.modulePath == ":core:ui" ||
+                        (
+                            ownedFile.modulePath == ":feature:media:impl" &&
+                                it == "coil3.ImageLoader"
+                        ) ||
                         (
                             ownedFile.modulePath == ":app" &&
                                 (
@@ -1267,6 +1296,7 @@ internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>
         val viewModelIssue =
             viewModel?.let { declaration ->
                 val declarationText = declaration.text
+                val assistedViewModel = declaration.hasAnnotationWithName("AssistedInject")
                 val matchingRouteName = "${declaration.name.removeSuffix("ViewModel")}Route"
                 val matchingRoute =
                     featureFiles
@@ -1285,25 +1315,49 @@ internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>
                         .findAll(declarationText)
                         .map { match -> match.groupValues[1] }
                         .toList()
+                val assistedFactoryIsValid =
+                    assistedViewModel &&
+                        Regex("@AssistedFactory\\b").containsMatchIn(declarationText) &&
+                        Regex("@ManualViewModelAssistedFactoryKey\\b").containsMatchIn(declarationText) &&
+                        Regex("@ContributesIntoMap\\s*\\(\\s*AccountScope::class\\s*\\)").containsMatchIn(
+                            declarationText,
+                        ) &&
+                        Regex("fun\\s+interface\\s+Factory\\b").containsMatchIn(declarationText)
                 when {
                     !Regex("\\bViewModel\\s*\\(").containsMatchIn(declarationText) ->
                         "ViewModel '${declaration.name}' must extend androidx.lifecycle.ViewModel"
 
-                    !declaration.hasAnnotationWithName("Inject") ->
+                    !assistedViewModel && !declaration.hasAnnotationWithName("Inject") ->
                         "ViewModel '${declaration.name}' must use constructor injection"
 
-                    !declaration.hasAnnotationWithName("ViewModelKey") ->
+                    !assistedViewModel && !declaration.hasAnnotationWithName("ViewModelKey") ->
                         "ViewModel '${declaration.name}' must have @ViewModelKey"
 
-                    !Regex("@ContributesIntoMap\\s*\\(\\s*AppScope::class\\s*\\)").containsMatchIn(source) ->
+                    !assistedViewModel &&
+                        !Regex("@ContributesIntoMap\\s*\\(\\s*AppScope::class\\s*\\)").containsMatchIn(source) ->
                         "ViewModel '${declaration.name}' must contribute into AppScope"
+
+                    assistedViewModel && declaration.hasAnnotationWithName("ViewModelKey") ->
+                        "assisted ViewModel '${declaration.name}' must use its AccountScope assisted factory"
+
+                    assistedViewModel && !assistedFactoryIsValid ->
+                        "assisted ViewModel '${declaration.name}' must contribute a ManualViewModelAssistedFactory in AccountScope"
 
                     matchingRoute.size != 1 ->
                         "ViewModel '${declaration.name}' must have exactly one matching Route in ${ownedFile.modulePath}"
 
-                    !Regex("\\bmetroViewModel\\s*<\\s*${Regex.escape(declaration.name)}\\s*>").containsMatchIn(
-                        route!!.second.text,
-                    ) ->
+                    assistedViewModel &&
+                        !Regex(
+                            "\\bassistedMetroViewModel\\s*<\\s*${Regex.escape(
+                                declaration.name,
+                            )}\\s*,\\s*${Regex.escape(declaration.name)}\\.Factory\\s*>",
+                        ).containsMatchIn(route!!.second.text) ->
+                        "Route '$matchingRouteName' must obtain '${declaration.name}' with assistedMetroViewModel()"
+
+                    !assistedViewModel &&
+                        !Regex("\\bmetroViewModel\\s*<\\s*${Regex.escape(declaration.name)}\\s*>").containsMatchIn(
+                            route!!.second.text,
+                        ) ->
                         "Route '$matchingRouteName' must obtain '${declaration.name}' with metroViewModel()"
 
                     stateFlowNames.isEmpty() ->
@@ -1314,11 +1368,14 @@ internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>
                             "\\bviewModel\\s*\\.\\s*${Regex.escape(
                                 propertyName,
                             )}\\s*\\.\\s*collectAsStateWithLifecycle\\s*\\(",
-                        ).containsMatchIn(route.second.text)
+                        ).containsMatchIn(route?.second?.text.orEmpty())
                     } ->
                         "Route '$matchingRouteName' must lifecycle-collect every ViewModel StateFlow property"
 
-                    countCall(route.second.text, "${declaration.name.removeSuffix("ViewModel")}Screen") != 1 ->
+                    countCall(
+                        route?.second?.text.orEmpty(),
+                        "${declaration.name.removeSuffix("ViewModel")}Screen",
+                    ) != 1 ->
                         "Route '$matchingRouteName' must invoke its Screen exactly once"
 
                     else -> null
@@ -1329,7 +1386,7 @@ internal fun enforceViewModelPresentationConvention(files: List<OwnedKotlinFile>
             ownedFile.file
                 .properties(true)
                 .firstOrNull { property ->
-                    val propertyText = property.text
+                    val propertyText = property.type?.text.orEmpty()
                     val isFlow =
                         Regex("\\b(?:StateFlow|SharedFlow)\\s*<").containsMatchIn(propertyText)
                     isFlow && containsForbiddenPresentationFlowType(ownedFile, propertyText)

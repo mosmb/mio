@@ -7,6 +7,8 @@ import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.di.AppGraph
+import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.feature.media.api.MediaKey
 import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -49,10 +51,11 @@ class NavigationRegistrationTest {
             val provider = registry.entryProvider(navigator)
             val rootKeys =
                 listOf(registry.onboardingDestination.key) +
-                    registry.topLevelDestinations.map { destination -> destination.key }
+                    registry.topLevelDestinations.map { destination -> destination.key } +
+                    MediaKey(MediaId("media-fixture"))
 
-            assertEquals(5, rootKeys.size)
-            assertEquals(5, rootKeys.map { key -> key::class }.toSet().size)
+            assertEquals(6, rootKeys.size)
+            assertEquals(6, rootKeys.map { key -> key::class }.toSet().size)
             rootKeys.forEach { key -> assertNotNull(provider(key)) }
             assertThrows(Throwable::class.java) { provider(UnknownNavigationTestKey) }
         } finally {

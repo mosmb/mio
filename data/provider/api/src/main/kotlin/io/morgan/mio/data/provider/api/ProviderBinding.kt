@@ -5,10 +5,12 @@ public class ProviderBinding(
     public val authenticator: ProviderAuthenticator,
     public val identityDataSource: ProviderIdentityDataSource,
     public val initialImportDataSource: ProviderInitialImportDataSource,
+    public val mediaDetailDataSource: ProviderMediaDetailDataSource,
 ) {
     init {
         require(authenticator.provider == provider)
         require(identityDataSource.provider == provider)
         require(initialImportDataSource.provider == provider)
+        require(mediaDetailDataSource.provider == provider)
     }
 }

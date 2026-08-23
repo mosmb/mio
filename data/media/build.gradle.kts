@@ -13,6 +13,7 @@ dependencies {
 
     testImplementation(libs.room.runtime)
     testImplementation(libs.room.testing)
+    testImplementation(project(":core:testing"))
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)

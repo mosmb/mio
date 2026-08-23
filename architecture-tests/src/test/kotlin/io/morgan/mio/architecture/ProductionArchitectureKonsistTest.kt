@@ -674,6 +674,113 @@ class ProductionArchitectureKonsistTest {
         )
     }
 
+    @Test
+    fun taskSixteenProductionTypesAreActuallyScanned() {
+        val files = productionFiles()
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:media:api" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/MediaKey.kt") &&
+                    ownedFile.file.text.contains("FocusedDestination") &&
+                    ownedFile.file.text.contains("private object MediaIdSerializer")
+            },
+            "production scan omitted the typed focused MediaKey serializer",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:media:impl" &&
+                    ownedFile.file.classes(true, true).any { declaration -> declaration.name == "MediaDetailViewModel" }
+            },
+            "production scan omitted the AccountScope-assisted media detail ViewModel",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:media:impl" &&
+                    ownedFile.file.text.contains(
+                        "assistedMetroViewModel<MediaDetailViewModel, MediaDetailViewModel.Factory>",
+                    )
+            },
+            "production scan omitted the assisted media detail ViewModel route",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.interfaces(true).any { declaration -> declaration.name == "AccountGraph" } &&
+                    ownedFile.file.text.contains("ViewModelGraph")
+            },
+            "production scan omitted the AccountGraph ViewModelGraph extension",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name ==
+                            "AccountMetroViewModelFactory"
+                    } &&
+                    ownedFile.file.text.contains("AccountScope")
+            },
+            "production scan omitted the AccountScope Metro ViewModel factory",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/MainActivity.kt") &&
+                    ownedFile.file.text.contains("activeHandle()") &&
+                    ownedFile.file.text.contains("?: graph.metroViewModelFactory")
+            },
+            "production scan omitted MainActivity's active-account factory fallback",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:provider:anilist" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name ==
+                            "AniListMediaDetailDataSource"
+                    }
+            },
+            "production scan omitted AniList detail enrichment",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:provider:myanimelist" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name ==
+                            "MyAnimeListMediaDetailDataSource"
+                    }
+            },
+            "production scan omitted MyAnimeList detail enrichment",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:media" &&
+                    ownedFile.file.classes(true, true).any { declaration ->
+                        declaration.name ==
+                            "ProviderMediaRefreshRequester"
+                    } &&
+                    ownedFile.file.text.contains("refreshMedia")
+            },
+            "production scan omitted the Room-backed detail refresh requester",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:database" &&
+                    ownedFile.file.text.contains("version = 3")
+            },
+            "production scan omitted the schema-3 database version",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:database" &&
+                    ownedFile.file.text.contains("MIGRATION_2_3")
+            },
+            "production scan omitted the 2-to-3 media migration",
+        )
+    }
+
     private fun productionFiles(): List<OwnedKotlinFile> =
         MioProductionModules.paths.flatMap { modulePath ->
             listOf("main", "debug", "release").flatMap { sourceSet ->

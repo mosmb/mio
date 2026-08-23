@@ -2,6 +2,8 @@ package io.morgan.mio.data.media.local
 
 import dev.zacsweers.metro.Inject
 import io.morgan.mio.core.database.MioDatabase
+import io.morgan.mio.core.database.model.StoredConnectedProvider
+import io.morgan.mio.data.media.mapper.MediaDetailsPersistenceSnapshot
 import io.morgan.mio.data.media.mapper.MediaPersistenceSnapshot
 import io.morgan.mio.data.media.mapper.toDomain
 import io.morgan.mio.data.media.mapper.toEntity
@@ -22,10 +24,24 @@ public class RoomMediaLocalDataSource(
     public fun observeMedia(mediaId: MediaId): Flow<Media?> =
         database.mediaDao().observeMedia(mediaId.value).map { aggregate -> aggregate?.toDomain() }
 
+    public fun observeRelatedMedia(mediaId: MediaId): Flow<List<Media>> =
+        database.mediaDao().observeRelatedMedia(mediaId.value).map { aggregates ->
+            aggregates.map { aggregate -> aggregate.toDomain() }.toList()
+        }
+
     public fun observeReleases(mediaId: MediaId): Flow<List<Release>> =
         database.releaseDao().observeReleases(mediaId.value).map { releases ->
             releases.map { release -> release.toDomain() }.toList()
         }
+
+    internal suspend fun findMediaProviderId(
+        mediaId: MediaId,
+        provider: StoredConnectedProvider,
+    ): String? =
+        database
+            .providerIdDao()
+            .findMediaProviderId(mediaId.value, provider)
+            ?.remoteMediaId
 
     internal suspend fun replaceInitialMediaSnapshot(snapshot: MediaPersistenceSnapshot) {
         replaceInitialMediaSnapshots(listOf(snapshot))
@@ -60,6 +76,37 @@ public class RoomMediaLocalDataSource(
             if (relatedMedia.isNotEmpty()) database.mediaDao().upsertRelatedMedia(relatedMedia)
             if (releases.isNotEmpty()) database.releaseDao().upsertReleases(releases)
             if (providerMappings.isNotEmpty()) database.providerIdDao().upsertMediaProviderIds(providerMappings)
+        }
+    }
+
+    internal suspend fun replaceMediaDetailsSnapshot(snapshot: MediaDetailsPersistenceSnapshot) {
+        val owner = snapshot.owner
+        val related = snapshot.related
+        val ownerMediaId = owner.media.id.value
+        val media = listOf(owner.media) + related.map { item -> item.media }
+        val genres = media.flatMap { item -> item.toGenreEntities() }
+        val relations = owner.media.toRelatedMediaEntities()
+        val releases = owner.releases.map { release -> release.releaseToEntity() }
+        val provider = requireNotNull(owner.providerIds.singleOrNull()?.provider)
+        val mappings =
+            (listOf(owner) + related).map { item ->
+                require(item.providerIds.size == 1)
+                require(item.providerIds.single().provider == provider)
+                item.providerIds.single().providerIdToEntity()
+            }
+
+        database.inTransaction {
+            database.mediaDao().upsertMedia(media.map { item -> item.toEntity() })
+            database.mediaDao().deleteGenres(ownerMediaId)
+            related.forEach { item -> database.mediaDao().deleteGenres(item.media.id.value) }
+            database.mediaDao().deleteRelatedMedia(ownerMediaId)
+            database.releaseDao().deleteReleases(ownerMediaId)
+            database.providerIdDao().deleteMediaProviderId(ownerMediaId, provider)
+            related.forEach { item -> database.providerIdDao().deleteMediaProviderId(item.media.id.value, provider) }
+            if (genres.isNotEmpty()) database.mediaDao().upsertGenres(genres)
+            if (relations.isNotEmpty()) database.mediaDao().upsertRelatedMedia(relations)
+            if (releases.isNotEmpty()) database.releaseDao().upsertReleases(releases)
+            database.providerIdDao().upsertMediaProviderIds(mappings)
         }
     }
 }

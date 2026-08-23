@@ -30,7 +30,15 @@ internal data class MyAnimeListAnimeDto(
     @SerialName("media_type") val mediaType: String? = null,
     val status: String? = null,
     @SerialName("num_episodes") val numEpisodes: Int? = null,
+    val mean: Double? = null,
+    @SerialName("start_date") val startDate: String? = null,
+    @SerialName("start_season") val startSeason: MyAnimeListStartSeasonDto? = null,
     val genres: List<MyAnimeListGenreDto?>? = null,
+)
+
+@Serializable
+internal data class MyAnimeListStartSeasonDto(
+    val year: Int? = null,
 )
 
 @Serializable

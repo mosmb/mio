@@ -31,6 +31,10 @@ public data class MediaEntity(
     public val chapterTotal: Int?,
     @ColumnInfo(name = "volume_total")
     public val volumeTotal: Int?,
+    @ColumnInfo(name = "release_year")
+    public val releaseYear: Int? = null,
+    @ColumnInfo(name = "score_percent")
+    public val scorePercent: Int? = null,
 ) {
     init {
         require(mediaId.isNotBlank())
@@ -41,5 +45,7 @@ public data class MediaEntity(
         require(episodeTotal == null || episodeTotal > 0)
         require(chapterTotal == null || chapterTotal > 0)
         require(volumeTotal == null || volumeTotal > 0)
+        require(releaseYear == null || releaseYear > 0)
+        require(scorePercent == null || scorePercent in 1..100)
     }
 }

@@ -31,6 +31,8 @@ class AniListMediaListMapperTest {
         description: String? = null,
         bannerImage: String? = null,
         genres: List<String?>? = null,
+        seasonYear: Int? = null,
+        averageScore: Int? = null,
         title: AniListMediaTitleDto? = titleDto(),
         coverImage: AniListCoverImageDto? = null,
         airingSchedule: AniListAiringScheduleConnectionDto? = null,
@@ -45,6 +47,8 @@ class AniListMediaListMapperTest {
         description = description,
         bannerImage = bannerImage,
         genres = genres,
+        seasonYear = seasonYear,
+        averageScore = averageScore,
         title = title,
         coverImage = coverImage,
         airingSchedule = airingSchedule,
@@ -295,6 +299,37 @@ class AniListMediaListMapperTest {
         assertNull(totals.episodes)
         assertNull(totals.chapters)
         assertNull(totals.volumes)
+    }
+
+    @Test
+    fun optionalYearAndScoreAreNormalizedToNullableMetadata() {
+        val populated =
+            mapOne(entryDto(media = mediaDto(seasonYear = 2026, averageScore = 87))) as ProviderResult.Success
+        assertEquals(
+            2026,
+            populated.value.media
+                .single()
+                .releaseYear,
+        )
+        assertEquals(
+            87,
+            populated.value.media
+                .single()
+                .scorePercent,
+        )
+
+        val unknown =
+            mapOne(entryDto(media = mediaDto(seasonYear = 0, averageScore = 101))) as ProviderResult.Success
+        assertNull(
+            unknown.value.media
+                .single()
+                .releaseYear,
+        )
+        assertNull(
+            unknown.value.media
+                .single()
+                .scorePercent,
+        )
     }
 
     @Test

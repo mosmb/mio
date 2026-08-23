@@ -50,6 +50,8 @@ public class ProviderMedia(
     genres: List<String>,
     relatedMediaIds: List<ProviderMediaId>,
     releases: List<ProviderRelease>,
+    public val releaseYear: Int? = null,
+    public val scorePercent: Int? = null,
 ) {
     public val genres: List<String> = genres.toList()
     public val relatedMediaIds: List<ProviderMediaId> = relatedMediaIds.toList()
@@ -69,5 +71,7 @@ public class ProviderMedia(
                 .toSet()
                 .size == this.releases.size,
         )
+        require(releaseYear == null || releaseYear > 0)
+        require(scorePercent == null || scorePercent in 1..100)
     }
 }

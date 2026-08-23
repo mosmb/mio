@@ -28,7 +28,10 @@ class InitialImportPersistenceMappersTest {
 
     @Test
     fun everyEntityGroupIsProducedWithTheExpectedValues() {
-        val import = completeProviderImportFixture()
+        val import =
+            completeProviderImportFixture(
+                media = listOf(providerMediaFixture(releaseYear = 2026, scorePercent = 87)),
+            )
 
         val snapshot = import.toInitialImportPersistence(identity)
 
@@ -45,6 +48,8 @@ class InitialImportPersistenceMappersTest {
         val expectedMediaId = ImportedIdentityFactory.mediaId(StoredConnectedProvider.ANILIST, "media-fixture")
         assertEquals(1, snapshot.media.size)
         assertEquals(expectedMediaId.value, snapshot.media.single().mediaId)
+        assertEquals(2026, snapshot.media.single().releaseYear)
+        assertEquals(87, snapshot.media.single().scorePercent)
 
         assertEquals(1, snapshot.mediaProviderIds.size)
         assertEquals(StoredConnectedProvider.ANILIST, snapshot.mediaProviderIds.single().provider)
@@ -72,6 +77,17 @@ class InitialImportPersistenceMappersTest {
         assertEquals(StoredConnectedProvider.ANILIST, snapshot.entryProviderIds.single().provider)
         assertEquals("entry-fixture", snapshot.entryProviderIds.single().remoteCollectionEntryId)
         assertEquals(expectedEntryId.value, snapshot.entryProviderIds.single().collectionEntryId)
+    }
+
+    @Test
+    fun missingOptionalYearAndScoreRemainNull() {
+        val snapshot =
+            completeProviderImportFixture(
+                media = listOf(providerMediaFixture(releaseYear = null, scorePercent = null)),
+            ).toInitialImportPersistence(identity)
+
+        assertNull(snapshot.media.single().releaseYear)
+        assertNull(snapshot.media.single().scorePercent)
     }
 
     @Test

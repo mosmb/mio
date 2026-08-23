@@ -8,7 +8,6 @@ import io.morgan.mio.core.testing.provider.FakeProviderInitialImportDataSource
 import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
-import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.domain.model.AccountId
@@ -39,14 +38,12 @@ class AccountGraphLifecycleTest {
 
             val anilistBinding = providerBindingFixture(provider = ProviderKey.ANILIST)
             val accountRefreshCalls = mutableListOf<Unit>()
-            val mediaRefreshCalls = mutableListOf<Unit>()
             val collectionRefreshCalls = mutableListOf<Unit>()
             val anilistRequest =
                 request(
                     providerBinding = anilistBinding,
                     accountId = "anilist-account",
                     accountRefreshCalls = accountRefreshCalls,
-                    mediaRefreshCalls = mediaRefreshCalls,
                     collectionRefreshCalls = collectionRefreshCalls,
                 )
             val first = lifecycle.create(anilistRequest)
@@ -91,7 +88,6 @@ class AccountGraphLifecycleTest {
                     AccountId("ordinary-one"),
                     providerBindingFixture(provider = ProviderKey.ANILIST),
                     AccountRefreshRequester {},
-                    MediaRefreshRequester {},
                     CollectionRefreshRequester {},
                 )
             val ordinaryTwo =
@@ -99,7 +95,6 @@ class AccountGraphLifecycleTest {
                     AccountId("ordinary-two"),
                     providerBindingFixture(provider = ProviderKey.ANILIST),
                     AccountRefreshRequester {},
-                    MediaRefreshRequester {},
                     CollectionRefreshRequester {},
                 )
             assertNotSame(ordinaryOne.accountRepository, ordinaryTwo.accountRepository)
@@ -123,7 +118,6 @@ class AccountGraphLifecycleTest {
             assertTrue(anilistAuthenticator.refreshCredentials.isEmpty())
             assertTrue(anilistImport.calls.isEmpty())
             assertTrue(accountRefreshCalls.isEmpty())
-            assertTrue(mediaRefreshCalls.isEmpty())
             assertTrue(collectionRefreshCalls.isEmpty())
 
             lifecycle.destroy()
@@ -154,7 +148,6 @@ class AccountGraphLifecycleTest {
                         accountId,
                         providerBinding,
                         accountRefreshRequester,
-                        mediaRefreshRequester,
                         collectionRefreshRequester,
                         ->
                         if (fail) throw expected
@@ -162,7 +155,6 @@ class AccountGraphLifecycleTest {
                             accountId,
                             providerBinding,
                             accountRefreshRequester,
-                            mediaRefreshRequester,
                             collectionRefreshRequester,
                         )
                     },
@@ -190,14 +182,12 @@ class AccountGraphLifecycleTest {
         providerBinding: ProviderBinding,
         accountId: String,
         accountRefreshCalls: MutableList<Unit> = mutableListOf(),
-        mediaRefreshCalls: MutableList<Unit> = mutableListOf(),
         collectionRefreshCalls: MutableList<Unit> = mutableListOf(),
     ): AccountGraphRequest =
         AccountGraphRequest(
             accountId = AccountId(accountId),
             providerBinding = providerBinding,
             accountRefreshRequester = AccountRefreshRequester { accountRefreshCalls += Unit },
-            mediaRefreshRequester = MediaRefreshRequester { mediaRefreshCalls += Unit },
             collectionRefreshRequester = CollectionRefreshRequester { collectionRefreshCalls += Unit },
         )
 }

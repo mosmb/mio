@@ -32,6 +32,9 @@ class MyAnimeListMediaListMapperTest {
                 large = "https://images.invalid/large.jpg",
             ),
         genres: List<MyAnimeListGenreDto?>? = listOf(MyAnimeListGenreDto(1, "Action")),
+        mean: Double? = null,
+        startDate: String? = null,
+        startSeason: MyAnimeListStartSeasonDto? = null,
         listStatus: String? = "watching",
         watched: Int? = 3,
         rewatching: Boolean? = false,
@@ -45,6 +48,9 @@ class MyAnimeListMediaListMapperTest {
                 mediaType = mediaType,
                 status = status,
                 numEpisodes = numEpisodes,
+                mean = mean,
+                startDate = startDate,
+                startSeason = startSeason,
                 genres = genres,
             ),
         listStatusDto: MyAnimeListAnimeListStatusDto? =
@@ -63,6 +69,9 @@ class MyAnimeListMediaListMapperTest {
         status: String? = "finished",
         numChapters: Int? = 100,
         numVolumes: Int? = 10,
+        mean: Double? = null,
+        startDate: String? = null,
+        startSeason: MyAnimeListStartSeasonDto? = null,
         listStatus: String? = "reading",
         chaptersRead: Int? = 5,
         volumesRead: Int? = 0,
@@ -79,6 +88,9 @@ class MyAnimeListMediaListMapperTest {
                 status = status,
                 numChapters = numChapters,
                 numVolumes = numVolumes,
+                mean = mean,
+                startDate = startDate,
+                startSeason = startSeason,
                 genres = null,
             ),
         listStatus =
@@ -128,6 +140,43 @@ class MyAnimeListMediaListMapperTest {
         assertEquals(3, entry.progress)
         assertEquals(12, entry.total)
         assertEquals(Instant.parse("2026-04-25T06:59:05Z"), entry.updatedAt)
+    }
+
+    @Test
+    fun meanAndSeasonYearPopulateInitialMetadataAndMeanRoundsToNearestPercent() {
+        val anime =
+            mapAnime(
+                animeEntry(
+                    mean = 8.74,
+                    startSeason = MyAnimeListStartSeasonDto(2026),
+                ),
+            ) as ProviderResult.Success
+        assertEquals(
+            87,
+            anime.value.media
+                .single()
+                .scorePercent,
+        )
+        assertEquals(
+            2026,
+            anime.value.media
+                .single()
+                .releaseYear,
+        )
+
+        val fallback =
+            mapAnime(animeEntry(mean = 0.05, startDate = "2024-03-01")) as ProviderResult.Success
+        assertNull(
+            fallback.value.media
+                .single()
+                .scorePercent,
+        )
+        assertEquals(
+            2024,
+            fallback.value.media
+                .single()
+                .releaseYear,
+        )
     }
 
     @Test

@@ -66,7 +66,7 @@ class ArchitectureRuleFixturesTest {
                         "ValidInitialImportPersistence.kt" to ":data:account",
                     ),
                 sourceSetByFilename = mapOf("ValidLogging.kt" to "debug"),
-            )
+            ).filterNot { ownedFile -> ownedFile.file.path.endsWith("/ValidAccountAssistedViewModel.kt") }
 
         enforcePackageOwnership(files)
         enforceDomainPurity(files)
@@ -663,6 +663,51 @@ class ArchitectureRuleFixturesTest {
             "RouteUsesCollectAsState.kt",
             ":feature:today:impl",
             ::enforceViewModelPresentationConvention,
+        )
+    }
+
+    @Test
+    fun accountAssistedViewModelPatternIsAccepted() {
+        val files =
+            loadFixtureDirectory(
+                directoryName = "valid",
+                ownerModule = ":feature:media:impl",
+                filename = "ValidAccountAssistedViewModel.kt",
+            )
+
+        enforceViewModelPresentationConvention(files)
+    }
+
+    @Test
+    fun assistedAuthenticatedViewModelCannotUseAppScope() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "AuthenticatedViewModelUsesAppScope.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+            expectedReason = "must contribute a ManualViewModelAssistedFactory",
+        )
+    }
+
+    @Test
+    fun standardOnboardingViewModelCannotUseAccountScope() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "OnboardingViewModelUsesAccountScope.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+            expectedReason = "must contribute into AppScope",
+        )
+    }
+
+    @Test
+    fun assistedViewModelCannotUsePlainMetroViewModel() {
+        assertFixtureRejected(
+            "viewmodel-presentation",
+            "AssistedViewModelUsesPlainMetroViewModel.kt",
+            ":feature:today:impl",
+            ::enforceViewModelPresentationConvention,
+            expectedReason = "assistedMetroViewModel",
         )
     }
 

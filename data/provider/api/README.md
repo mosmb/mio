@@ -135,3 +135,16 @@ Recorded 2026-08-19. The provenance of each part differs, and the difference mat
 - The list order is not documented as stable, so Mio de-duplicates by remote media ID rather than relying on it; a title added mid-import may be missed until the next refresh.
 - `paging.next` is read only as a boolean "more exists" signal; its URL is never followed to avoid letting MyAnimeList redirect Mio's authenticated request at an arbitrary host.
 - The refresh token is dropped when a refresh response omits it, forcing re-authentication rather than reusing a possibly-rotated value.
+
+## Task 16 media-detail enrichment contract
+
+Task 16 adds one provider-neutral `ProviderMediaDetailDataSource` request that returns a validated `ProviderMediaDetails` snapshot: one requested root and its direct related titles. The snapshot requires a matching provider, a positive root identity, unique related IDs, and exact ordered agreement between `root.relatedMediaIds` and the returned related list. Implementations copy the related list before exposing it, and malformed optional related nodes are omitted rather than invented.
+
+| Provider | Detail request | Optional metadata | Relation order and defensive behavior |
+|---|---|---|---|
+| AniList | One validated GraphQL `Media(id: $id)` query with existing media fields, `seasonYear`, `averageScore`, releases, and direct `relations.nodes` essentials | positive `seasonYear` and scores in `1..100`; invalid values become `null`; root anime releases use valid positive episode/time pairs | GraphQL relation order is preserved; duplicate/self/invalid related nodes are dropped; a malformed mandatory root or response-ID mismatch fails |
+| MyAnimeList | One fixed `GET anime/{id}` or `GET manga/{id}` request, selected only from `anime/<positive-int>` or `manga/<positive-int>`, with exact nested `related_anime{...}` and `related_manga{...}` fields | `mean` is converted to a nearest-integer percentage after multiplying by 10; year uses positive `start_season.year`, then a four-digit `start_date` fallback; invalid values become `null` | Anime relations precede manga relations and each provider array keeps its order; duplicate/self/malformed optional nodes are dropped; a malformed mandatory root or response-ID mismatch fails |
+
+The initial-import field sets now include only year and score. Relations remain absent from initial imports; the detail request is the sole enrichment path and never performs an N+1 request per related title. These fields are optional honest data: unknown, zero, out-of-range, or malformed values remain `null`, not fabricated defaults.
+
+The one-request shapes and nested relation fields were verified against the live AniList GraphQL schema and MyAnimeList detail endpoints during the task-13/task-14 planning checks (2026-08-19). The contract fixtures and provider tests in Task 16 preserve that evidence locally. Live limitations remain: provider relation completeness is not guaranteed, MyAnimeList has no banner or release schedule, and provider detail failures are normalized by the concrete provider before the capability layer writes any Room data.

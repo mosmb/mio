@@ -143,6 +143,8 @@ internal object MyAnimeListMediaListMapper {
                 genres = genres,
                 relatedMediaIds = emptyList(),
                 releases = emptyList(),
+                releaseYear = node.startSeason?.year?.positiveYearOrNull() ?: node.startDate?.fourDigitYearOrNull(),
+                scorePercent = node.mean?.toScorePercentOrNull(),
             )
 
         val entry =
@@ -256,6 +258,8 @@ internal object MyAnimeListMediaListMapper {
                 genres = genres,
                 relatedMediaIds = emptyList(),
                 releases = emptyList(),
+                releaseYear = node.startSeason?.year?.positiveYearOrNull() ?: node.startDate?.fourDigitYearOrNull(),
+                scorePercent = node.mean?.toScorePercentOrNull(),
             )
 
         val entry =
@@ -322,4 +326,24 @@ internal object MyAnimeListMediaListMapper {
         }
 
     private fun Int?.positiveOrNull(): Int? = this?.takeIf { value -> value > 0 }
+
+    private fun Int.positiveYearOrNull(): Int? = takeIf { value -> value in 1..9999 }
+
+    private fun String.fourDigitYearOrNull(): Int? =
+        Regex("(?:^|[^0-9])(\\d{4})(?:[^0-9]|$)")
+            .find(this)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?.positiveYearOrNull()
+
+    private fun Double.toScorePercentOrNull(): Int? =
+        if (isFinite() && this in 0.1..10.0) {
+            kotlin.math
+                .floor(this * 10.0 + 0.5)
+                .toInt()
+                .takeIf { value -> value in 1..100 }
+        } else {
+            null
+        }
 }

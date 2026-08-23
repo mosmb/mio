@@ -31,6 +31,7 @@ class MioDatabaseMigrationTest {
     @After
     fun tearDown() {
         context.deleteDatabase(TEST_DATABASE_NAME)
+        context.deleteDatabase(TEST_DATABASE_V2_NAME)
     }
 
     @Test
@@ -57,7 +58,7 @@ class MioDatabaseMigrationTest {
         }
 
         helper
-            .runMigrationsAndValidate(TEST_DATABASE_NAME, 2, true, MioMigrations.MIGRATION_1_2)
+            .runMigrationsAndValidate(TEST_DATABASE_NAME, 3, true, *MioMigrations.ALL)
             .use { migrated ->
                 assertEquals(1, countRows(migrated, "selected_account"))
                 assertEquals(1, countRows(migrated, "media"))
@@ -65,6 +66,8 @@ class MioDatabaseMigrationTest {
                 assertEquals(0, countRows(migrated, "pending_operation_group"))
                 assertEquals(0, countRows(migrated, "pending_operation"))
                 assertEquals(0, countRows(migrated, "pending_operation_dependency"))
+                assertTrue(hasColumn(migrated, "media", "release_year"))
+                assertTrue(hasColumn(migrated, "media", "score_percent"))
             }
 
         val current = MioDatabaseFactory.create(context, TEST_DATABASE_NAME)
@@ -76,9 +79,46 @@ class MioDatabaseMigrationTest {
         assertNotNull(current.pendingOperationDao())
         current.close()
 
-        assertEquals(2, MioDatabase.VERSION)
-        assertEquals(1, MioMigrations.ALL.size)
-        assertTrue(MioMigrations.ALL.single() === MioMigrations.MIGRATION_1_2)
+        assertEquals(3, MioDatabase.VERSION)
+        assertEquals(2, MioMigrations.ALL.size)
+        assertTrue(MioMigrations.ALL[0] === MioMigrations.MIGRATION_1_2)
+        assertTrue(MioMigrations.ALL[1] === MioMigrations.MIGRATION_2_3)
+    }
+
+    @Test
+    fun versionTwoRowsAndRelationsSurviveTheMetadataMigration() {
+        helper.createDatabase(TEST_DATABASE_V2_NAME, 1).use { database ->
+            database.execSQL(
+                "INSERT INTO selected_account " +
+                    "(selection_key, account_id, connected_provider, display_name, avatar_reference) " +
+                    "VALUES ('selected', 'account-v2', 'anilist', 'Migration account', NULL)",
+            )
+            database.execSQL(
+                "INSERT INTO media " +
+                    "(media_id, media_type, title, format, publication_status, synopsis, poster_reference, " +
+                    "banner_reference, episode_total, chapter_total, volume_total) " +
+                    "VALUES ('media-v2', 'anime', 'Migration media', 'tv', 'releasing', NULL, NULL, NULL, 12, NULL, NULL)",
+            )
+            database.execSQL(
+                "INSERT INTO media_provider_id (provider, remote_media_id, media_id) " +
+                    "VALUES ('anilist', 'v2-remote', 'media-v2')",
+            )
+        }
+        helper.runMigrationsAndValidate(TEST_DATABASE_V2_NAME, 2, true, MioMigrations.MIGRATION_1_2).close()
+
+        helper
+            .runMigrationsAndValidate(TEST_DATABASE_V2_NAME, 3, true, MioMigrations.MIGRATION_2_3)
+            .use { migrated ->
+                assertEquals(1, countRows(migrated, "media"))
+                assertEquals(1, countRows(migrated, "media_provider_id"))
+                migrated
+                    .query("SELECT release_year, score_percent FROM media WHERE media_id = 'media-v2'")
+                    .use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        assertTrue(cursor.isNull(0))
+                        assertTrue(cursor.isNull(1))
+                    }
+            }
     }
 
     private fun countRows(
@@ -90,7 +130,20 @@ class MioDatabaseMigrationTest {
             cursor.getInt(0)
         }
 
+    private fun hasColumn(
+        database: SupportSQLiteDatabase,
+        tableName: String,
+        columnName: String,
+    ): Boolean =
+        database.query("PRAGMA table_info(`$tableName`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            generateSequence {
+                if (cursor.moveToNext()) cursor.getString(nameIndex) else null
+            }.any { name -> name == columnName }
+        }
+
     private companion object {
         const val TEST_DATABASE_NAME: String = "mio-migration-test.db"
+        const val TEST_DATABASE_V2_NAME: String = "mio-migration-v2-test.db"
     }
 }

@@ -2,10 +2,10 @@ package io.morgan.mio.di
 
 import dev.zacsweers.metro.GraphExtension
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import io.morgan.mio.core.common.di.AccountScope
 import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
-import io.morgan.mio.data.media.MediaRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.domain.account.AccountRepository
 import io.morgan.mio.domain.collection.CollectionRepository
@@ -14,7 +14,7 @@ import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.preferences.PreferencesRepository
 
 @GraphExtension(AccountScope::class)
-internal interface AccountGraph {
+internal interface AccountGraph : ViewModelGraph {
     val accountId: AccountId
     val providerBinding: ProviderBinding
     val accountRepository: AccountRepository
@@ -28,7 +28,6 @@ internal interface AccountGraph {
             @Provides accountId: AccountId,
             @Provides providerBinding: ProviderBinding,
             @Provides accountRefreshRequester: AccountRefreshRequester,
-            @Provides mediaRefreshRequester: MediaRefreshRequester,
             @Provides collectionRefreshRequester: CollectionRefreshRequester,
         ): AccountGraph
     }
