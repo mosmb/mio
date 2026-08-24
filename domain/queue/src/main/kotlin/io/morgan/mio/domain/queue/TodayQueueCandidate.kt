@@ -4,7 +4,7 @@ import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.Release
 
-internal class NowCandidate(
+internal class TodayQueueCandidate(
     val entry: CollectionEntry,
     val media: Media,
     releases: List<Release>,

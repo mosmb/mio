@@ -36,6 +36,7 @@ import io.morgan.mio.core.ui.image.MioImageLoaderProvider
 import io.morgan.mio.feature.today.impl.component.TODAY_NOW_LOWER_SCRIM_ALPHA
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -63,162 +64,272 @@ class TodayScreenTest {
     }
 
     @Test
-    fun populatedCardHasHeadingsCopyOneButtonAndOneNavigationCallback() {
-        var callbackCount = 0
-        var callbackId: String? = null
+    fun populatedShowsNowThreeNewRowsRemainingAndOneCallbackPerDetailTarget() {
+        val clickedIds = mutableListOf<String>()
+        var density: Density? = null
         show(
-            state = TodayUiState.Content(populatedNow()),
-            onMediaDetail = { id ->
-                callbackCount += 1
-                callbackId = id
-            },
+            state = populatedState(),
+            onMediaDetail = clickedIds::add,
+            onDensity = { density = it },
         )
+
+        val targets = composeRule.onAllNodes(hasClickAction())
+        targets.assertCountEquals(4)
+        val currentDensity = requireNotNull(density)
+        assertTrue(targets[0].fetchSemanticsNode().boundsInRoot.height >= with(currentDensity) { 300.dp.toPx() })
 
         composeRule.onNodeWithText("Today").assertIsDisplayed()
         composeRule.onNodeWithText("Now").assertIsDisplayed()
-        composeRule.onNodeWithText("Anime").assertIsDisplayed()
-        composeRule.onNodeWithText("Readable title").assertIsDisplayed()
-        composeRule.onNodeWithText("Next episode 9").assertIsDisplayed()
-        composeRule.onNodeWithText("4 episodes ready").assertIsDisplayed()
-        composeRule.onNodeWithText("Episode 8 of 12").assertIsDisplayed()
+        composeRule.onNodeWithText("New").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Readable title").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("A Gentle Beginning").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("A Longer Evening").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("A Distant Return").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("2 other titles are ready when you are").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Next episode 9").assertCountEquals(4)
+        composeRule.onAllNodesWithText("2 episodes ready").assertCountEquals(3)
+        composeRule.onAllNodesWithText("Episode 8 of 12").assertCountEquals(4)
+        composeRule.onAllNodesWithText("New · under one hour ago").assertCountEquals(1)
+        composeRule.onAllNodesWithText("New · 3 hours ago").assertCountEquals(1)
+        composeRule.onAllNodesWithText("New · 7 days ago").assertCountEquals(1)
+        listOf("A Gentle Beginning", "A Longer Evening", "A Distant Return").forEach { title ->
+            val row = composeRule.onNodeWithText(title).performScrollTo()
+            assertTrue(
+                row.fetchSemanticsNode().boundsInRoot.height >= with(currentDensity) { 104.dp.toPx() },
+            )
+        }
 
-        val card = composeRule.onNode(hasClickAction())
-        card.assertIsDisplayed().assertHasClickAction().performClick()
-        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        composeRule
+            .onNodeWithText("A Gentle Beginning")
+            .performScrollTo()
+            .assertHasClickAction()
+            .performClick()
+        composeRule
+            .onNodeWithText("A Distant Return")
+            .performScrollTo()
+            .assertHasClickAction()
+            .performClick()
+        assertEquals(listOf("new-one", "new-three"), clickedIds)
 
-        assertEquals(1, callbackCount)
-        assertEquals("media-1", callbackId)
-        val cardSemantics = card.fetchSemanticsNode().config
-        assertEquals(Role.Button, cardSemantics[SemanticsProperties.Role])
-        assertEquals("Open Readable title details", cardSemantics[SemanticsActions.OnClick].label)
-        assertEquals(
-            listOf(
-                "Anime",
-                "Readable title",
-                "Next episode 9",
-                "4 episodes ready",
-                "Episode 8 of 12",
-            ),
-            cardSemantics[SemanticsProperties.Text].map { text -> text.text },
-        )
+        val firstNewSemantics = targets[1].fetchSemanticsNode().config
+        assertEquals(Role.Button, firstNewSemantics[SemanticsProperties.Role])
+        assertEquals("Open A Gentle Beginning details", firstNewSemantics[SemanticsActions.OnClick].label)
+        assertTrue(firstNewSemantics[SemanticsProperties.Text].any { text -> text.text == "Anime" })
+        assertTrue(firstNewSemantics[SemanticsProperties.Text].any { text -> text.text == "A Gentle Beginning" })
+        assertTrue(firstNewSemantics[SemanticsProperties.Text].any { text -> text.text.contains("New") })
+        assertTrue(firstNewSemantics[SemanticsProperties.Text].any { text -> text.text == "Next episode 9" })
+        assertTrue(firstNewSemantics[SemanticsProperties.Text].any { text -> text.text.contains("2 episodes ready") })
+        assertTrue(firstNewSemantics[SemanticsProperties.Text].any { text -> text.text == "Episode 8 of 12" })
         composeRule
             .onNode(
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
                 useUnmergedTree = true,
             ).assertDoesNotExist()
-        assertTrue(
-            composeRule
-                .onNodeWithText("Today")
-                .fetchSemanticsNode()
-                .config
-                .contains(SemanticsProperties.Heading),
-        )
-        assertTrue(
-            composeRule
-                .onNodeWithText("Now")
-                .fetchSemanticsNode()
-                .config
-                .contains(SemanticsProperties.Heading),
-        )
+
+        composeRule.onNode(hasScrollAction()).assertIsDisplayed()
         listOf(
             "+1",
             "−1",
             "-1",
             "Add to library",
             "Change status",
-            "New",
-            "Caught up",
             "Explore Discover",
             "Retry",
-            "Snackbar",
+            "Undo",
+            "Achievement",
         ).forEach { forbidden ->
             composeRule.onAllNodesWithText(forbidden, substring = true, ignoreCase = true).assertCountEquals(0)
         }
     }
 
     @Test
-    fun unknownTotalUsesUnitSpecificCopyWithoutAnOfSuffix() {
+    fun remainingSummaryIsInformationalAndHasNoButtonSemantics() {
         show(
-            TodayUiState.Content(
-                populatedNow(
-                    progressUnit = TodayProgressUnit.CHAPTER,
-                    progress = 41,
-                    nextUnit = 42,
-                    total = null,
-                    availableUnitCount = 3,
+            state =
+                TodayUiState.Populated(
+                    now = previewNow(),
+                    newRecommendations = emptyList(),
+                    remainingReadyCount = 1,
                 ),
-            ),
         )
 
-        composeRule.onNodeWithText("Next chapter 42").assertIsDisplayed()
-        composeRule.onNodeWithText("3 chapters ready").assertIsDisplayed()
-        composeRule.onNodeWithText("Chapter 41").assertIsDisplayed()
-        composeRule.onAllNodesWithText("of", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithText("1 other title is ready when you are").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        val summary = composeRule.onNodeWithText("1 other title is ready when you are").fetchSemanticsNode().config
+        assertFalse(summary.contains(SemanticsActions.OnClick))
+        assertFalse(summary.contains(SemanticsProperties.Role))
     }
 
     @Test
-    fun loadingHasNeutralSkeletonSemanticsAndEmptyHasNoNowClaim() {
+    fun caughtUpReceiptIsQuietAndFutureReleaseIsTheOnlyAction() {
+        val clickedIds = mutableListOf<String>()
+        var density: Density? = null
+        show(
+            state = caughtUpState(),
+            onMediaDetail = clickedIds::add,
+            onDensity = { density = it },
+        )
+
+        composeRule.onNodeWithText("You're caught up").assertIsDisplayed()
+        composeRule.onNodeWithText("Nothing needs your attention right now.").assertIsDisplayed()
+        composeRule.onNodeWithText("Next release").assertIsDisplayed()
+        composeRule.onNodeWithText("The Next Chapter").assertIsDisplayed()
+        composeRule.onNodeWithText("Next chapter 42").assertIsDisplayed()
+        composeRule.onNodeWithText("In 2 days").assertIsDisplayed()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        val futureTarget = composeRule.onAllNodes(hasClickAction())[0].fetchSemanticsNode()
+        assertTrue(futureTarget.boundsInRoot.height >= with(requireNotNull(density)) { 48.dp.toPx() })
+        assertEquals(Role.Button, futureTarget.config[SemanticsProperties.Role])
+        assertEquals(
+            "Open The Next Chapter details",
+            futureTarget.config[SemanticsActions.OnClick].label,
+        )
+        composeRule.onNodeWithText("The Next Chapter").performClick()
+        assertEquals(listOf("future-preview"), clickedIds)
+        composeRule.onAllNodesWithText("Discover", substring = true, ignoreCase = true).assertCountEquals(0)
+        composeRule
+            .onNode(
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
+                useUnmergedTree = true,
+            ).assertDoesNotExist()
+    }
+
+    @Test
+    fun singularUnitAndRelativeTimeCopyIsLocalizedForNewAndFutureRows() {
+        val newHour =
+            previewNew(
+                mediaId = "new-hour",
+                title = "New hour",
+                releaseAge = TodayRelativeTime(1, TodayRelativeTimeUnit.HOURS),
+            ).copy(
+                progressUnit = TodayProgressUnit.VOLUME,
+                availableUnitCount = 1,
+            )
+        val newDay =
+            previewNew(
+                mediaId = "new-day",
+                title = "New day",
+                releaseAge = TodayRelativeTime(1, TodayRelativeTimeUnit.DAYS),
+            ).copy(progressUnit = TodayProgressUnit.CHAPTER)
+        val state =
+            show(
+                populatedState(
+                    newRecommendations = listOf(newHour, newDay),
+                    remainingReadyCount = 0,
+                ),
+            )
+
+        composeRule.onNodeWithText("New · 1 hour ago").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("New · 1 day ago").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Next volume 9").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("1 volume ready").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Volume 8 of 12").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Next chapter 9").performScrollTo().assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            state.value =
+                TodayUiState.CaughtUp(
+                    TodayCaughtUpUiModel(
+                        artwork = emptyList(),
+                        nextRelease =
+                            TodayNextReleaseUiModel(
+                                mediaId = "future-hour",
+                                mediaType = TodayMediaType.ANIME,
+                                title = "Future hour",
+                                posterReference = null,
+                                progressUnit = TodayProgressUnit.EPISODE,
+                                unitNumber = 2,
+                                waitUntilRelease = TodayRelativeTime(1, TodayRelativeTimeUnit.HOURS),
+                            ),
+                    ),
+                )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("In 1 hour").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            state.value =
+                TodayUiState.CaughtUp(
+                    TodayCaughtUpUiModel(
+                        artwork = emptyList(),
+                        nextRelease =
+                            TodayNextReleaseUiModel(
+                                mediaId = "future-day",
+                                mediaType = TodayMediaType.MANGA,
+                                title = "Future day",
+                                posterReference = null,
+                                progressUnit = TodayProgressUnit.CHAPTER,
+                                unitNumber = 2,
+                                waitUntilRelease = TodayRelativeTime(1, TodayRelativeTimeUnit.DAYS),
+                            ),
+                    ),
+                )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("In 1 day").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyCaughtUpReceiptHasNoArtworkActionOrFakeRelease() {
+        show(
+            TodayUiState.CaughtUp(
+                TodayCaughtUpUiModel(artwork = emptyList(), nextRelease = null),
+            ),
+        )
+        composeRule.onNodeWithText("You're caught up").assertIsDisplayed()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Next release").assertCountEquals(0)
+        composeRule
+            .onNode(
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
+                useUnmergedTree = true,
+            ).assertDoesNotExist()
+    }
+
+    @Test
+    fun loadingHasSkeletonAndLargeTextStatesRemainScrollable() {
         val state = show(TodayUiState.Loading)
         composeRule.onNodeWithText("Today").assertIsDisplayed()
         composeRule.onNodeWithText("Now").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Loading Today").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Open", substring = true).assertCountEquals(0)
 
-        composeRule.runOnIdle { state.value = TodayUiState.Empty }
+        composeRule.runOnIdle { state.value = populatedState() }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Today").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Now").assertCountEquals(0)
-        listOf("Ready", "Continue", "unavailable", "offline", "error", "caught up").forEach { forbidden ->
-            composeRule.onAllNodesWithText(forbidden, substring = true, ignoreCase = true).assertCountEquals(0)
-        }
-    }
-
-    @Test
-    fun missingArtworkPreservesTheCardBoundsAndLargeTextRemainsScrollable() {
-        var contentDensity: Density? = null
-        show(
-            state = TodayUiState.Content(populatedNow(posterReference = null, bannerReference = null)),
-            modifier = Modifier.width(320.dp).height(852.dp),
-            fontScale = 2f,
-            onDensity = { contentDensity = it },
-        )
-        val missingArtworkCard = composeRule.onNode(hasClickAction(), useUnmergedTree = true)
-        val initialBounds = missingArtworkCard.fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            "bounds=$initialBounds density=$contentDensity",
-            initialBounds.height >= with(requireNotNull(contentDensity)) { 300.dp.toPx() },
-        )
-
+        composeRule.onNodeWithText("A Distant Return").performScrollTo().assertIsDisplayed()
         composeRule.onNode(hasScrollAction()).assertIsDisplayed()
-        composeRule.onNodeWithText("Episode 8 of 12").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun artworkChangesPreserveTheReferenceCardBounds() {
-        val state = show(TodayUiState.Content(populatedNow()))
-        val card = composeRule.onNode(hasClickAction())
-        val populatedBounds = card.fetchSemanticsNode().boundsInRoot
+    fun missingArtworkAndCaughtUpLargeTextGrowWithoutClipping() {
+        var density: Density? = null
+        val state =
+            show(
+                state =
+                    populatedState(
+                        now = previewNow(posterReference = null, bannerReference = null),
+                        newRecommendations =
+                            previewNewRecommendations().mapIndexed { index, recommendation ->
+                                if (index == 0) recommendation.copy(posterReference = null) else recommendation
+                            },
+                    ),
+                modifier = Modifier.width(320.dp).height(852.dp),
+                fontScale = 2f,
+                onDensity = { density = it },
+            )
+        val nowCard = composeRule.onAllNodes(hasClickAction())[0]
+        assertTrue(nowCard.fetchSemanticsNode().boundsInRoot.height >= with(requireNotNull(density)) { 300.dp.toPx() })
+        composeRule.onNodeWithText("A Distant Return").performScrollTo().assertIsDisplayed()
 
-        composeRule.runOnIdle {
-            state.value =
-                TodayUiState.Content(
-                    populatedNow(posterReference = null, bannerReference = null),
-                )
-        }
+        composeRule.runOnIdle { state.value = caughtUpState() }
         composeRule.waitForIdle()
-        val missingBounds = card.fetchSemanticsNode().boundsInRoot
-
-        assertEquals(populatedBounds, missingBounds)
-        assertTrue(populatedBounds.height >= with(composeRule.density) { 332.dp.toPx() })
+        composeRule.onNodeWithText("The Next Chapter").performScrollTo().assertIsDisplayed()
+        composeRule.onNode(hasScrollAction()).assertIsDisplayed()
     }
 
     @Test
     fun lowerScrimMeetsTheRequiredContrastForWorstCaseArtwork() {
-        val whiteArtwork = Color.White
-        val blackArtwork = Color.Black
-        val scrimOverWhite = Color.Black.copy(alpha = TODAY_NOW_LOWER_SCRIM_ALPHA).compositeOver(whiteArtwork)
-        val scrimOverBlack = Color.Black.copy(alpha = TODAY_NOW_LOWER_SCRIM_ALPHA).compositeOver(blackArtwork)
-
+        val scrimOverWhite = Color.Black.copy(alpha = TODAY_NOW_LOWER_SCRIM_ALPHA).compositeOver(Color.White)
+        val scrimOverBlack = Color.Black.copy(alpha = TODAY_NOW_LOWER_SCRIM_ALPHA).compositeOver(Color.Black)
         assertTrue(Color.White.contrastRatioAgainst(scrimOverWhite) >= MioContrast.NormalText)
         assertTrue(Color.White.contrastRatioAgainst(scrimOverBlack) >= MioContrast.NormalText)
         assertTrue(Color.White.contrastRatioAgainst(scrimOverWhite) >= MioContrast.LargeTextAndEssentialIcons)
@@ -252,12 +363,13 @@ class TodayScreenTest {
         return stateHolder
     }
 
-    private fun populatedNow(
-        progressUnit: TodayProgressUnit = TodayProgressUnit.EPISODE,
-        progress: Int = 8,
-        nextUnit: Int = 9,
-        total: Int? = 12,
-        availableUnitCount: Int = 4,
+    private fun populatedState(
+        now: TodayNowUiModel = previewNow(),
+        newRecommendations: List<TodayNewUiModel> = previewNewRecommendations(),
+        remainingReadyCount: Int = 2,
+    ): TodayUiState.Populated = TodayUiState.Populated(now, newRecommendations, remainingReadyCount)
+
+    private fun previewNow(
         posterReference: String? = "poster://one",
         bannerReference: String? = "banner://one",
     ): TodayNowUiModel =
@@ -267,11 +379,60 @@ class TodayScreenTest {
             title = "Readable title",
             posterReference = posterReference,
             bannerReference = bannerReference,
-            progress = progress,
-            progressUnit = progressUnit,
-            total = total,
-            nextUnit = nextUnit,
-            availableUnitCount = availableUnitCount,
+            progress = 8,
+            progressUnit = TodayProgressUnit.EPISODE,
+            total = 12,
+            nextUnit = 9,
+            availableUnitCount = 4,
+        )
+
+    private fun previewNewRecommendations(): List<TodayNewUiModel> =
+        listOf(
+            previewNew("new-one", "A Gentle Beginning", TodayRelativeTime(0, TodayRelativeTimeUnit.UNDER_HOUR)),
+            previewNew("new-two", "A Longer Evening", TodayRelativeTime(3, TodayRelativeTimeUnit.HOURS)),
+            previewNew("new-three", "A Distant Return", TodayRelativeTime(7, TodayRelativeTimeUnit.DAYS)),
+        )
+
+    private fun previewNew(
+        mediaId: String,
+        title: String,
+        releaseAge: TodayRelativeTime,
+    ): TodayNewUiModel =
+        TodayNewUiModel(
+            mediaId = mediaId,
+            mediaType = TodayMediaType.ANIME,
+            title = title,
+            posterReference = "poster://$mediaId",
+            progress = 8,
+            progressUnit = TodayProgressUnit.EPISODE,
+            total = 12,
+            nextUnit = 9,
+            availableUnitCount = 2,
+            releaseAge = releaseAge,
+        )
+
+    private fun caughtUpState(): TodayUiState.CaughtUp =
+        TodayUiState.CaughtUp(
+            TodayCaughtUpUiModel(
+                artwork =
+                    (1..6).map { index ->
+                        TodayCaughtUpArtworkUiModel(
+                            mediaId = "receipt-$index",
+                            title = "Receipt title $index",
+                            reference = if (index == 6) null else "poster://receipt-$index",
+                        )
+                    },
+                nextRelease =
+                    TodayNextReleaseUiModel(
+                        mediaId = "future-preview",
+                        mediaType = TodayMediaType.MANGA,
+                        title = "The Next Chapter",
+                        posterReference = "poster://future",
+                        progressUnit = TodayProgressUnit.CHAPTER,
+                        unitNumber = 42,
+                        waitUntilRelease = TodayRelativeTime(2, TodayRelativeTimeUnit.DAYS),
+                    ),
+            ),
         )
 }
 

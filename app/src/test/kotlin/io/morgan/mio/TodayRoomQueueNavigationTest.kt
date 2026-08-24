@@ -126,6 +126,139 @@ class TodayRoomQueueNavigationTest {
         }
     }
 
+    @Test
+    fun roomQueueShowsThreeNewOverflowCountAndTypedNewNavigation() {
+        val scheduler = TestCoroutineScheduler()
+        Dispatchers.setMain(StandardTestDispatcher(scheduler))
+        val accountId = AccountId("account-1")
+        val fixture = TestGraphFixture(activityRule.activity, scheduler)
+        val graph =
+            createDynamicGraphFactory<AppGraph.Factory>(productionBindings(fixture))
+                .create(activityRule.activity)
+        val handle =
+            graph.accountGraphLifecycle.create(
+                AccountGraphRequest(
+                    accountId = accountId,
+                    providerBinding =
+                        io.morgan.mio.core.testing.provider
+                            .providerBindingFixture(ProviderKey.ANILIST),
+                    accountRefreshRequester =
+                        io.morgan.mio.data.account
+                            .AccountRefreshRequester {},
+                    collectionRefreshRequester = CollectionRefreshRequester {},
+                ),
+            )
+
+        try {
+            seedAccount(fixture.database, accountId)
+            seedQueueTitle(fixture.database, "now", "Now title", UPDATED_11)
+            seedQueueTitle(fixture.database, "new-one", "New one", UPDATED_10, releaseInstant = RELEASE_11)
+            seedQueueTitle(fixture.database, "new-two", "New two", UPDATED_09, releaseInstant = RELEASE_10)
+            seedQueueTitle(fixture.database, "new-three", "New three", UPDATED_08, releaseInstant = RELEASE_09)
+            seedQueueTitle(fixture.database, "new-overflow", "New overflow", UPDATED_07, releaseInstant = RELEASE_08)
+            seedQueueTitle(
+                fixture.database,
+                "backlog",
+                "Backlog title",
+                UPDATED_06,
+                releaseNumber = 3,
+                releaseInstant = RELEASE_11,
+            )
+            showAuthenticated(graph, handle)
+
+            waitForText(scheduler, "Now title")
+            waitForText(scheduler, "New")
+            waitForText(scheduler, "2 other titles are ready when you are")
+            composeRule.onAllNodesWithText("New one").assertCountEquals(1)
+            composeRule.onAllNodesWithText("New two").assertCountEquals(1)
+            composeRule.onAllNodesWithText("New three").assertCountEquals(1)
+            composeRule.onAllNodesWithText("New overflow").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Backlog title").assertCountEquals(0)
+
+            composeRule.onNodeWithText("New one").performScrollTo().performClick()
+            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Synopsis")
+            composeRule.onAllNodesWithText("Today").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Library").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Discover").assertCountEquals(0)
+            composeRule.onAllNodesWithText("You").assertCountEquals(0)
+        } finally {
+            graph.accountGraphLifecycle.destroy()
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun roomUpdateReplacesPopulatedQueueWithCaughtUpFutureReleaseAndTypedNavigation() {
+        val scheduler = TestCoroutineScheduler()
+        Dispatchers.setMain(StandardTestDispatcher(scheduler))
+        val accountId = AccountId("account-1")
+        val fixture = TestGraphFixture(activityRule.activity, scheduler)
+        val graph =
+            createDynamicGraphFactory<AppGraph.Factory>(productionBindings(fixture))
+                .create(activityRule.activity)
+        val handle =
+            graph.accountGraphLifecycle.create(
+                AccountGraphRequest(
+                    accountId = accountId,
+                    providerBinding =
+                        io.morgan.mio.core.testing.provider
+                            .providerBindingFixture(ProviderKey.ANILIST),
+                    accountRefreshRequester =
+                        io.morgan.mio.data.account
+                            .AccountRefreshRequester {},
+                    collectionRefreshRequester = CollectionRefreshRequester {},
+                ),
+            )
+
+        try {
+            seedAccount(fixture.database, accountId)
+            seedQueueTitle(
+                fixture.database,
+                "active-art",
+                "Active artwork",
+                UPDATED_11,
+            )
+            showAuthenticated(graph, handle)
+
+            waitForText(scheduler, "Active artwork")
+            composeRule.onNodeWithText("Now").assertIsDisplayed()
+            seedQueueTitle(
+                fixture.database,
+                "active-art",
+                "Active artwork",
+                UPDATED_11,
+                status = StoredCollectionStatus.COMPLETED,
+                includeRelease = false,
+            )
+            seedQueueTitle(
+                fixture.database,
+                "future",
+                "Future title",
+                UPDATED_10,
+                status = StoredCollectionStatus.PLANNED,
+                releaseNumber = 3,
+                releaseInstant = FUTURE_RELEASE,
+            )
+
+            waitForText(scheduler, "You're caught up")
+            composeRule.onAllNodesWithText("Now").assertCountEquals(0)
+            waitForText(scheduler, "Next release")
+            waitForText(scheduler, "Future title")
+            waitForText(scheduler, "In 2 hours")
+            composeRule.onNodeWithText("Future title").performScrollTo().performClick()
+            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Synopsis")
+            composeRule.onAllNodesWithText("Today").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Library").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Discover").assertCountEquals(0)
+            composeRule.onAllNodesWithText("You").assertCountEquals(0)
+        } finally {
+            graph.accountGraphLifecycle.destroy()
+            fixture.close()
+        }
+    }
+
     private fun showAuthenticated(
         graph: AppGraph,
         handle: io.morgan.mio.di.AccountGraphHandle,
@@ -210,6 +343,19 @@ class TodayRoomQueueNavigationTest {
         mediaId: String,
         title: String,
         updatedAt: Instant,
+    ) = seedQueueTitle(database, mediaId, title, updatedAt)
+
+    private fun seedQueueTitle(
+        database: MioDatabase,
+        mediaId: String,
+        title: String,
+        updatedAt: Instant,
+        status: StoredCollectionStatus = StoredCollectionStatus.CURRENT,
+        progress: Int = 1,
+        total: Int? = 12,
+        releaseNumber: Int = 2,
+        releaseInstant: Instant = FIRST_UPDATED_AT,
+        includeRelease: Boolean = true,
     ) = runBlocking {
         database.inTransaction {
             database.mediaDao().upsertMedia(
@@ -236,33 +382,46 @@ class TodayRoomQueueNavigationTest {
                         accountId = "account-1",
                         mediaId = mediaId,
                         progressUnit = StoredProgressUnit.EPISODE,
-                        remoteStatus = StoredCollectionStatus.CURRENT,
-                        remoteProgress = 1,
-                        remoteTotal = 12,
+                        remoteStatus = status,
+                        remoteProgress = progress,
+                        remoteTotal = total,
                         remoteUpdatedAtUtcMs = updatedAt,
-                        effectiveStatus = StoredCollectionStatus.CURRENT,
-                        effectiveProgress = 1,
-                        effectiveTotal = 12,
+                        effectiveStatus = status,
+                        effectiveProgress = progress,
+                        effectiveTotal = total,
                         effectiveUpdatedAtUtcMs = updatedAt,
                     ),
                 ),
             )
-            database.releaseDao().upsertReleases(
-                listOf(
-                    ReleaseEntity(
-                        mediaId = mediaId,
-                        progressUnit = StoredProgressUnit.EPISODE,
-                        unitNumber = 2,
-                        timeKind = StoredReleaseTimeKind.TRUSTED,
-                        releaseInstantUtcMs = FIRST_UPDATED_AT,
+            if (includeRelease) {
+                database.releaseDao().upsertReleases(
+                    listOf(
+                        ReleaseEntity(
+                            mediaId = mediaId,
+                            progressUnit = StoredProgressUnit.EPISODE,
+                            unitNumber = releaseNumber,
+                            timeKind = StoredReleaseTimeKind.TRUSTED,
+                            releaseInstantUtcMs = releaseInstant,
+                        ),
                     ),
-                ),
-            )
+                )
+            }
         }
     }
 
     private companion object {
         val FIRST_UPDATED_AT: Instant = Instant.parse("2026-08-11T10:00:00Z")
         val NEWER_UPDATED_AT: Instant = Instant.parse("2026-08-11T11:00:00Z")
+        val UPDATED_11: Instant = Instant.parse("2026-08-11T11:00:00Z")
+        val UPDATED_10: Instant = Instant.parse("2026-08-11T10:00:00Z")
+        val UPDATED_09: Instant = Instant.parse("2026-08-11T09:00:00Z")
+        val UPDATED_08: Instant = Instant.parse("2026-08-11T08:00:00Z")
+        val UPDATED_07: Instant = Instant.parse("2026-08-11T07:00:00Z")
+        val UPDATED_06: Instant = Instant.parse("2026-08-11T06:00:00Z")
+        val RELEASE_11: Instant = Instant.parse("2026-08-11T11:00:00Z")
+        val RELEASE_10: Instant = Instant.parse("2026-08-11T10:00:00Z")
+        val RELEASE_09: Instant = Instant.parse("2026-08-11T09:00:00Z")
+        val RELEASE_08: Instant = Instant.parse("2026-08-11T08:00:00Z")
+        val FUTURE_RELEASE: Instant = Instant.parse("2026-08-11T14:00:00Z")
     }
 }

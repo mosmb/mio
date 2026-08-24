@@ -25,21 +25,17 @@ public class ObserveTodayQueueUseCase(
         }
 
     private fun observeQueue(entries: List<CollectionEntry>): Flow<TodayQueue> {
-        if (entries.isEmpty()) return flowOf(TodayQueue(now = null))
+        if (entries.isEmpty()) {
+            return flowOf(TodayQueueSelector.select(emptyList(), clock.now()))
+        }
 
         val candidateFlows = entries.map(::observeCandidate)
         return combine(candidateFlows) { candidates ->
-            TodayQueue(
-                now =
-                    NowSelector.select(
-                        candidates = candidates.filterNotNull(),
-                        now = clock.now(),
-                    ),
-            )
+            TodayQueueSelector.select(candidates.filterNotNull(), clock.now())
         }
     }
 
-    private fun observeCandidate(entry: CollectionEntry): Flow<NowCandidate?> =
+    private fun observeCandidate(entry: CollectionEntry): Flow<TodayQueueCandidate?> =
         combine(
             mediaRepository.observeMedia(entry.mediaId),
             mediaRepository.observeReleases(entry.mediaId),
@@ -50,5 +46,5 @@ public class ObserveTodayQueueUseCase(
     private fun Media.toCandidate(
         entry: CollectionEntry,
         releases: List<Release>,
-    ): NowCandidate = NowCandidate(entry = entry, media = this, releases = releases)
+    ): TodayQueueCandidate = TodayQueueCandidate(entry = entry, media = this, releases = releases)
 }

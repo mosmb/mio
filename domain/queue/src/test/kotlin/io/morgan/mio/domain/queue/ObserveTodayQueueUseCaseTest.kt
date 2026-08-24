@@ -10,6 +10,7 @@ import io.morgan.mio.domain.media.MediaPublicationStatus
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.media.MediaTotals
 import io.morgan.mio.domain.media.Release
+import io.morgan.mio.domain.media.ReleaseTime
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.MediaId
@@ -32,10 +33,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,7 +54,7 @@ class ObserveTodayQueueUseCaseTest {
             val media = TestMediaRepository()
             val flow = ObserveTodayQueueUseCase(collection, media, fixedClock())(accountId)
 
-            assertEquals(TodayQueue(now = null), flow.firstValue())
+            assertEquals(caughtUpQueue(), flow.firstValue())
             assertTrue(media.refreshCalls.isEmpty())
             assertTrue(collection.refreshCalls.isEmpty())
         }
@@ -68,7 +72,16 @@ class ObserveTodayQueueUseCaseTest {
                 launch { ObserveTodayQueueUseCase(collection, media, fixedClock())(accountId).collect(observed::add) }
 
             runCurrent()
-            assertEquals(TodayQueue(now = null), observed.last())
+            assertNull(observed.last().now)
+            assertEquals(
+                MediaId("media-1"),
+                observed
+                    .last()
+                    .caughtUp
+                    ?.artwork
+                    ?.single()
+                    ?.mediaId,
+            )
             media.releases("media-1").value = listOf(release("media-1", 2))
             runCurrent()
             assertEquals(MediaId("media-1"), observed.last().now?.mediaId)
@@ -95,7 +108,7 @@ class ObserveTodayQueueUseCaseTest {
                 launch { ObserveTodayQueueUseCase(collection, media, fixedClock())(accountId).collect(emissions::add) }
 
             runCurrent()
-            assertEquals(TodayQueue(now = null), emissions.last())
+            assertEquals(caughtUpQueue(), emissions.last())
             assertTrue(media.mediaStarts("removed") > 0)
             assertTrue(media.releaseStarts("removed") > 0)
 
@@ -108,6 +121,43 @@ class ObserveTodayQueueUseCaseTest {
             media.releases("removed").value = listOf(release("removed", 2))
             runCurrent()
             assertEquals(emissionCount, emissions.size)
+            job.cancel()
+        }
+
+    @Test
+    fun cachedNewRecomputesStaleAfterClockBoundaryOnRoomEmissionWithoutRefresh() =
+        runTest {
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val mutableClock = MutableTestClock(now)
+            val currentEntry = entry(mediaId = "current", updatedAt = "2026-08-23T11:00:00Z")
+            val newEntry = entry(mediaId = "new", updatedAt = "2026-08-23T10:00:00Z")
+            collection.entries.value = listOf(currentEntry, newEntry)
+            media.media("current").value = media("current")
+            media.media("new").value = media("new")
+            media.releases("current").value = listOf(release("current", 2, ReleaseTime.Trusted(now)))
+            media.releases("new").value = listOf(release("new", 2, ReleaseTime.Trusted(now - 7.days)))
+            val observed = mutableListOf<TodayQueue>()
+            val job =
+                launch {
+                    ObserveTodayQueueUseCase(collection, media, mutableClock)(accountId).collect(observed::add)
+                }
+
+            runCurrent()
+            assertEquals(listOf(MediaId("new")), observed.last().newRecommendations.map { item -> item.mediaId })
+
+            mutableClock.current = now + 1.hours
+            media.releases("current").value =
+                listOf(
+                    release("current", 2, ReleaseTime.Trusted(now)),
+                    release("current", 2, ReleaseTime.Trusted(now)),
+                )
+            runCurrent()
+
+            assertTrue(observed.last().newRecommendations.isEmpty())
+            assertEquals(1, observed.last().remainingReadyCount)
+            assertTrue(media.refreshCalls.isEmpty())
+            assertTrue(collection.refreshCalls.isEmpty())
             job.cancel()
         }
 
@@ -135,6 +185,14 @@ class ObserveTodayQueueUseCaseTest {
         object : Clock {
             override fun now(): Instant = now
         }
+
+    private fun caughtUpQueue(): TodayQueue =
+        TodayQueue(
+            now = null,
+            newRecommendations = emptyList(),
+            remainingReadyCount = 0,
+            caughtUp = CaughtUpSummary(artwork = emptyList(), nextRelease = null),
+        )
 
     private fun entry(
         mediaId: String,
@@ -168,15 +226,22 @@ class ObserveTodayQueueUseCaseTest {
     private fun release(
         mediaId: String,
         number: Int,
+        time: io.morgan.mio.domain.media.ReleaseTime =
+            io.morgan.mio.domain.media.ReleaseTime
+                .Trusted(now),
     ): Release =
         Release(
             mediaId = MediaId(mediaId),
             unit = ProgressUnit.EPISODE,
             number = UnitNumber(number),
-            time =
-                io.morgan.mio.domain.media.ReleaseTime
-                    .Trusted(now),
+            time = time,
         )
+}
+
+private class MutableTestClock(
+    var current: Instant,
+) : Clock {
+    override fun now(): Instant = current
 }
 
 private class TestCollectionRepository : CollectionRepository {

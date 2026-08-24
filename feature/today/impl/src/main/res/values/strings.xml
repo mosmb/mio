@@ -26,4 +26,30 @@
     <string name="today_progress_chapter_unknown">Chapter %1$d</string>
     <string name="today_progress_volume_known">Volume %1$d of %2$d</string>
     <string name="today_progress_volume_unknown">Volume %1$d</string>
+    <string name="today_new">New</string>
+    <string name="today_new_under_hour">New · under one hour ago</string>
+    <plurals name="today_new_hours">
+        <item quantity="one">New · 1 hour ago</item>
+        <item quantity="other">New · %1$d hours ago</item>
+    </plurals>
+    <plurals name="today_new_days">
+        <item quantity="one">New · 1 day ago</item>
+        <item quantity="other">New · %1$d days ago</item>
+    </plurals>
+    <plurals name="today_remaining_titles">
+        <item quantity="one">1 other title is ready when you are</item>
+        <item quantity="other">%1$d other titles are ready when you are</item>
+    </plurals>
+    <string name="today_caught_up">You\'re caught up</string>
+    <string name="today_caught_up_supporting">Nothing needs your attention right now.</string>
+    <string name="today_next_release">Next release</string>
+    <string name="today_future_under_hour">In under one hour</string>
+    <plurals name="today_future_hours">
+        <item quantity="one">In 1 hour</item>
+        <item quantity="other">In %1$d hours</item>
+    </plurals>
+    <plurals name="today_future_days">
+        <item quantity="one">In 1 day</item>
+        <item quantity="other">In %1$d days</item>
+    </plurals>
 </resources>

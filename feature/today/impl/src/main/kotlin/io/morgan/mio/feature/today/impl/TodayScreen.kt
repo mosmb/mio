@@ -1,6 +1,7 @@
 package io.morgan.mio.feature.today.impl
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,7 +35,11 @@ import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.feature.today.impl.component.TodayCaughtUpReceipt
+import io.morgan.mio.feature.today.impl.component.TodayNewRow
+import io.morgan.mio.feature.today.impl.component.TodayNextReleaseRow
 import io.morgan.mio.feature.today.impl.component.TodayNowCard
+import io.morgan.mio.feature.today.impl.component.TodayRemainingReadySummary
 
 @Composable
 internal fun TodayRoute(
@@ -76,24 +81,75 @@ internal fun TodayScreen(
             style = MioTheme.typography.display,
             modifier = Modifier.mioHeading(),
         )
-        if (state is TodayUiState.Loading || state is TodayUiState.Content) {
-            Text(
-                text = stringResource(R.string.today_now),
-                style = MioTheme.typography.section,
-                modifier = Modifier.padding(top = 24.dp).mioHeading(),
-            )
-            when (state) {
-                TodayUiState.Loading -> TodayLoadingCard(modifier = Modifier.padding(top = 12.dp))
-                is TodayUiState.Content ->
-                    TodayNowCard(
-                        now = state.now,
-                        onClick = { onMediaDetail(state.now.mediaId) },
-                        modifier = Modifier.padding(top = 12.dp),
+        when (state) {
+            TodayUiState.Loading -> {
+                TodayNowSectionHeading()
+                TodayLoadingCard(modifier = Modifier.padding(top = 12.dp))
+            }
+            is TodayUiState.Populated -> {
+                TodayNowSectionHeading()
+                TodayNowCard(
+                    now = state.now,
+                    onClick = { onMediaDetail(state.now.mediaId) },
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                if (state.newRecommendations.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.today_new),
+                        style = MioTheme.typography.section,
+                        modifier = Modifier.padding(top = 24.dp).mioHeading(),
                     )
-                TodayUiState.Empty -> Unit
+                    state.newRecommendations.forEachIndexed { index, recommendation ->
+                        if (index > 0) TodayRowDivider()
+                        TodayNewRow(
+                            recommendation = recommendation,
+                            onClick = { onMediaDetail(recommendation.mediaId) },
+                            modifier = Modifier.padding(top = if (index == 0) 12.dp else 0.dp),
+                        )
+                    }
+                }
+                if (state.remainingReadyCount > 0) {
+                    TodayRemainingReadySummary(
+                        count = state.remainingReadyCount,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+            }
+            is TodayUiState.CaughtUp -> {
+                TodayCaughtUpReceipt(
+                    receipt = state.receipt,
+                    modifier = Modifier.padding(top = 24.dp),
+                )
+                state.receipt.nextRelease?.let { recommendation ->
+                    TodayNextReleaseRow(
+                        recommendation = recommendation,
+                        onClick = { onMediaDetail(recommendation.mediaId) },
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun TodayNowSectionHeading() {
+    Text(
+        text = stringResource(R.string.today_now),
+        style = MioTheme.typography.section,
+        modifier = Modifier.padding(top = 24.dp).mioHeading(),
+    )
+}
+
+@Composable
+private fun TodayRowDivider() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MioTheme.colors.border),
+    )
 }
 
 @Composable
@@ -125,7 +181,7 @@ private val PreviewImageLoader: @Composable () -> ImageLoader = {
 @Preview(name = "Today populated light", widthDp = 393, heightDp = 852, showBackground = true)
 @Composable
 private fun TodayScreenLightPreview() {
-    TodayPreview(MioPreviewConfiguration.Light, TodayUiState.Content(todayPreviewNow()))
+    TodayPreview(MioPreviewConfiguration.Light, todayPreviewPopulated())
 }
 
 @Preview(
@@ -137,7 +193,7 @@ private fun TodayScreenLightPreview() {
 )
 @Composable
 private fun TodayScreenDarkPreview() {
-    TodayPreview(MioPreviewConfiguration.Dark, TodayUiState.Content(todayPreviewNow()))
+    TodayPreview(MioPreviewConfiguration.Dark, todayPreviewPopulated())
 }
 
 @Preview(name = "Today unknown total", widthDp = 393, heightDp = 852)
@@ -145,14 +201,17 @@ private fun TodayScreenDarkPreview() {
 private fun TodayScreenUnknownTotalPreview() {
     TodayPreview(
         MioPreviewConfiguration.Light,
-        TodayUiState.Content(
-            todayPreviewNow(
-                total = null,
-                progress = 41,
-                nextUnit = 42,
-                availableUnitCount = 3,
-                bannerReference = PREVIEW_VERY_LIGHT_ARTWORK,
-            ),
+        TodayUiState.Populated(
+            now =
+                todayPreviewNow(
+                    total = null,
+                    progress = 41,
+                    nextUnit = 42,
+                    availableUnitCount = 3,
+                    bannerReference = PREVIEW_VERY_LIGHT_ARTWORK,
+                ),
+            newRecommendations = emptyList(),
+            remainingReadyCount = 0,
         ),
     )
 }
@@ -162,7 +221,14 @@ private fun TodayScreenUnknownTotalPreview() {
 private fun TodayScreenMissingArtworkPreview() {
     TodayPreview(
         MioPreviewConfiguration.Light,
-        TodayUiState.Content(todayPreviewNow(posterReference = null, bannerReference = null)),
+        TodayUiState.Populated(
+            now = todayPreviewNow(posterReference = null, bannerReference = null),
+            newRecommendations =
+                todayPreviewNewRecommendations()
+                    .take(1)
+                    .map { recommendation -> recommendation.copy(posterReference = null) },
+            remainingReadyCount = 0,
+        ),
     )
 }
 
@@ -175,7 +241,10 @@ private fun TodayScreenLoadingPreview() {
 @Preview(name = "Today no recommendation", widthDp = 393, heightDp = 852)
 @Composable
 private fun TodayScreenEmptyPreview() {
-    TodayPreview(MioPreviewConfiguration.Light, TodayUiState.Empty)
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        TodayUiState.CaughtUp(TodayCaughtUpUiModel(artwork = emptyList(), nextRelease = null)),
+    )
 }
 
 @Preview(name = "Today large text", widthDp = 320, heightDp = 852, fontScale = 2f)
@@ -183,8 +252,41 @@ private fun TodayScreenEmptyPreview() {
 private fun TodayScreenLargeTextPreview() {
     TodayPreview(
         MioPreviewConfiguration.Light,
-        TodayUiState.Content(todayPreviewNow(bannerReference = PREVIEW_VERY_DARK_ARTWORK)),
+        todayPreviewPopulated(now = todayPreviewNow(bannerReference = PREVIEW_VERY_DARK_ARTWORK)),
     )
+}
+
+@Preview(name = "Today caught up light", widthDp = 393, heightDp = 852, showBackground = true)
+@Composable
+private fun TodayScreenCaughtUpLightPreview() {
+    TodayPreview(MioPreviewConfiguration.Light, todayPreviewCaughtUp())
+}
+
+@Preview(
+    name = "Today caught up dark",
+    widthDp = 393,
+    heightDp = 852,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+)
+@Composable
+private fun TodayScreenCaughtUpDarkPreview() {
+    TodayPreview(MioPreviewConfiguration.Dark, todayPreviewCaughtUp())
+}
+
+@Preview(name = "Today backlog only", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayScreenBacklogPreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated(newRecommendations = emptyList(), remainingReadyCount = 4),
+    )
+}
+
+@Preview(name = "Today caught up large text", widthDp = 320, heightDp = 852, fontScale = 2f)
+@Composable
+private fun TodayScreenCaughtUpLargeTextPreview() {
+    TodayPreview(MioPreviewConfiguration.Light, todayPreviewCaughtUp())
 }
 
 @Composable
@@ -221,6 +323,66 @@ private fun todayPreviewNow(
         total = total,
         nextUnit = nextUnit,
         availableUnitCount = availableUnitCount,
+    )
+
+private fun todayPreviewPopulated(
+    now: TodayNowUiModel = todayPreviewNow(),
+    newRecommendations: List<TodayNewUiModel> = todayPreviewNewRecommendations(),
+    remainingReadyCount: Int = 2,
+): TodayUiState.Populated =
+    TodayUiState.Populated(
+        now = now,
+        newRecommendations = newRecommendations,
+        remainingReadyCount = remainingReadyCount,
+    )
+
+private fun todayPreviewNewRecommendations(): List<TodayNewUiModel> =
+    listOf(
+        todayPreviewNew("new-one", "A Gentle Beginning", TodayRelativeTime(0, TodayRelativeTimeUnit.UNDER_HOUR)),
+        todayPreviewNew("new-two", "A Longer Evening", TodayRelativeTime(3, TodayRelativeTimeUnit.HOURS)),
+        todayPreviewNew("new-three", "A Distant Return", TodayRelativeTime(7, TodayRelativeTimeUnit.DAYS)),
+    )
+
+private fun todayPreviewNew(
+    mediaId: String,
+    title: String,
+    releaseAge: TodayRelativeTime,
+): TodayNewUiModel =
+    TodayNewUiModel(
+        mediaId = mediaId,
+        mediaType = TodayMediaType.ANIME,
+        title = title,
+        posterReference = PREVIEW_HIGH_DETAIL_ARTWORK,
+        progress = 8,
+        progressUnit = TodayProgressUnit.EPISODE,
+        total = 12,
+        nextUnit = 9,
+        availableUnitCount = 2,
+        releaseAge = releaseAge,
+    )
+
+private fun todayPreviewCaughtUp(): TodayUiState.CaughtUp =
+    TodayUiState.CaughtUp(
+        TodayCaughtUpUiModel(
+            artwork =
+                (1..6).map { index ->
+                    TodayCaughtUpArtworkUiModel(
+                        mediaId = "receipt-$index",
+                        title = "Receipt title $index",
+                        reference = if (index == 6) null else PREVIEW_HIGH_DETAIL_ARTWORK,
+                    )
+                },
+            nextRelease =
+                TodayNextReleaseUiModel(
+                    mediaId = "future-preview",
+                    mediaType = TodayMediaType.MANGA,
+                    title = "The Next Chapter",
+                    posterReference = PREVIEW_VERY_DARK_ARTWORK,
+                    progressUnit = TodayProgressUnit.CHAPTER,
+                    unitNumber = 42,
+                    waitUntilRelease = TodayRelativeTime(2, TodayRelativeTimeUnit.DAYS),
+                ),
+        ),
     )
 
 private const val PREVIEW_DATA_URI_PREFIX = "data:image/png;base64,"

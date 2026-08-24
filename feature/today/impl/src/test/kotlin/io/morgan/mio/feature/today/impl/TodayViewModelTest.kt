@@ -66,7 +66,7 @@ class TodayViewModelTest {
             val observer = backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
 
-            assertEquals(TodayUiState.Empty, viewModel.uiState.value)
+            assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
             observer.cancel()
         }
 
@@ -82,7 +82,7 @@ class TodayViewModelTest {
             val observer = backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
 
-            val first = viewModel.uiState.value as TodayUiState.Content
+            val first = viewModel.uiState.value as TodayUiState.Populated
             assertEquals(2, first.now.nextUnit)
             assertTrue(repositories.mediaRefreshCalls.isEmpty())
             assertTrue(repositories.collectionRefreshCalls.isEmpty())
@@ -91,7 +91,7 @@ class TodayViewModelTest {
             repositories.releaseState.value = listOf(release(3))
             runCurrent()
 
-            val replacement = viewModel.uiState.value as TodayUiState.Content
+            val replacement = viewModel.uiState.value as TodayUiState.Populated
             assertEquals(3, replacement.now.nextUnit)
             observer.cancel()
         }
