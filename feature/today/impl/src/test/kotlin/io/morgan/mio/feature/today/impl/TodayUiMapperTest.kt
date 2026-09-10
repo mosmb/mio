@@ -1,13 +1,20 @@
 package io.morgan.mio.feature.today.impl
 
+import io.morgan.mio.domain.collection.CollectionEntry
+import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.ImageReference
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.MediaTitle
 import io.morgan.mio.domain.model.MediaType
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitNumber
 import io.morgan.mio.domain.model.UnitTotal
+import io.morgan.mio.domain.progress.ProgressAction
+import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.queue.CaughtUpSummary
 import io.morgan.mio.domain.queue.NewRecommendation
 import io.morgan.mio.domain.queue.NextReleaseRecommendation
@@ -20,6 +27,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class TodayUiMapperTest {
     @Test
@@ -205,6 +213,85 @@ class TodayUiMapperTest {
         assertEquals(42, state.now.nextUnit)
     }
 
+    @Test
+    fun nonCurrentEntriesAreStatusOnlyAndLatestUndoIsMappedToItsMedia() {
+        val now = nowRecommendation("now", MediaType.ANIME, ProgressUnit.EPISODE)
+        val state =
+            TodayUiMapper.map(
+                queue = TodayQueue(now, listOf(newRecommendation("new", 1.hours)), 0, null),
+                collection =
+                    listOf(
+                        collectionEntry("now", CollectionStatus.PLANNED),
+                        collectionEntry("new", CollectionStatus.CURRENT),
+                    ),
+                latestUndo = progressAction("now"),
+                progressError = null,
+            ) as TodayUiState.Populated
+
+        assertEquals(TodayCollectionStatus.PLANNED, state.now.status)
+        assertNull(state.now.controls)
+        assertNull(state.now.nextUnit)
+        assertNull(state.now.availableUnitCount)
+        assertEquals("group-now", state.latestUndo?.groupId)
+        assertEquals("group-now", state.now.undo?.groupId)
+        assertEquals("new", state.newRecommendations.single().mediaId)
+        assertEquals(TodayCollectionStatus.CURRENT, state.newRecommendations.single().status)
+        assertEquals(
+            true,
+            state.newRecommendations
+                .single()
+                .controls
+                ?.increaseEnabled,
+        )
+    }
+
+    @Test
+    fun currentBoundaryDisablesDecreaseButLeavesTheFinalIncreaseEligible() {
+        val state =
+            TodayUiMapper.map(
+                queue =
+                    TodayQueue(
+                        nowRecommendation("now", MediaType.ANIME, ProgressUnit.EPISODE),
+                        emptyList(),
+                        0,
+                        null,
+                    ),
+                collection = listOf(collectionEntry("now", CollectionStatus.CURRENT, progress = 0)),
+                latestUndo = null,
+                progressError = null,
+            ) as TodayUiState.Populated
+
+        assertEquals(false, state.now.controls?.decreaseEnabled)
+        assertEquals(true, state.now.controls?.increaseEnabled)
+    }
+
+    @Test
+    fun collectionEffectiveProgressAndUnitReplaceQueueProjection() {
+        val state =
+            TodayUiMapper.map(
+                queue =
+                    TodayQueue(
+                        nowRecommendation("now", MediaType.ANIME, ProgressUnit.EPISODE),
+                        emptyList(),
+                        0,
+                        null,
+                    ),
+                collection =
+                    listOf(
+                        collectionEntry("now", CollectionStatus.CURRENT, progress = 7).copy(
+                            progressUnit = ProgressUnit.CHAPTER,
+                            total = UnitTotal(30),
+                        ),
+                    ),
+                latestUndo = null,
+                progressError = null,
+            ) as TodayUiState.Populated
+
+        assertEquals(7, state.now.progress)
+        assertEquals(TodayProgressUnit.CHAPTER, state.now.progressUnit)
+        assertEquals(30, state.now.total)
+    }
+
     private fun nowRecommendation(
         mediaId: String,
         mediaType: MediaType,
@@ -238,5 +325,42 @@ class TodayUiMapperTest {
             nextUnit = UnitNumber(2),
             availableUnitCount = 2,
             releaseAge = releaseAge,
+        )
+
+    private fun collectionEntry(
+        mediaId: String,
+        status: CollectionStatus,
+        progress: Int = 1,
+    ): CollectionEntry =
+        CollectionEntry(
+            id = CollectionEntryId("entry-$mediaId"),
+            accountId = AccountId("account-1"),
+            mediaId = MediaId(mediaId),
+            status = status,
+            progress = ProgressValue(progress),
+            progressUnit = ProgressUnit.EPISODE,
+            total = UnitTotal(12),
+            updatedAt = Instant.parse("2026-08-23T12:00:00Z"),
+        )
+
+    private fun progressAction(mediaId: String): ProgressAction =
+        ProgressAction(
+            id = OperationGroupId("group-$mediaId"),
+            order = 1,
+            accountId = AccountId("account-1"),
+            entryId = CollectionEntryId("entry-$mediaId"),
+            mediaId = MediaId(mediaId),
+            direction = ProgressDirection.INCREASE,
+            unit = ProgressUnit.EPISODE,
+            beforeProgress = ProgressValue(1),
+            afterProgress = ProgressValue(2),
+            beforeStatus = CollectionStatus.CURRENT,
+            afterStatus = CollectionStatus.CURRENT,
+            beforeUpdatedAt = Instant.parse("2026-08-23T12:00:00Z"),
+            afterUpdatedAt = Instant.parse("2026-08-23T12:00:00Z"),
+            afterRevision = 1,
+            createdAt = Instant.parse("2026-08-23T12:00:00Z"),
+            undoUntil = Instant.parse("2026-08-23T12:00:06Z"),
+            undoneAt = null,
         )
 }

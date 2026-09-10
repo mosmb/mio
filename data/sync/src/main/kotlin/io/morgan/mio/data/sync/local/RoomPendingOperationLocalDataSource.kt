@@ -2,9 +2,12 @@ package io.morgan.mio.data.sync.local
 
 import dev.zacsweers.metro.Inject
 import io.morgan.mio.core.database.MioDatabase
+import io.morgan.mio.core.database.model.StoredPendingOperationState
 import io.morgan.mio.data.sync.mapper.toPendingOperationDependencyEntities
 import io.morgan.mio.data.sync.mapper.toPendingOperationEntity
 import io.morgan.mio.data.sync.mapper.toPendingOperationGroupEntity
+import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.sync.PendingOperationGroup
 import io.morgan.mio.domain.sync.PendingOperationState
 
@@ -63,4 +66,45 @@ public class RoomPendingOperationLocalDataSource(
             }
         }
     }
+
+    internal suspend fun cancelUndelivered(
+        accountId: AccountId,
+        groupId: OperationGroupId,
+    ): Boolean =
+        database.inTransaction {
+            val groupEntity = database.pendingOperationDao().getGroup(groupId.value) ?: return@inTransaction false
+            if (groupEntity.accountId != accountId.value) return@inTransaction false
+
+            val operations = database.pendingOperationDao().getOperationsForGroup(groupId.value)
+            if (operations.isEmpty()) return@inTransaction false
+            if (
+                operations.any { operation ->
+                    operation.accountId != accountId.value ||
+                        operation.lifecycleState != StoredPendingOperationState.ENQUEUED ||
+                        operation.attemptCount != 0 ||
+                        operation.lastAttemptAtUtcMs != null ||
+                        operation.retryNotBeforeUtcMs != null
+                }
+            ) {
+                return@inTransaction false
+            }
+
+            for (operation in operations) {
+                database
+                    .pendingOperationDao()
+                    .getDependenciesForOperation(operation.operationId)
+                    .forEach { dependency ->
+                        val predecessor =
+                            database.pendingOperationDao().getOperation(dependency.dependsOnOperationId)
+                                ?: return@inTransaction false
+                        if (predecessor.accountId != accountId.value) return@inTransaction false
+                    }
+            }
+
+            if (database.pendingOperationDao().countExternalDependents(groupId.value) != 0) {
+                return@inTransaction false
+            }
+
+            database.pendingOperationDao().deleteGroup(accountId.value, groupId.value) == 1
+        }
 }

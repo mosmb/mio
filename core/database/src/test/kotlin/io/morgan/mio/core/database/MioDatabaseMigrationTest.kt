@@ -32,6 +32,7 @@ class MioDatabaseMigrationTest {
     fun tearDown() {
         context.deleteDatabase(TEST_DATABASE_NAME)
         context.deleteDatabase(TEST_DATABASE_V2_NAME)
+        context.deleteDatabase(TEST_DATABASE_V3_NAME)
     }
 
     @Test
@@ -58,7 +59,7 @@ class MioDatabaseMigrationTest {
         }
 
         helper
-            .runMigrationsAndValidate(TEST_DATABASE_NAME, 3, true, *MioMigrations.ALL)
+            .runMigrationsAndValidate(TEST_DATABASE_NAME, 4, true, *MioMigrations.ALL)
             .use { migrated ->
                 assertEquals(1, countRows(migrated, "selected_account"))
                 assertEquals(1, countRows(migrated, "media"))
@@ -66,6 +67,17 @@ class MioDatabaseMigrationTest {
                 assertEquals(0, countRows(migrated, "pending_operation_group"))
                 assertEquals(0, countRows(migrated, "pending_operation"))
                 assertEquals(0, countRows(migrated, "pending_operation_dependency"))
+                assertEquals(0, countRows(migrated, "local_progress_activity"))
+                assertEquals(
+                    0L,
+                    migrated
+                        .query(
+                            "SELECT local_progress_revision FROM collection_entry WHERE collection_entry_id = 'entry-migration'",
+                        ).use { cursor ->
+                            cursor.moveToFirst()
+                            cursor.getLong(0)
+                        },
+                )
                 assertTrue(hasColumn(migrated, "media", "release_year"))
                 assertTrue(hasColumn(migrated, "media", "score_percent"))
             }
@@ -77,12 +89,14 @@ class MioDatabaseMigrationTest {
         assertNotNull(current.collectionEntryDao())
         assertNotNull(current.providerIdDao())
         assertNotNull(current.pendingOperationDao())
+        assertNotNull(current.progressDao())
         current.close()
 
-        assertEquals(3, MioDatabase.VERSION)
-        assertEquals(2, MioMigrations.ALL.size)
+        assertEquals(4, MioDatabase.VERSION)
+        assertEquals(3, MioMigrations.ALL.size)
         assertTrue(MioMigrations.ALL[0] === MioMigrations.MIGRATION_1_2)
         assertTrue(MioMigrations.ALL[1] === MioMigrations.MIGRATION_2_3)
+        assertTrue(MioMigrations.ALL[2] === MioMigrations.MIGRATION_3_4)
     }
 
     @Test
@@ -121,6 +135,52 @@ class MioDatabaseMigrationTest {
             }
     }
 
+    @Test
+    fun versionThreeRowsSurviveProgressActivityMigrationWithZeroLocalState() {
+        helper.createDatabase(TEST_DATABASE_V3_NAME, 3).use { database ->
+            database.execSQL(
+                "INSERT INTO selected_account " +
+                    "(selection_key, account_id, connected_provider, display_name, avatar_reference) " +
+                    "VALUES ('selected', 'account-v3', 'anilist', 'Migration account', NULL)",
+            )
+            database.execSQL(
+                "INSERT INTO media " +
+                    "(media_id, media_type, title, format, publication_status, synopsis, poster_reference, " +
+                    "banner_reference, episode_total, chapter_total, volume_total, release_year, score_percent) " +
+                    "VALUES ('media-v3', 'anime', 'Migration media', 'tv', 'releasing', NULL, NULL, NULL, " +
+                    "12, NULL, NULL, 2026, 91)",
+            )
+            database.execSQL(
+                "INSERT INTO collection_entry " +
+                    "(collection_entry_id, account_id, media_id, progress_unit, remote_status, remote_progress, " +
+                    "remote_total, remote_updated_at_utc_ms, effective_status, effective_progress, effective_total, " +
+                    "effective_updated_at_utc_ms) VALUES ('entry-v3', 'account-v3', 'media-v3', " +
+                    "'episode', 'current', 4, 12, 1767225600000, 'current', 5, 12, 1767225601000)",
+            )
+        }
+
+        helper
+            .runMigrationsAndValidate(TEST_DATABASE_V3_NAME, 4, true, MioMigrations.MIGRATION_3_4)
+            .use { migrated ->
+                assertEquals(1, countRows(migrated, "media"))
+                assertEquals(1, countRows(migrated, "collection_entry"))
+                assertEquals(0, countRows(migrated, "local_progress_activity"))
+                migrated
+                    .query(
+                        "SELECT release_year, score_percent, remote_progress, effective_progress, " +
+                            "local_progress_revision FROM media " +
+                            "INNER JOIN collection_entry ON collection_entry.media_id = media.media_id",
+                    ).use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        assertEquals(2026, cursor.getInt(0))
+                        assertEquals(91, cursor.getInt(1))
+                        assertEquals(4, cursor.getInt(2))
+                        assertEquals(5, cursor.getInt(3))
+                        assertEquals(0, cursor.getLong(4))
+                    }
+            }
+    }
+
     private fun countRows(
         database: SupportSQLiteDatabase,
         tableName: String,
@@ -145,5 +205,6 @@ class MioDatabaseMigrationTest {
     private companion object {
         const val TEST_DATABASE_NAME: String = "mio-migration-test.db"
         const val TEST_DATABASE_V2_NAME: String = "mio-migration-v2-test.db"
+        const val TEST_DATABASE_V3_NAME: String = "mio-migration-v3-test.db"
     }
 }

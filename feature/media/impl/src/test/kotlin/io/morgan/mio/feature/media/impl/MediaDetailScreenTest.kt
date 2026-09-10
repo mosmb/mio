@@ -87,7 +87,7 @@ class MediaDetailScreenTest {
     fun loadingAndErrorStatesExposeOnlyLoadingOrRetryActions() {
         var retryCalls = 0
         var backCalls = 0
-        val state = mutableStateOf<MediaDetailUiState>(MediaDetailUiState.Loading)
+        val state = mutableStateOf<MediaDetailUiState>(MediaDetailUiState.Loading())
         imageLoader = ImageLoader.Builder(activityRule.activity).build()
         composeRule.setContent {
             MioTheme {
@@ -104,7 +104,7 @@ class MediaDetailScreenTest {
         composeRule.onNodeWithContentDescription("Loading title").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Back").performClick()
 
-        composeRule.runOnIdle { state.value = MediaDetailUiState.Error }
+        composeRule.runOnIdle { state.value = MediaDetailUiState.Error() }
         composeRule.onNodeWithText("Retry").performClick()
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, retryCalls)

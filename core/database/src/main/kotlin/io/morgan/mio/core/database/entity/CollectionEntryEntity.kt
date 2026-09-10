@@ -61,6 +61,8 @@ public data class CollectionEntryEntity(
     public val effectiveTotal: Int?,
     @ColumnInfo(name = "effective_updated_at_utc_ms")
     public val effectiveUpdatedAtUtcMs: Instant,
+    @ColumnInfo(name = "local_progress_revision", defaultValue = "0")
+    public val localProgressRevision: Long = 0L,
 ) {
     init {
         require(collectionEntryId.isNotBlank())
@@ -70,5 +72,6 @@ public data class CollectionEntryEntity(
         require(remoteTotal == null || remoteTotal > 0)
         require(effectiveProgress >= 0)
         require(effectiveTotal == null || effectiveTotal > 0)
+        require(localProgressRevision >= 0)
     }
 }

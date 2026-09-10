@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -377,6 +379,147 @@ class PendingOperationWriterTest {
             )
             assertEquals(0, countRows("pending_operation_group"))
             assertEquals(0, countRows("pending_operation"))
+        }
+
+    @Test
+    fun cancelUndeliveredDeletesAnEligibleGroupAndItsDependenciesAsOneUnit() =
+        runTest {
+            val groupId = OperationGroupId("group-cancel")
+            val progress = operation("operation-cancel-progress", groupId, position = 0)
+            val status =
+                statusOperation(
+                    id = "operation-cancel-status",
+                    groupId = groupId,
+                    position = 1,
+                    dependsOn = setOf(progress.id),
+                )
+            writer.enqueue(group("group-cancel", operations = listOf(status, progress)))
+
+            assertTrue(writer.cancelUndelivered(groupId))
+            assertNull(database.pendingOperationDao().getGroup(groupId.value))
+            assertEquals(0, countRows("pending_operation"))
+            assertEquals(0, countRows("pending_operation_dependency"))
+        }
+
+    @Test
+    fun cancellationRejectsMissingForeignEmptyAttemptedPartialAndExternallyNeededGroups() =
+        runTest {
+            assertFalse(writer.cancelUndelivered(OperationGroupId("missing")))
+
+            insertOtherAccountAndEntry()
+            val foreignWriter =
+                DefaultPendingOperationWriter(
+                    accountId = OTHER_ACCOUNT_ID,
+                    localDataSource = RoomPendingOperationLocalDataSource(database),
+                )
+            foreignWriter.enqueue(
+                group(
+                    id = "group-foreign",
+                    accountId = OTHER_ACCOUNT_ID,
+                    operations =
+                        listOf(
+                            operation(
+                                id = "operation-foreign",
+                                groupId = OperationGroupId("group-foreign"),
+                                entryId = CollectionEntryId("entry-other"),
+                                accountId = OTHER_ACCOUNT_ID,
+                            ),
+                        ),
+                ),
+            )
+            assertFalse(writer.cancelUndelivered(OperationGroupId("group-foreign")))
+            assertEquals(1, database.pendingOperationDao().getOperationsForGroup("group-foreign").size)
+
+            database.pendingOperationDao().insertGroup(
+                PendingOperationGroupEntity(
+                    groupOrder = 0,
+                    operationGroupId = "group-empty",
+                    accountId = ACCOUNT_ID.value,
+                    createdAtUtcMs = INSTANT,
+                    compensatesGroupId = null,
+                ),
+            )
+            assertFalse(writer.cancelUndelivered(OperationGroupId("group-empty")))
+            assertNotNull(database.pendingOperationDao().getGroup("group-empty"))
+
+            writer.enqueue(group("group-attempted"))
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET lifecycle_state = 'in_flight', " +
+                    "attempt_count = 1, last_attempt_at_utc_ms = ${INSTANT.toEpochMilliseconds()} " +
+                    "WHERE operation_group_id = 'group-attempted'",
+            )
+            assertFalse(writer.cancelUndelivered(OperationGroupId("group-attempted")))
+            assertNotNull(database.pendingOperationDao().getGroup("group-attempted"))
+
+            val partialGroup = OperationGroupId("group-partial")
+            writer.enqueue(
+                group(
+                    id = partialGroup.value,
+                    operations =
+                        listOf(
+                            operation("operation-partial-0", partialGroup, position = 0),
+                            operation("operation-partial-1", partialGroup, position = 1),
+                        ),
+                ),
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET lifecycle_state = 'delivered', " +
+                    "attempt_count = 1, last_attempt_at_utc_ms = ${INSTANT.toEpochMilliseconds()} " +
+                    "WHERE operation_id = 'operation-partial-0'",
+            )
+            assertFalse(writer.cancelUndelivered(partialGroup))
+            assertEquals(2, database.pendingOperationDao().getOperationsForGroup(partialGroup.value).size)
+
+            val predecessor = OperationGroupId("group-predecessor")
+            writer.enqueue(group(predecessor.value, operationId = "operation-predecessor"))
+            val dependent = OperationGroupId("group-dependent")
+            writer.enqueue(
+                group(
+                    dependent.value,
+                    operations =
+                        listOf(
+                            operation(
+                                id = "operation-dependent-external",
+                                groupId = dependent,
+                                dependsOn = setOf(OperationId("operation-predecessor")),
+                            ),
+                        ),
+                ),
+            )
+            assertFalse(writer.cancelUndelivered(predecessor))
+            assertNotNull(database.pendingOperationDao().getGroup(predecessor.value))
+            assertNotNull(database.pendingOperationDao().getGroup(dependent.value))
+        }
+
+    @Test
+    fun cancellationRejectsEveryNonEnqueuedStateAndAttemptMetadata() =
+        runTest {
+            StoredPendingOperationState.entries
+                .filter { state -> state != StoredPendingOperationState.ENQUEUED }
+                .forEachIndexed { index, state ->
+                    val groupId = OperationGroupId("group-state-$index")
+                    writer.enqueue(group(groupId.value, operationId = "operation-state-$index"))
+                    val retryNotBefore =
+                        if (state == StoredPendingOperationState.RETRYABLE_FAILURE) {
+                            INSTANT
+                        } else {
+                            null
+                        }
+                    database.openHelper.writableDatabase.execSQL(
+                        "UPDATE pending_operation SET lifecycle_state = ?, " +
+                            "attempt_count = 1, last_attempt_at_utc_ms = ?, " +
+                            "retry_not_before_utc_ms = ? WHERE operation_group_id = ?",
+                        arrayOf<Any?>(
+                            state.serializedValue,
+                            INSTANT.toEpochMilliseconds(),
+                            retryNotBefore?.toEpochMilliseconds(),
+                            groupId.value,
+                        ),
+                    )
+
+                    assertFalse(writer.cancelUndelivered(groupId))
+                    assertNotNull(database.pendingOperationDao().getGroup(groupId.value))
+                }
         }
 
     private suspend fun insertOtherAccountAndEntry() {

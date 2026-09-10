@@ -7,12 +7,14 @@ import androidx.room.withTransaction
 import io.morgan.mio.core.database.dao.CollectionEntryDao
 import io.morgan.mio.core.database.dao.MediaDao
 import io.morgan.mio.core.database.dao.PendingOperationDao
+import io.morgan.mio.core.database.dao.ProgressDao
 import io.morgan.mio.core.database.dao.ProviderIdDao
 import io.morgan.mio.core.database.dao.ReleaseDao
 import io.morgan.mio.core.database.dao.SelectedAccountDao
 import io.morgan.mio.core.database.entity.AccountProviderIdEntity
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
 import io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity
+import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
 import io.morgan.mio.core.database.entity.MediaEntity
 import io.morgan.mio.core.database.entity.MediaGenreEntity
 import io.morgan.mio.core.database.entity.MediaProviderIdEntity
@@ -38,8 +40,9 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         PendingOperationGroupEntity::class,
         PendingOperationEntity::class,
         PendingOperationDependencyEntity::class,
+        LocalProgressActivityEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -56,9 +59,11 @@ public abstract class MioDatabase : RoomDatabase() {
 
     public abstract fun pendingOperationDao(): PendingOperationDao
 
+    public abstract fun progressDao(): ProgressDao
+
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 3
+        public const val VERSION: Int = 4
     }
 }

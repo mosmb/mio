@@ -1,6 +1,7 @@
 package io.morgan.mio.feature.today.impl
 
 import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,11 +14,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -25,11 +29,17 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import coil3.ImageLoader
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.morgan.mio.core.designsystem.accessibility.MioHapticType
 import io.morgan.mio.core.designsystem.accessibility.mioHeading
+import io.morgan.mio.core.designsystem.accessibility.rememberMioHaptics
 import io.morgan.mio.core.designsystem.component.MioSkeleton
+import io.morgan.mio.core.designsystem.component.MioSnackbarHost
+import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
@@ -48,10 +58,34 @@ internal fun TodayRoute(
 ) {
     val viewModel = metroViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics by rememberUpdatedState(rememberMioHaptics())
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val timeoutMillis =
+        remember(context) {
+            (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager)
+                ?.getRecommendedTimeoutMillis(
+                    DEFAULT_UNDO_TIMEOUT_MILLIS,
+                    AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS,
+                )?.toLong()
+                ?: DEFAULT_UNDO_TIMEOUT_MILLIS.toLong()
+        }
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            viewModel.onAction(TodayAction.VisibilityChanged(visible = true))
+            try {
+                viewModel.routineHaptics.collect { haptics.perform(MioHapticType.ROUTINE_TICK) }
+            } finally {
+                viewModel.onAction(TodayAction.VisibilityChanged(visible = false))
+            }
+        }
+    }
     TodayScreen(
         modifier = modifier,
         state = state,
         onMediaDetail = { mediaId -> onMediaDetail(MediaId(mediaId)) },
+        onAction = viewModel::onAction,
+        timeoutMillis = timeoutMillis,
     )
 }
 
@@ -60,77 +94,201 @@ internal fun TodayScreen(
     modifier: Modifier = Modifier,
     state: TodayUiState,
     onMediaDetail: (String) -> Unit,
+    onAction: (TodayAction) -> Unit = {},
+    timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
 ) {
     val scrollState = rememberScrollState()
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(
-                    PaddingValues(
-                        start = MioTheme.spacing.screenGutter,
-                        top = MioTheme.spacing.rootTopContentPadding,
-                        end = MioTheme.spacing.screenGutter,
-                        bottom = 128.dp,
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(
+                        PaddingValues(
+                            start = MioTheme.spacing.screenGutter,
+                            top = MioTheme.spacing.rootTopContentPadding,
+                            end = MioTheme.spacing.screenGutter,
+                            bottom = 128.dp,
+                        ),
                     ),
-                ),
-    ) {
-        Text(
-            text = stringResource(R.string.today_title),
-            style = MioTheme.typography.display,
-            modifier = Modifier.mioHeading(),
-        )
-        when (state) {
-            TodayUiState.Loading -> {
-                TodayNowSectionHeading()
-                TodayLoadingCard(modifier = Modifier.padding(top = 12.dp))
-            }
-            is TodayUiState.Populated -> {
-                TodayNowSectionHeading()
-                TodayNowCard(
-                    now = state.now,
-                    onClick = { onMediaDetail(state.now.mediaId) },
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-                if (state.newRecommendations.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.today_new),
-                        style = MioTheme.typography.section,
-                        modifier = Modifier.padding(top = 24.dp).mioHeading(),
+        ) {
+            Text(
+                text = stringResource(R.string.today_title),
+                style = MioTheme.typography.display,
+                modifier = Modifier.mioHeading(),
+            )
+            when (state) {
+                is TodayUiState.Loading -> {
+                    TodayNowSectionHeading()
+                    TodayLoadingCard(modifier = Modifier.padding(top = 12.dp))
+                }
+                is TodayUiState.Populated -> {
+                    TodayNowSectionHeading()
+                    TodayNowCard(
+                        now = state.now,
+                        onClick = { onMediaDetail(state.now.mediaId) },
+                        onDecrease = {
+                            onAction(
+                                TodayAction.Step(
+                                    mediaId = state.now.mediaId,
+                                    direction = TodayProgressDirection.DECREASE,
+                                    timeoutMillis = timeoutMillis,
+                                ),
+                            )
+                        },
+                        onIncrease = {
+                            onAction(
+                                TodayAction.Step(
+                                    mediaId = state.now.mediaId,
+                                    direction = TodayProgressDirection.INCREASE,
+                                    timeoutMillis = timeoutMillis,
+                                ),
+                            )
+                        },
+                        onInteractionChanged = { pressed ->
+                            onAction(TodayAction.InteractionChanged(state.now.mediaId, pressed))
+                        },
+                        modifier = Modifier.padding(top = 12.dp),
                     )
-                    state.newRecommendations.forEachIndexed { index, recommendation ->
-                        if (index > 0) TodayRowDivider()
-                        TodayNewRow(
-                            recommendation = recommendation,
-                            onClick = { onMediaDetail(recommendation.mediaId) },
-                            modifier = Modifier.padding(top = if (index == 0) 12.dp else 0.dp),
+                    if (state.newRecommendations.isNotEmpty()) {
+                        Text(
+                            text = stringResource(R.string.today_new),
+                            style = MioTheme.typography.section,
+                            modifier = Modifier.padding(top = 24.dp).mioHeading(),
+                        )
+                        state.newRecommendations.forEachIndexed { index, recommendation ->
+                            if (index > 0) TodayRowDivider()
+                            TodayNewRow(
+                                recommendation = recommendation,
+                                onClick = { onMediaDetail(recommendation.mediaId) },
+                                onDecrease = {
+                                    onAction(
+                                        TodayAction.Step(
+                                            mediaId = recommendation.mediaId,
+                                            direction = TodayProgressDirection.DECREASE,
+                                            timeoutMillis = timeoutMillis,
+                                        ),
+                                    )
+                                },
+                                onIncrease = {
+                                    onAction(
+                                        TodayAction.Step(
+                                            mediaId = recommendation.mediaId,
+                                            direction = TodayProgressDirection.INCREASE,
+                                            timeoutMillis = timeoutMillis,
+                                        ),
+                                    )
+                                },
+                                onInteractionChanged = { pressed ->
+                                    onAction(TodayAction.InteractionChanged(recommendation.mediaId, pressed))
+                                },
+                                modifier = Modifier.padding(top = if (index == 0) 12.dp else 0.dp),
+                            )
+                        }
+                    }
+                    if (state.remainingReadyCount > 0) {
+                        TodayRemainingReadySummary(
+                            count = state.remainingReadyCount,
+                            modifier = Modifier.padding(top = 16.dp),
                         )
                     }
                 }
-                if (state.remainingReadyCount > 0) {
-                    TodayRemainingReadySummary(
-                        count = state.remainingReadyCount,
-                        modifier = Modifier.padding(top = 16.dp),
+                is TodayUiState.CaughtUp -> {
+                    TodayCaughtUpReceipt(
+                        receipt = state.receipt,
+                        modifier = Modifier.padding(top = 24.dp),
                     )
-                }
-            }
-            is TodayUiState.CaughtUp -> {
-                TodayCaughtUpReceipt(
-                    receipt = state.receipt,
-                    modifier = Modifier.padding(top = 24.dp),
-                )
-                state.receipt.nextRelease?.let { recommendation ->
-                    TodayNextReleaseRow(
-                        recommendation = recommendation,
-                        onClick = { onMediaDetail(recommendation.mediaId) },
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
+                    state.receipt.nextRelease?.let { recommendation ->
+                        TodayNextReleaseRow(
+                            recommendation = recommendation,
+                            onClick = { onMediaDetail(recommendation.mediaId) },
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                    }
                 }
             }
         }
+        TodaySnackbar(
+            state = state,
+            onAction = onAction,
+        )
     }
 }
+
+@Composable
+private fun TodaySnackbar(
+    state: TodayUiState,
+    onAction: (TodayAction) -> Unit,
+) {
+    val error = state.progressErrorOrNull()
+    val undo = state.latestUndoOrNull()
+    val message =
+        when {
+            error != null ->
+                MioSnackbarMessage(
+                    id = PROGRESS_ERROR_SNACKBAR_ID,
+                    message = stringResource(R.string.today_progress_error),
+                    actionLabel = stringResource(R.string.today_retry_progress).takeIf { error.retryable },
+                )
+            undo != null ->
+                MioSnackbarMessage(
+                    id = undo.groupId,
+                    message =
+                        stringResource(
+                            when (undo.unit) {
+                                TodayProgressUnit.EPISODE -> R.string.today_saved_episode
+                                TodayProgressUnit.CHAPTER -> R.string.today_saved_chapter
+                                TodayProgressUnit.VOLUME -> R.string.today_saved_volume
+                            },
+                            undo.progress,
+                        ),
+                    actionLabel = stringResource(R.string.today_undo),
+                )
+            else -> null
+        }
+    // Root labels wrap at accessibility text sizes. Reserve two scaled label lines
+    // in addition to the host's normal navigation clearance so Undo stays above them.
+    val density = LocalDensity.current
+    val largeTextNavigationClearance =
+        if (density.fontScale > 1.3f) {
+            with(density) {
+                MioTheme.typography.label.lineHeight
+                    .toDp()
+            } * 2
+        } else {
+            0.dp
+        }
+    MioSnackbarHost(
+        snackbar = message,
+        bottomNavigationVisible = true,
+        modifier = Modifier.padding(bottom = largeTextNavigationClearance),
+        onAction = { id ->
+            if (id == PROGRESS_ERROR_SNACKBAR_ID) {
+                onAction(TodayAction.RetryProgress)
+            } else {
+                onAction(TodayAction.Undo(id))
+            }
+        },
+    )
+}
+
+private fun TodayUiState.progressErrorOrNull(): TodayProgressErrorUiModel? =
+    when (this) {
+        is TodayUiState.Loading -> progressError
+        is TodayUiState.Populated -> progressError
+        is TodayUiState.CaughtUp -> progressError
+    }
+
+private fun TodayUiState.latestUndoOrNull(): TodayUndoUiModel? =
+    when (this) {
+        is TodayUiState.Loading -> latestUndo
+        is TodayUiState.Populated -> latestUndo
+        is TodayUiState.CaughtUp -> latestUndo
+    }
+
+private const val DEFAULT_UNDO_TIMEOUT_MILLIS: Int = 6_000
+private const val PROGRESS_ERROR_SNACKBAR_ID: String = "progress-error"
 
 @Composable
 private fun TodayNowSectionHeading() {
@@ -235,7 +393,7 @@ private fun TodayScreenMissingArtworkPreview() {
 @Preview(name = "Today loading", widthDp = 393, heightDp = 852)
 @Composable
 private fun TodayScreenLoadingPreview() {
-    TodayPreview(MioPreviewConfiguration.Light, TodayUiState.Loading)
+    TodayPreview(MioPreviewConfiguration.Light, TodayUiState.Loading())
 }
 
 @Preview(name = "Today no recommendation", widthDp = 393, heightDp = 852)
@@ -289,6 +447,94 @@ private fun TodayScreenCaughtUpLargeTextPreview() {
     TodayPreview(MioPreviewConfiguration.Light, todayPreviewCaughtUp())
 }
 
+@Preview(name = "Today progress Zero", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayProgressZeroPreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated(now = todayPreviewNow(progress = 0, nextUnit = 1)),
+    )
+}
+
+@Preview(name = "Today progress Chapter", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayProgressChapterPreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated(
+            now =
+                todayPreviewNow(
+                    progress = 41,
+                    total = 50,
+                    nextUnit = 42,
+                ).copy(progressUnit = TodayProgressUnit.CHAPTER),
+        ),
+    )
+}
+
+@Preview(name = "Today progress Volume", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayProgressVolumePreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated(
+            now = todayPreviewNow(progress = 2, total = 3, nextUnit = 3).copy(progressUnit = TodayProgressUnit.VOLUME),
+        ),
+    )
+}
+
+@Preview(name = "Today progress CompletedUndo", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayProgressCompletedUndoPreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated(
+            now =
+                todayPreviewNow(
+                    progress = 12,
+                ).copy(
+                    status = TodayCollectionStatus.COMPLETED,
+                    controls = null,
+                    nextUnit = null,
+                    availableUnitCount = null,
+                ),
+        ).copy(
+            latestUndo =
+                TodayUndoUiModel(
+                    "preview-action",
+                    "preview-media",
+                    12,
+                    TodayProgressUnit.EPISODE,
+                    true,
+                ),
+        ),
+    )
+}
+
+@Preview(name = "Today progress SaveError", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayProgressSaveErrorPreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated().copy(progressError = TodayProgressErrorUiModel(true)),
+    )
+}
+
+@Preview(name = "Today progress ReducedMotion", widthDp = 393, heightDp = 852)
+@Composable
+private fun TodayProgressReducedMotionPreview() {
+    TodayPreview(MioPreviewConfiguration.ReducedMotionLight, todayPreviewPopulated())
+}
+
+@Preview(name = "Today error large text", widthDp = 320, heightDp = 852, fontScale = 2f)
+@Composable
+private fun TodayProgressErrorLargePreview() {
+    TodayPreview(
+        MioPreviewConfiguration.Light,
+        todayPreviewPopulated().copy(progressError = TodayProgressErrorUiModel(true)),
+    )
+}
+
 @Composable
 private fun TodayPreview(
     configuration: MioPreviewConfiguration,
@@ -323,6 +569,7 @@ private fun todayPreviewNow(
         total = total,
         nextUnit = nextUnit,
         availableUnitCount = availableUnitCount,
+        controls = TodayProgressControlsUiModel(progress > 0, total == null || progress < total),
     )
 
 private fun todayPreviewPopulated(
@@ -359,6 +606,7 @@ private fun todayPreviewNew(
         nextUnit = 9,
         availableUnitCount = 2,
         releaseAge = releaseAge,
+        controls = TodayProgressControlsUiModel(true, true),
     )
 
 private fun todayPreviewCaughtUp(): TodayUiState.CaughtUp =

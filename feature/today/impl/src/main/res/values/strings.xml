@@ -26,6 +26,21 @@
     <string name="today_progress_chapter_unknown">Chapter %1$d</string>
     <string name="today_progress_volume_known">Volume %1$d of %2$d</string>
     <string name="today_progress_volume_unknown">Volume %1$d</string>
+    <string name="today_decrease_episode">Decrease episode to %1$d</string>
+    <string name="today_increase_episode">Increase episode to %1$d</string>
+    <string name="today_decrease_chapter">Decrease chapter to %1$d</string>
+    <string name="today_increase_chapter">Increase chapter to %1$d</string>
+    <string name="today_decrease_volume">Decrease volume to %1$d</string>
+    <string name="today_increase_volume">Increase volume to %1$d</string>
+    <string name="today_status_current">Current</string>
+    <string name="today_status_planned">Planned</string>
+    <string name="today_status_paused">Paused</string>
+    <string name="today_status_completed">Completed</string>
+    <string name="today_status_dropped">Dropped</string>
+    <string name="today_status_repeating">Repeating</string>
+    <string name="today_undo">Undo</string>
+    <string name="today_progress_error">Could not update progress</string>
+    <string name="today_retry_progress">Retry</string>
     <string name="today_new">New</string>
     <string name="today_new_under_hour">New · under one hour ago</string>
     <plurals name="today_new_hours">
@@ -40,7 +55,7 @@
         <item quantity="one">1 other title is ready when you are</item>
         <item quantity="other">%1$d other titles are ready when you are</item>
     </plurals>
-    <string name="today_caught_up">You\'re caught up</string>
+    <string name="today_caught_up">You are caught up</string>
     <string name="today_caught_up_supporting">Nothing needs your attention right now.</string>
     <string name="today_next_release">Next release</string>
     <string name="today_future_under_hour">In under one hour</string>
@@ -52,4 +67,7 @@
         <item quantity="one">In 1 day</item>
         <item quantity="other">In %1$d days</item>
     </plurals>
+    <string name="today_saved_episode">Saved episode %1$d</string>
+    <string name="today_saved_chapter">Saved chapter %1$d</string>
+    <string name="today_saved_volume">Saved volume %1$d</string>
 </resources>

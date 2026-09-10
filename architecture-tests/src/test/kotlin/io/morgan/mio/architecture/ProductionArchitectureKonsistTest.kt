@@ -799,7 +799,7 @@ class ProductionArchitectureKonsistTest {
         assertTrue(
             files.any { ownedFile ->
                 ownedFile.modulePath == ":core:database" &&
-                    ownedFile.file.text.contains("version = 3")
+                    ownedFile.file.text.contains("version = 4")
             },
             "production scan omitted the schema-3 database version",
         )
@@ -861,6 +861,132 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.text.contains("mergeDescendants = true")
             },
             "production scan omitted the bounded, merged-semantic Now card",
+        )
+    }
+
+    @Test
+    fun taskNineteenProgressTypesAreActuallyScanned() {
+        val files = productionFiles()
+        val requiredProductionFiles =
+            listOf(
+                ":domain:progress" to "ProgressRules.kt",
+                ":domain:progress" to "StepProgressUseCase.kt",
+                ":domain:progress" to "ProgressRepository.kt",
+                ":data:progress" to "DefaultProgressRepository.kt",
+                ":data:progress" to "RoomProgressLocalDataSource.kt",
+                ":core:database" to "ProgressDao.kt",
+                ":core:database" to "LocalProgressActivityEntity.kt",
+                ":core:ui" to "MioProgressStepper.kt",
+                ":core:ui" to "MioProgressValue.kt",
+                ":feature:today:impl" to "TodayViewModel.kt",
+                ":feature:today:impl" to "TodayAction.kt",
+                ":feature:media:impl" to "MediaDetailViewModel.kt",
+                ":feature:media:impl" to "MediaDetailAction.kt",
+                ":app" to "ProgressBindings.kt",
+            )
+
+        requiredProductionFiles.forEach { (modulePath, filename) ->
+            assertTrue(
+                files.any { ownedFile ->
+                    ownedFile.modulePath == modulePath &&
+                        ownedFile.sourceSet == "main" &&
+                        ownedFile.file.path
+                            .replace('\\', '/')
+                            .endsWith("/$filename")
+                },
+                "production scan omitted $filename from $modulePath",
+            )
+        }
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":domain:progress" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/ProgressRules.kt") &&
+                    ownedFile.file.text.contains("ProgressDirection.INCREASE") &&
+                    ownedFile.file.text.contains("ProgressDirection.DECREASE")
+            },
+            "production scan omitted both Task 19 pure-rule directions",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":data:progress" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/DefaultProgressRepository.kt") &&
+                    ownedFile.file.text.contains("database.inTransaction") &&
+                    ownedFile.file.text.contains("cancelUndelivered")
+            },
+            "production scan omitted the Task 19 atomic repository boundary",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:database" &&
+                    ownedFile.file.text.contains("MIGRATION_3_4") &&
+                    ownedFile.file.text.contains("local_progress_activity")
+            },
+            "production scan omitted the Task 19 Room migration/activity schema",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 4")
+            },
+            "production scan omitted the Task 19 database version",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:ui" && ownedFile.file.text.contains("MioProgressStepper")
+            },
+            "production scan omitted the shared Task 19 progress stepper",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":core:ui" && ownedFile.file.text.contains("MioProgressValue")
+            },
+            "production scan omitted the shared Task 19 progress value",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:today:impl" &&
+                    ownedFile.file.text.contains("MioProgressStepper")
+            },
+            "production scan omitted Today progress stepper wiring",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:today:impl" && ownedFile.file.text.contains("TodayAction.Step")
+            },
+            "production scan omitted Today progress actions",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:media:impl" &&
+                    ownedFile.file.text.contains("MioProgressStepper")
+            },
+            "production scan omitted media-detail progress stepper wiring",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":feature:media:impl" &&
+                    ownedFile.file.text.contains("MediaDetailAction.Step")
+            },
+            "production scan omitted media-detail progress actions",
+        )
+        assertTrue(
+            files.any { ownedFile ->
+                ownedFile.modulePath == ":app" &&
+                    ownedFile.file.path
+                        .replace('\\', '/')
+                        .endsWith("/ProgressBindings.kt") &&
+                    ownedFile.file.text.contains("AccountScope") &&
+                    ownedFile.file.text.contains("DefaultProgressRepository")
+            },
+            "production scan omitted Account-scoped progress composition",
+        )
+        assertTrue(
+            files.any { ownedFile -> ownedFile.sourceSet == "debug" } &&
+                files.any { ownedFile -> ownedFile.sourceSet == "release" },
+            "production scan omitted debug or release source sets while checking Task 19",
         )
     }
 

@@ -11,7 +11,7 @@ class DependencyRulesTest {
     fun matrixContainsAllCurrentLeafModulesAndRejectsUnknownPaths() {
         assertEquals(43, DependencyRules.productionProjectDependencies.size)
         assertEquals(
-            7,
+            6,
             DependencyRules.productionProjectDependencies.values.count { it.isEmpty() },
         )
         assertFalse(DependencyRules.productionProjectDependencies.containsKey(":new:module"))
@@ -87,6 +87,36 @@ class DependencyRulesTest {
             violations(":domain:media", "implementation", ":domain:queue").isNotEmpty(),
             "Expected the inverse :domain:media -> :domain:queue edge to remain forbidden",
         )
+    }
+
+    @Test
+    fun opensOnlyTheTaskNineteenProgressDomainEdges() {
+        assertEquals(
+            setOf(":domain:model", ":domain:collection"),
+            DependencyRules.productionProjectDependencies.getValue(":domain:progress"),
+        )
+        listOf("api", "implementation").forEach { configuration ->
+            listOf(":domain:model", ":domain:collection").forEach { dependency ->
+                assertTrue(violations(":domain:progress", configuration, dependency).isEmpty())
+                assertTrue(violations(dependency, configuration, ":domain:progress").isNotEmpty())
+            }
+            listOf(
+                ":domain:sync",
+                ":domain:queue",
+                ":domain:media",
+                ":data:progress",
+                ":data:sync",
+                ":core:database",
+                ":core:common",
+                ":feature:today:impl",
+                ":sync:work",
+            ).forEach { dependency ->
+                assertTrue(
+                    violations(":domain:progress", configuration, dependency).isNotEmpty(),
+                    "Expected :domain:progress -> $dependency to remain forbidden",
+                )
+            }
+        }
     }
 
     @Test

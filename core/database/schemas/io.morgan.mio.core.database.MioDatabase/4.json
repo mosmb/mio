@@ -1,0 +1,1203 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "90a106dd8259edbad758044cd63f7a6c",
+    "entities": [
+      {
+        "tableName": "selected_account",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`selection_key` TEXT NOT NULL, `account_id` TEXT NOT NULL, `connected_provider` TEXT NOT NULL, `display_name` TEXT NOT NULL, `avatar_reference` TEXT, PRIMARY KEY(`selection_key`))",
+        "fields": [
+          {
+            "fieldPath": "selectionKey",
+            "columnName": "selection_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "connectedProvider",
+            "columnName": "connected_provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avatarReference",
+            "columnName": "avatar_reference",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "selection_key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_selected_account_account_id",
+            "unique": true,
+            "columnNames": [
+              "account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_selected_account_account_id` ON `${TABLE_NAME}` (`account_id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "account_provider_id",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`account_id` TEXT NOT NULL, `provider` TEXT NOT NULL, `remote_account_id` TEXT NOT NULL, PRIMARY KEY(`account_id`), FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteAccountId",
+            "columnName": "remote_account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "account_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_account_provider_id_account_id",
+            "unique": false,
+            "columnNames": [
+              "account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_account_provider_id_account_id` ON `${TABLE_NAME}` (`account_id`)"
+          },
+          {
+            "name": "index_account_provider_id_provider_remote_account_id",
+            "unique": true,
+            "columnNames": [
+              "provider",
+              "remote_account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_account_provider_id_provider_remote_account_id` ON `${TABLE_NAME}` (`provider`, `remote_account_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "selected_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "account_id"
+            ],
+            "referencedColumns": [
+              "account_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` TEXT NOT NULL, `media_type` TEXT NOT NULL, `title` TEXT NOT NULL, `format` TEXT, `publication_status` TEXT NOT NULL, `synopsis` TEXT, `poster_reference` TEXT, `banner_reference` TEXT, `episode_total` INTEGER, `chapter_total` INTEGER, `volume_total` INTEGER, `release_year` INTEGER, `score_percent` INTEGER, PRIMARY KEY(`media_id`))",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaType",
+            "columnName": "media_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "format",
+            "columnName": "format",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicationStatus",
+            "columnName": "publication_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "synopsis",
+            "columnName": "synopsis",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "posterReference",
+            "columnName": "poster_reference",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bannerReference",
+            "columnName": "banner_reference",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "episodeTotal",
+            "columnName": "episode_total",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "chapterTotal",
+            "columnName": "chapter_total",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "volumeTotal",
+            "columnName": "volume_total",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "releaseYear",
+            "columnName": "release_year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scorePercent",
+            "columnName": "score_percent",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id"
+          ]
+        }
+      },
+      {
+        "tableName": "media_genre",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` TEXT NOT NULL, `genre` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`media_id`, `genre`), FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "genre",
+            "columnName": "genre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id",
+            "genre"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_genre_media_id",
+            "unique": false,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_genre_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          },
+          {
+            "name": "index_media_genre_media_id_position",
+            "unique": true,
+            "columnNames": [
+              "media_id",
+              "position"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_media_genre_media_id_position` ON `${TABLE_NAME}` (`media_id`, `position`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "related_media",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` TEXT NOT NULL, `related_media_id` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`media_id`, `related_media_id`), FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(`related_media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED)",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedMediaId",
+            "columnName": "related_media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id",
+            "related_media_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_related_media_media_id",
+            "unique": false,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_related_media_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          },
+          {
+            "name": "index_related_media_related_media_id",
+            "unique": false,
+            "columnNames": [
+              "related_media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_related_media_related_media_id` ON `${TABLE_NAME}` (`related_media_id`)"
+          },
+          {
+            "name": "index_related_media_media_id_position",
+            "unique": true,
+            "columnNames": [
+              "media_id",
+              "position"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_related_media_media_id_position` ON `${TABLE_NAME}` (`media_id`, `position`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          },
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "related_media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "release",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` TEXT NOT NULL, `progress_unit` TEXT NOT NULL, `unit_number` INTEGER NOT NULL, `time_kind` TEXT NOT NULL, `release_instant_utc_ms` INTEGER, PRIMARY KEY(`media_id`, `progress_unit`, `unit_number`), FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "progressUnit",
+            "columnName": "progress_unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unitNumber",
+            "columnName": "unit_number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeKind",
+            "columnName": "time_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "releaseInstantUtcMs",
+            "columnName": "release_instant_utc_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id",
+            "progress_unit",
+            "unit_number"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_release_media_id",
+            "unique": false,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_release_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_provider_id",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`provider` TEXT NOT NULL, `remote_media_id` TEXT NOT NULL, `media_id` TEXT NOT NULL, PRIMARY KEY(`provider`, `remote_media_id`), FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteMediaId",
+            "columnName": "remote_media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "provider",
+            "remote_media_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_provider_id_media_id",
+            "unique": false,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_provider_id_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          },
+          {
+            "name": "index_media_provider_id_provider_media_id",
+            "unique": true,
+            "columnNames": [
+              "provider",
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_media_provider_id_provider_media_id` ON `${TABLE_NAME}` (`provider`, `media_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "collection_entry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`collection_entry_id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `media_id` TEXT NOT NULL, `progress_unit` TEXT NOT NULL, `remote_status` TEXT NOT NULL, `remote_progress` INTEGER NOT NULL, `remote_total` INTEGER, `remote_updated_at_utc_ms` INTEGER NOT NULL, `effective_status` TEXT NOT NULL, `effective_progress` INTEGER NOT NULL, `effective_total` INTEGER, `effective_updated_at_utc_ms` INTEGER NOT NULL, `local_progress_revision` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`collection_entry_id`), FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "collectionEntryId",
+            "columnName": "collection_entry_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "progressUnit",
+            "columnName": "progress_unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteStatus",
+            "columnName": "remote_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteProgress",
+            "columnName": "remote_progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteTotal",
+            "columnName": "remote_total",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "remoteUpdatedAtUtcMs",
+            "columnName": "remote_updated_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectiveStatus",
+            "columnName": "effective_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectiveProgress",
+            "columnName": "effective_progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectiveTotal",
+            "columnName": "effective_total",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "effectiveUpdatedAtUtcMs",
+            "columnName": "effective_updated_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localProgressRevision",
+            "columnName": "local_progress_revision",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "collection_entry_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_collection_entry_account_id",
+            "unique": false,
+            "columnNames": [
+              "account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_collection_entry_account_id` ON `${TABLE_NAME}` (`account_id`)"
+          },
+          {
+            "name": "index_collection_entry_media_id",
+            "unique": false,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_collection_entry_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          },
+          {
+            "name": "index_collection_entry_account_id_media_id",
+            "unique": true,
+            "columnNames": [
+              "account_id",
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_collection_entry_account_id_media_id` ON `${TABLE_NAME}` (`account_id`, `media_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "selected_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "account_id"
+            ],
+            "referencedColumns": [
+              "account_id"
+            ]
+          },
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "collection_entry_provider_id",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`provider` TEXT NOT NULL, `remote_collection_entry_id` TEXT NOT NULL, `collection_entry_id` TEXT NOT NULL, PRIMARY KEY(`provider`, `remote_collection_entry_id`), FOREIGN KEY(`collection_entry_id`) REFERENCES `collection_entry`(`collection_entry_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteCollectionEntryId",
+            "columnName": "remote_collection_entry_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "collectionEntryId",
+            "columnName": "collection_entry_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "provider",
+            "remote_collection_entry_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_collection_entry_provider_id_collection_entry_id",
+            "unique": false,
+            "columnNames": [
+              "collection_entry_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_collection_entry_provider_id_collection_entry_id` ON `${TABLE_NAME}` (`collection_entry_id`)"
+          },
+          {
+            "name": "index_collection_entry_provider_id_provider_collection_entry_id",
+            "unique": true,
+            "columnNames": [
+              "provider",
+              "collection_entry_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_collection_entry_provider_id_provider_collection_entry_id` ON `${TABLE_NAME}` (`provider`, `collection_entry_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "collection_entry",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "collection_entry_id"
+            ],
+            "referencedColumns": [
+              "collection_entry_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pending_operation_group",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`group_order` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `operation_group_id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `created_at_utc_ms` INTEGER NOT NULL, `compensates_group_id` TEXT, FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "groupOrder",
+            "columnName": "group_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationGroupId",
+            "columnName": "operation_group_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtUtcMs",
+            "columnName": "created_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "compensatesGroupId",
+            "columnName": "compensates_group_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "group_order"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pending_operation_group_operation_group_id",
+            "unique": true,
+            "columnNames": [
+              "operation_group_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_pending_operation_group_operation_group_id` ON `${TABLE_NAME}` (`operation_group_id`)"
+          },
+          {
+            "name": "index_pending_operation_group_account_id",
+            "unique": false,
+            "columnNames": [
+              "account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_group_account_id` ON `${TABLE_NAME}` (`account_id`)"
+          },
+          {
+            "name": "index_pending_operation_group_compensates_group_id",
+            "unique": false,
+            "columnNames": [
+              "compensates_group_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_group_compensates_group_id` ON `${TABLE_NAME}` (`compensates_group_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "selected_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "account_id"
+            ],
+            "referencedColumns": [
+              "account_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pending_operation",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`operation_id` TEXT NOT NULL, `operation_group_id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `collection_entry_id` TEXT NOT NULL, `position_in_group` INTEGER NOT NULL, `kind` TEXT NOT NULL, `base_progress` INTEGER, `target_progress` INTEGER, `base_status` TEXT, `target_status` TEXT, `lifecycle_state` TEXT NOT NULL, `attempt_count` INTEGER NOT NULL, `last_attempt_at_utc_ms` INTEGER, `retry_not_before_utc_ms` INTEGER, PRIMARY KEY(`operation_id`), FOREIGN KEY(`operation_group_id`) REFERENCES `pending_operation_group`(`operation_group_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`collection_entry_id`) REFERENCES `collection_entry`(`collection_entry_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "operationId",
+            "columnName": "operation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationGroupId",
+            "columnName": "operation_group_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "collectionEntryId",
+            "columnName": "collection_entry_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionInGroup",
+            "columnName": "position_in_group",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseProgress",
+            "columnName": "base_progress",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "targetProgress",
+            "columnName": "target_progress",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "baseStatus",
+            "columnName": "base_status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "targetStatus",
+            "columnName": "target_status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lifecycleState",
+            "columnName": "lifecycle_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attempt_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAttemptAtUtcMs",
+            "columnName": "last_attempt_at_utc_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "retryNotBeforeUtcMs",
+            "columnName": "retry_not_before_utc_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "operation_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pending_operation_operation_group_id",
+            "unique": false,
+            "columnNames": [
+              "operation_group_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_operation_group_id` ON `${TABLE_NAME}` (`operation_group_id`)"
+          },
+          {
+            "name": "index_pending_operation_account_id",
+            "unique": false,
+            "columnNames": [
+              "account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_account_id` ON `${TABLE_NAME}` (`account_id`)"
+          },
+          {
+            "name": "index_pending_operation_collection_entry_id",
+            "unique": false,
+            "columnNames": [
+              "collection_entry_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_collection_entry_id` ON `${TABLE_NAME}` (`collection_entry_id`)"
+          },
+          {
+            "name": "index_pending_operation_lifecycle_state",
+            "unique": false,
+            "columnNames": [
+              "lifecycle_state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_lifecycle_state` ON `${TABLE_NAME}` (`lifecycle_state`)"
+          },
+          {
+            "name": "index_pending_operation_operation_group_id_position_in_group",
+            "unique": true,
+            "columnNames": [
+              "operation_group_id",
+              "position_in_group"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_pending_operation_operation_group_id_position_in_group` ON `${TABLE_NAME}` (`operation_group_id`, `position_in_group`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "pending_operation_group",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "operation_group_id"
+            ],
+            "referencedColumns": [
+              "operation_group_id"
+            ]
+          },
+          {
+            "table": "selected_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "account_id"
+            ],
+            "referencedColumns": [
+              "account_id"
+            ]
+          },
+          {
+            "table": "collection_entry",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "collection_entry_id"
+            ],
+            "referencedColumns": [
+              "collection_entry_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pending_operation_dependency",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`operation_id` TEXT NOT NULL, `depends_on_operation_id` TEXT NOT NULL, PRIMARY KEY(`operation_id`, `depends_on_operation_id`), FOREIGN KEY(`operation_id`) REFERENCES `pending_operation`(`operation_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`depends_on_operation_id`) REFERENCES `pending_operation`(`operation_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "operationId",
+            "columnName": "operation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependsOnOperationId",
+            "columnName": "depends_on_operation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "operation_id",
+            "depends_on_operation_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pending_operation_dependency_depends_on_operation_id",
+            "unique": false,
+            "columnNames": [
+              "depends_on_operation_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operation_dependency_depends_on_operation_id` ON `${TABLE_NAME}` (`depends_on_operation_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "pending_operation",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "operation_id"
+            ],
+            "referencedColumns": [
+              "operation_id"
+            ]
+          },
+          {
+            "table": "pending_operation",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "depends_on_operation_id"
+            ],
+            "referencedColumns": [
+              "operation_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "local_progress_activity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`activity_order` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `operation_group_id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `collection_entry_id` TEXT NOT NULL, `media_id` TEXT NOT NULL, `direction` TEXT NOT NULL, `progress_unit` TEXT NOT NULL, `before_progress` INTEGER NOT NULL, `after_progress` INTEGER NOT NULL, `before_status` TEXT NOT NULL, `after_status` TEXT NOT NULL, `before_updated_at_utc_ms` INTEGER NOT NULL, `after_updated_at_utc_ms` INTEGER NOT NULL, `after_revision` INTEGER NOT NULL, `created_at_utc_ms` INTEGER NOT NULL, `undo_until_utc_ms` INTEGER NOT NULL, `undone_at_utc_ms` INTEGER, FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`collection_entry_id`) REFERENCES `collection_entry`(`collection_entry_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "activityOrder",
+            "columnName": "activity_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationGroupId",
+            "columnName": "operation_group_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "collectionEntryId",
+            "columnName": "collection_entry_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "direction",
+            "columnName": "direction",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "progressUnit",
+            "columnName": "progress_unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeProgress",
+            "columnName": "before_progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "afterProgress",
+            "columnName": "after_progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeStatus",
+            "columnName": "before_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "afterStatus",
+            "columnName": "after_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeUpdatedAtUtcMs",
+            "columnName": "before_updated_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "afterUpdatedAtUtcMs",
+            "columnName": "after_updated_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "afterRevision",
+            "columnName": "after_revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtUtcMs",
+            "columnName": "created_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "undoUntilUtcMs",
+            "columnName": "undo_until_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "undoneAtUtcMs",
+            "columnName": "undone_at_utc_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "activity_order"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_local_progress_activity_operation_group_id",
+            "unique": true,
+            "columnNames": [
+              "operation_group_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_local_progress_activity_operation_group_id` ON `${TABLE_NAME}` (`operation_group_id`)"
+          },
+          {
+            "name": "index_local_progress_activity_account_id_activity_order",
+            "unique": false,
+            "columnNames": [
+              "account_id",
+              "activity_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_local_progress_activity_account_id_activity_order` ON `${TABLE_NAME}` (`account_id`, `activity_order`)"
+          },
+          {
+            "name": "index_local_progress_activity_collection_entry_id",
+            "unique": false,
+            "columnNames": [
+              "collection_entry_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_local_progress_activity_collection_entry_id` ON `${TABLE_NAME}` (`collection_entry_id`)"
+          },
+          {
+            "name": "index_local_progress_activity_media_id",
+            "unique": false,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_local_progress_activity_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "selected_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "account_id"
+            ],
+            "referencedColumns": [
+              "account_id"
+            ]
+          },
+          {
+            "table": "collection_entry",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "collection_entry_id"
+            ],
+            "referencedColumns": [
+              "collection_entry_id"
+            ]
+          },
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "media_id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '90a106dd8259edbad758044cd63f7a6c')"
+    ]
+  }
+}

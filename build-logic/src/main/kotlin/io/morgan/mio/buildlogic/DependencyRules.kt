@@ -210,7 +210,7 @@ public object DependencyRules {
             ":domain:account" to setOf(":domain:model"),
             ":domain:media" to setOf(":domain:model"),
             ":domain:collection" to setOf(":domain:model"),
-            ":domain:progress" to emptySet(),
+            ":domain:progress" to setOf(":domain:model", ":domain:collection"),
             ":domain:queue" to setOf(":domain:media", ":domain:collection", ":domain:model"),
             ":domain:sync" to setOf(":domain:model", ":domain:collection"),
             ":domain:preferences" to setOf(":domain:model"),

@@ -16,11 +16,22 @@ import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.MediaTitle
 import io.morgan.mio.domain.model.MediaType
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitNumber
 import io.morgan.mio.domain.model.UnitTotal
+import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
+import io.morgan.mio.domain.progress.ProgressAction
+import io.morgan.mio.domain.progress.ProgressChange
+import io.morgan.mio.domain.progress.ProgressRepository
+import io.morgan.mio.domain.progress.ProgressSnapshot
+import io.morgan.mio.domain.progress.ProgressUndo
+import io.morgan.mio.domain.progress.ProgressWriteResult
+import io.morgan.mio.domain.progress.StepProgressUseCase
+import io.morgan.mio.domain.progress.UndoProgressUseCase
 import io.morgan.mio.domain.queue.ObserveTodayQueueUseCase
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -29,6 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -43,6 +55,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -62,7 +75,7 @@ class TodayViewModelTest {
             val repositories = TestRepositories()
             val viewModel = repositories.viewModel()
 
-            assertEquals(TodayUiState.Loading, viewModel.uiState.value)
+            assertEquals(TodayUiState.Loading(), viewModel.uiState.value)
             val observer = backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
 
@@ -112,10 +125,216 @@ class TodayViewModelTest {
             assertTrue(repositories.collectionCancellations.get() > 0)
         }
 
-    private fun TestRepositories.viewModel(): TodayViewModel =
+    @Test
+    fun touchKeepsIdentityButUsesFreshNextUnitAndReleasesCaughtUpState() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repositories = TestRepositories()
+            repositories.entries.value = listOf(entry(1))
+            repositories.mediaState.value = media()
+            repositories.releaseState.value = listOf(release(2), release(3))
+            val viewModel = repositories.viewModel()
+            backgroundScope.launch { viewModel.uiState.collect() }
+            runCurrent()
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", true))
+            runCurrent()
+            repositories.entries.value = listOf(entry(2))
+            runCurrent()
+            val updated = viewModel.uiState.value as TodayUiState.Populated
+            assertEquals(2, updated.now.progress)
+            assertEquals(3, updated.now.nextUnit)
+            repositories.entries.value = listOf(entry(3))
+            runCurrent()
+            val pinned = viewModel.uiState.value as TodayUiState.Populated
+            assertEquals(3, pinned.now.progress)
+            assertEquals(null, pinned.now.nextUnit)
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", false))
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
+        }
+
+    @Test
+    fun leavingDestinationAndAccountRemovalReleaseTouchedContent() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repositories = TestRepositories()
+            repositories.entries.value = listOf(entry(1))
+            repositories.mediaState.value = media()
+            repositories.releaseState.value = listOf(release(2))
+            val viewModel = repositories.viewModel()
+            backgroundScope.launch { viewModel.uiState.collect() }
+            runCurrent()
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", true))
+            repositories.entries.value = listOf(entry(2))
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.Populated)
+            viewModel.onAction(TodayAction.VisibilityChanged(false))
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
+            viewModel.onAction(TodayAction.VisibilityChanged(true))
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
+            repositories.entries.value = listOf(entry(1))
+            runCurrent()
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", true))
+            runCurrent()
+            repositories.entries.value = emptyList()
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
+        }
+
+    @Test
+    fun retryTargetsTheFailedGestureAfterANewerGestureAndDoesNotReplayHaptics() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val failure = CompletableDeferred<Unit>()
+            val requests = mutableListOf<ProgressChange>()
+            val handled = mutableMapOf<OperationGroupId, ProgressAction>()
+            val progress =
+                object : ProgressRepository {
+                    override suspend fun readSnapshot(mediaId: MediaId) = ProgressSnapshot(entry(1), 0)
+
+                    override suspend fun findAction(actionId: OperationGroupId) = handled[actionId]
+
+                    override fun observeLatestAction() = flowOf<ProgressAction?>(null)
+
+                    override suspend fun readLatestAction(): ProgressAction? = null
+
+                    override suspend fun undo(change: ProgressUndo) = ProgressWriteResult.Stale
+
+                    override suspend fun commit(change: ProgressChange): ProgressWriteResult {
+                        requests += change
+                        if (requests.size == 1) {
+                            failure.await()
+                            error("First gesture failed after the second gesture")
+                        }
+                        val action =
+                            ProgressAction(
+                                id = change.actionId,
+                                order = requests.size.toLong(),
+                                accountId = accountId,
+                                entryId = change.before.entry.id,
+                                mediaId = change.before.entry.mediaId,
+                                direction = change.direction,
+                                unit = change.before.entry.progressUnit,
+                                beforeProgress = change.before.entry.progress,
+                                afterProgress = change.targetProgress,
+                                beforeStatus = change.before.entry.status,
+                                afterStatus = change.targetStatus,
+                                beforeUpdatedAt = now,
+                                afterUpdatedAt = now,
+                                afterRevision = 1,
+                                createdAt = now,
+                                undoUntil = now + 6.seconds,
+                                undoneAt = null,
+                            )
+                        handled[change.actionId] = action
+                        return ProgressWriteResult.Committed(action)
+                    }
+                }
+            val viewModel = TestRepositories().viewModel(progress)
+            var haptics = 0
+            backgroundScope.launch { viewModel.routineHaptics.collect { haptics++ } }
+            backgroundScope.launch { viewModel.uiState.collect() }
+            runCurrent()
+            val step = TodayAction.Step("media-1", TodayProgressDirection.INCREASE, 6_000)
+            viewModel.onAction(step)
+            runCurrent()
+            viewModel.onAction(step)
+            runCurrent()
+            assertEquals(1, haptics)
+            failure.complete(Unit)
+            runCurrent()
+            viewModel.onAction(TodayAction.RetryProgress)
+            runCurrent()
+            assertEquals(3, requests.size)
+            assertEquals(requests[0].actionId, requests[2].actionId)
+            assertTrue(requests[0].actionId != requests[1].actionId)
+            assertEquals(2, haptics)
+            viewModel.onAction(TodayAction.RetryProgress)
+            runCurrent()
+            assertEquals(3, requests.size)
+            assertEquals(2, haptics)
+        }
+
+    @Test
+    fun unresolvedWriteAndMotionEachProtectIdentityUntilTheirOwnCompletion() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repositories = TestRepositories()
+            repositories.entries.value = listOf(entry(1))
+            repositories.mediaState.value = media()
+            repositories.releaseState.value = listOf(release(2))
+            val gate = CompletableDeferred<Unit>()
+            val progress =
+                object : ProgressRepository {
+                    override suspend fun readSnapshot(mediaId: MediaId) = ProgressSnapshot(entry(1), 0)
+
+                    override suspend fun findAction(actionId: OperationGroupId): ProgressAction? = null
+
+                    override fun observeLatestAction() = flowOf<ProgressAction?>(null)
+
+                    override suspend fun readLatestAction(): ProgressAction? = null
+
+                    override suspend fun undo(change: ProgressUndo) = ProgressWriteResult.Stale
+
+                    override suspend fun commit(change: ProgressChange): ProgressWriteResult {
+                        repositories.entries.value = listOf(entry(2))
+                        gate.await()
+                        val action =
+                            ProgressAction(
+                                id = change.actionId,
+                                order = 1,
+                                accountId = accountId,
+                                entryId = change.before.entry.id,
+                                mediaId = change.before.entry.mediaId,
+                                direction = change.direction,
+                                unit = change.before.entry.progressUnit,
+                                beforeProgress = change.before.entry.progress,
+                                afterProgress = change.targetProgress,
+                                beforeStatus = change.before.entry.status,
+                                afterStatus = change.targetStatus,
+                                beforeUpdatedAt = now,
+                                afterUpdatedAt = now,
+                                afterRevision = 1,
+                                createdAt = now,
+                                undoUntil = now + 6.seconds,
+                                undoneAt = null,
+                            )
+                        return ProgressWriteResult.Committed(action)
+                    }
+                }
+            val viewModel = repositories.viewModel(progress)
+            var haptics = 0
+            backgroundScope.launch { viewModel.uiState.collect() }
+            backgroundScope.launch { viewModel.routineHaptics.collect { haptics++ } }
+            runCurrent()
+            assertEquals(0, haptics)
+            viewModel.onAction(TodayAction.Step("media-1", TodayProgressDirection.INCREASE, 6_000))
+            runCurrent()
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", false))
+            runCurrent()
+            assertEquals(2, (viewModel.uiState.value as TodayUiState.Populated).now.progress)
+            assertEquals(0, haptics)
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(1, haptics)
+            advanceTimeBy(219)
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.Populated)
+            advanceTimeBy(1)
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
+        }
+
+    private fun TestRepositories.viewModel(progress: ProgressRepository = TestProgressRepository()): TodayViewModel =
         TodayViewModel(
             accountId = accountId,
             observeTodayQueue = ObserveTodayQueueUseCase(this, this, fixedClock()),
+            collectionRepository = this,
+            stepProgress = StepProgressUseCase(progress, fixedClock()),
+            undoProgress = UndoProgressUseCase(progress, fixedClock()),
+            observeUndoUseCase = ObserveProgressUndoUseCase(progress, fixedClock()),
         )
 
     private fun fixedClock(): Clock =
@@ -156,6 +375,22 @@ class TodayViewModelTest {
             number = UnitNumber(number),
             time = ReleaseTime.Trusted(now),
         )
+}
+
+private class TestProgressRepository : ProgressRepository {
+    override suspend fun readSnapshot(mediaId: MediaId): ProgressSnapshot? = null
+
+    override suspend fun findAction(actionId: OperationGroupId): ProgressAction? = null
+
+    override fun observeLatestAction() = flowOf<ProgressAction?>(null)
+
+    override suspend fun readLatestAction(): ProgressAction? = null
+
+    override suspend fun commit(change: ProgressChange): ProgressWriteResult =
+        ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(change: ProgressUndo): ProgressWriteResult =
+        ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.UNDO_UNAVAILABLE)
 }
 
 private class TestRepositories :

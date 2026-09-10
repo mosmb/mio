@@ -241,7 +241,7 @@ class TodayRoomQueueNavigationTest {
                 releaseInstant = FUTURE_RELEASE,
             )
 
-            waitForText(scheduler, "You're caught up")
+            waitForText(scheduler, "You are caught up")
             composeRule.onAllNodesWithText("Now").assertCountEquals(0)
             waitForText(scheduler, "Next release")
             waitForText(scheduler, "Future title")

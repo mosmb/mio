@@ -10,6 +10,15 @@
     <string name="media_detail_in_library">In library</string>
     <string name="media_detail_status">Status: %1$s</string>
     <string name="media_detail_progress">Progress: %1$d of %2$s %3$s</string>
+    <string name="media_detail_decrease_episode">Decrease episode to %1$d</string>
+    <string name="media_detail_increase_episode">Increase episode to %1$d</string>
+    <string name="media_detail_decrease_chapter">Decrease chapter to %1$d</string>
+    <string name="media_detail_increase_chapter">Increase chapter to %1$d</string>
+    <string name="media_detail_decrease_volume">Decrease volume to %1$d</string>
+    <string name="media_detail_increase_volume">Increase volume to %1$d</string>
+    <string name="media_detail_undo">Undo</string>
+    <string name="media_detail_progress_error">Could not update progress</string>
+    <string name="media_detail_retry_progress">Retry</string>
     <string name="media_detail_synopsis">Synopsis</string>
     <string name="media_detail_read_more">Read more</string>
     <string name="media_detail_read_less">Read less</string>
@@ -55,4 +64,7 @@
     <string name="media_detail_unit_episodes">episodes</string>
     <string name="media_detail_unit_chapters">chapters</string>
     <string name="media_detail_unit_volumes">volumes</string>
+    <string name="media_detail_saved_episode">Saved episode %1$d</string>
+    <string name="media_detail_saved_chapter">Saved chapter %1$d</string>
+    <string name="media_detail_saved_volume">Saved volume %1$d</string>
 </resources>

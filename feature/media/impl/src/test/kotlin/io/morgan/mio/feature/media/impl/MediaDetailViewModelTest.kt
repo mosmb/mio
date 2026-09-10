@@ -7,11 +7,23 @@ import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.media.Release
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.domain.model.OperationGroupId
+import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
+import io.morgan.mio.domain.progress.ProgressAction
+import io.morgan.mio.domain.progress.ProgressChange
+import io.morgan.mio.domain.progress.ProgressRepository
+import io.morgan.mio.domain.progress.ProgressSnapshot
+import io.morgan.mio.domain.progress.ProgressUndo
+import io.morgan.mio.domain.progress.ProgressWriteResult
+import io.morgan.mio.domain.progress.StepProgressUseCase
+import io.morgan.mio.domain.progress.UndoProgressUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -28,6 +40,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -80,7 +93,7 @@ class MediaDetailViewModelTest {
 
             advanceUntilIdle()
 
-            assertEquals(MediaDetailUiState.Loading, viewModel.uiState.value)
+            assertEquals(MediaDetailUiState.Loading(), viewModel.uiState.value)
             assertEquals(listOf(mediaId), repository.refreshCalls)
         }
 
@@ -96,7 +109,7 @@ class MediaDetailViewModelTest {
             val viewModel = createViewModel(repository)
             backgroundScope.launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
-            assertEquals(MediaDetailUiState.Error, viewModel.uiState.value)
+            assertEquals(MediaDetailUiState.Error(), viewModel.uiState.value)
 
             viewModel.onAction(MediaDetailAction.Retry)
             repository.media.value = sampleMedia()
@@ -116,17 +129,121 @@ class MediaDetailViewModelTest {
 
             advanceUntilIdle()
 
-            assertEquals(MediaDetailUiState.Loading, viewModel.uiState.value)
+            assertEquals(MediaDetailUiState.Loading(), viewModel.uiState.value)
             assertEquals(listOf(mediaId), repository.refreshCalls)
         }
 
-    private fun createViewModel(repository: TestMediaRepository): MediaDetailViewModel =
+    @Test
+    fun retryTargetsTheFailedGestureAfterANewerGestureAndDoesNotReplayHaptics() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val now = fixedClock().now()
+            val failure = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val requests = mutableListOf<ProgressChange>()
+            val handled = mutableMapOf<OperationGroupId, ProgressAction>()
+            val progress =
+                object : ProgressRepository {
+                    override suspend fun readSnapshot(mediaId: MediaId) = ProgressSnapshot(entry(1), 0)
+
+                    override suspend fun findAction(actionId: OperationGroupId) = handled[actionId]
+
+                    override fun observeLatestAction() = flowOf<ProgressAction?>(null)
+
+                    override suspend fun readLatestAction(): ProgressAction? = null
+
+                    override suspend fun undo(change: ProgressUndo) = ProgressWriteResult.Stale
+
+                    override suspend fun commit(change: ProgressChange): ProgressWriteResult {
+                        requests += change
+                        if (requests.size == 1) {
+                            failure.await()
+                            error("First gesture failed after the second gesture")
+                        }
+                        val action =
+                            ProgressAction(
+                                id = change.actionId,
+                                order = requests.size.toLong(),
+                                accountId = accountId,
+                                entryId = change.before.entry.id,
+                                mediaId = change.before.entry.mediaId,
+                                direction = change.direction,
+                                unit = change.before.entry.progressUnit,
+                                beforeProgress = change.before.entry.progress,
+                                afterProgress = change.targetProgress,
+                                beforeStatus = change.before.entry.status,
+                                afterStatus = change.targetStatus,
+                                beforeUpdatedAt = now,
+                                afterUpdatedAt = now,
+                                afterRevision = 1,
+                                createdAt = now,
+                                undoUntil = now + 6.seconds,
+                                undoneAt = null,
+                            )
+                        handled[change.actionId] = action
+                        return ProgressWriteResult.Committed(action)
+                    }
+                }
+            val viewModel = createViewModel(TestMediaRepository(media = sampleMedia()), progress)
+            var haptics = 0
+            backgroundScope.launch { viewModel.routineHaptics.collect { haptics++ } }
+            backgroundScope.launch { viewModel.uiState.collect() }
+            runCurrent()
+            val step = MediaDetailAction.Step("media-1", MediaDetailProgressDirection.INCREASE, 6_000)
+            viewModel.onAction(step)
+            runCurrent()
+            viewModel.onAction(step)
+            runCurrent()
+            assertEquals(1, haptics)
+            failure.complete(Unit)
+            runCurrent()
+            viewModel.onAction(MediaDetailAction.RetryProgress)
+            runCurrent()
+            assertEquals(3, requests.size)
+            assertEquals(requests[0].actionId, requests[2].actionId)
+            assertTrue(requests[0].actionId != requests[1].actionId)
+            assertEquals(2, haptics)
+            viewModel.onAction(MediaDetailAction.RetryProgress)
+            runCurrent()
+            assertEquals(3, requests.size)
+            assertEquals(2, haptics)
+        }
+
+    private fun createViewModel(
+        repository: TestMediaRepository,
+        progress: ProgressRepository = TestProgressRepository(),
+    ): MediaDetailViewModel =
         MediaDetailViewModel(
             mediaId = mediaId,
             accountId = accountId,
             mediaRepository = repository,
             collectionRepository = TestCollectionRepository(),
+            stepProgress = StepProgressUseCase(progress, fixedClock()),
+            undoProgress = UndoProgressUseCase(progress, fixedClock()),
+            observeUndoUseCase = ObserveProgressUndoUseCase(progress, fixedClock()),
         )
+
+    private fun entry(progress: Int) =
+        CollectionEntry(
+            id =
+                io.morgan.mio.domain.model
+                    .CollectionEntryId("entry-1"),
+            accountId = accountId,
+            mediaId = mediaId,
+            status = io.morgan.mio.domain.collection.CollectionStatus.CURRENT,
+            progress =
+                io.morgan.mio.domain.model
+                    .ProgressValue(progress),
+            progressUnit = io.morgan.mio.domain.model.ProgressUnit.EPISODE,
+            total =
+                io.morgan.mio.domain.model
+                    .UnitTotal(12),
+            updatedAt = fixedClock().now(),
+        )
+
+    private fun fixedClock(): kotlin.time.Clock =
+        object : kotlin.time.Clock {
+            override fun now(): kotlin.time.Instant = kotlin.time.Instant.parse("2026-08-23T12:00:00Z")
+        }
 
     private fun sampleMedia(id: String = mediaId.value): Media =
         Media(
@@ -147,6 +264,22 @@ class MediaDetailViewModelTest {
             genres = emptyList(),
             relatedMediaIds = emptyList(),
         )
+}
+
+private class TestProgressRepository : ProgressRepository {
+    override suspend fun readSnapshot(mediaId: MediaId): ProgressSnapshot? = null
+
+    override suspend fun findAction(actionId: OperationGroupId): ProgressAction? = null
+
+    override fun observeLatestAction() = flowOf<ProgressAction?>(null)
+
+    override suspend fun readLatestAction(): ProgressAction? = null
+
+    override suspend fun commit(change: ProgressChange): ProgressWriteResult =
+        ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(change: ProgressUndo): ProgressWriteResult =
+        ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.UNDO_UNAVAILABLE)
 }
 
 private class TestMediaRepository(

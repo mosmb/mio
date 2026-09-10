@@ -1,14 +1,22 @@
 package io.morgan.mio.feature.media.impl
 
 internal sealed interface MediaDetailUiState {
-    data object Loading : MediaDetailUiState
+    data class Loading(
+        val latestUndo: MediaDetailUndoUiModel? = null,
+        val progressError: MediaDetailProgressErrorUiModel? = null,
+    ) : MediaDetailUiState
 
-    data object Error : MediaDetailUiState
+    data class Error(
+        val latestUndo: MediaDetailUndoUiModel? = null,
+        val progressError: MediaDetailProgressErrorUiModel? = null,
+    ) : MediaDetailUiState
 
     data class Content(
         val media: MediaDetailUiModel,
         val relatedTitles: List<MediaDetailRelatedTitleUiModel>,
         val collection: MediaDetailCollectionUiModel?,
+        val latestUndo: MediaDetailUndoUiModel? = null,
+        val progressError: MediaDetailProgressErrorUiModel? = null,
     ) : MediaDetailUiState
 }
 
@@ -45,6 +53,24 @@ internal data class MediaDetailCollectionUiModel(
     val progress: Int,
     val progressUnit: MediaDetailProgressUnit,
     val total: Int?,
+    val controls: MediaDetailProgressControlsUiModel? = null,
+)
+
+internal data class MediaDetailProgressControlsUiModel(
+    val decreaseEnabled: Boolean,
+    val increaseEnabled: Boolean,
+)
+
+internal data class MediaDetailUndoUiModel(
+    val groupId: String,
+    val mediaId: String,
+    val progress: Int,
+    val unit: MediaDetailProgressUnit,
+    val completed: Boolean,
+)
+
+internal data class MediaDetailProgressErrorUiModel(
+    val retryable: Boolean,
 )
 
 internal enum class MediaDetailMediaType {

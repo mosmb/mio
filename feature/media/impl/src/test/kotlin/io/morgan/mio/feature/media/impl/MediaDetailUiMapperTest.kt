@@ -74,6 +74,27 @@ class MediaDetailUiMapperTest {
         assertNull(state.collection)
     }
 
+    @Test
+    fun nonCurrentCollectionKeepsStatusButOmitsFastControls() {
+        val collection =
+            CollectionEntry(
+                id = CollectionEntryId("entry-completed"),
+                accountId = AccountId("account-1"),
+                mediaId = MediaId("root"),
+                status = CollectionStatus.COMPLETED,
+                progress = ProgressValue(12),
+                progressUnit = ProgressUnit.VOLUME,
+                total = UnitTotal(12),
+                updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
+            )
+
+        val state = MediaDetailUiMapper.mapContent(media("root"), emptyList(), collection)
+
+        assertEquals(MediaDetailCollectionStatus.COMPLETED, state.collection?.status)
+        assertEquals(MediaDetailProgressUnit.VOLUME, state.collection?.progressUnit)
+        assertNull(state.collection?.controls)
+    }
+
     private fun media(
         id: String,
         title: String = "Title $id",

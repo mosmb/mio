@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteConstraintException
 import androidx.test.core.app.ApplicationProvider
 import io.morgan.mio.core.database.entity.AccountProviderIdEntity
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
+import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
 import io.morgan.mio.core.database.entity.MediaEntity
 import io.morgan.mio.core.database.entity.MediaProviderIdEntity
 import io.morgan.mio.core.database.entity.RelatedMediaEntity
@@ -29,6 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
@@ -82,11 +84,14 @@ class MioDatabaseTest {
             database.mediaDao().upsertMedia(listOf(media("media-1")))
             database.collectionEntryDao().upsertEntries(listOf(collectionEntry("entry-1")))
             database.providerIdDao().upsertCollectionEntryProviderIds(emptyList())
+            database.progressDao().insertActivity(progressActivity("account-1", "entry-1", "media-1"))
+            assertEquals(1, countRows("local_progress_activity"))
 
             database.selectedAccountDao().deleteAccount("account-1")
 
             assertEquals(0, countRows("account_provider_id"))
             assertEquals(0, countRows("collection_entry"))
+            assertEquals(0, countRows("local_progress_activity"))
         }
 
     @Test
@@ -360,6 +365,32 @@ class MioDatabaseTest {
             effectiveTotal = 12,
             effectiveUpdatedAtUtcMs = Instant.parse("2026-01-01T00:00:00Z"),
         )
+
+    private fun progressActivity(
+        accountId: String,
+        entryId: String,
+        mediaId: String,
+    ): LocalProgressActivityEntity {
+        val timestamp = Instant.parse("2026-01-01T00:00:00Z")
+        return LocalProgressActivityEntity(
+            operationGroupId = "group-$entryId",
+            accountId = accountId,
+            collectionEntryId = entryId,
+            mediaId = mediaId,
+            direction = "increase",
+            progressUnit = StoredProgressUnit.EPISODE,
+            beforeProgress = 1,
+            afterProgress = 2,
+            beforeStatus = StoredCollectionStatus.CURRENT,
+            afterStatus = StoredCollectionStatus.CURRENT,
+            beforeUpdatedAtUtcMs = timestamp,
+            afterUpdatedAtUtcMs = timestamp,
+            afterRevision = 1,
+            createdAtUtcMs = timestamp,
+            undoUntilUtcMs = timestamp.plus(6.seconds),
+            undoneAtUtcMs = null,
+        )
+    }
 
     private fun countRows(tableName: String): Int =
         database.openHelper.readableDatabase.query("SELECT COUNT(*) FROM $tableName").use { cursor ->

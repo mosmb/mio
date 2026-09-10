@@ -102,5 +102,56 @@ public object MioMigrations {
             }
         }
 
-    public val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    public val MIGRATION_3_4: Migration =
+        object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `collection_entry` ADD COLUMN `local_progress_revision` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `local_progress_activity` (
+                        `activity_order` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `operation_group_id` TEXT NOT NULL,
+                        `account_id` TEXT NOT NULL,
+                        `collection_entry_id` TEXT NOT NULL,
+                        `media_id` TEXT NOT NULL,
+                        `direction` TEXT NOT NULL,
+                        `progress_unit` TEXT NOT NULL,
+                        `before_progress` INTEGER NOT NULL,
+                        `after_progress` INTEGER NOT NULL,
+                        `before_status` TEXT NOT NULL,
+                        `after_status` TEXT NOT NULL,
+                        `before_updated_at_utc_ms` INTEGER NOT NULL,
+                        `after_updated_at_utc_ms` INTEGER NOT NULL,
+                        `after_revision` INTEGER NOT NULL,
+                        `created_at_utc_ms` INTEGER NOT NULL,
+                        `undo_until_utc_ms` INTEGER NOT NULL,
+                        `undone_at_utc_ms` INTEGER,
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`collection_entry_id`) REFERENCES `collection_entry`(`collection_entry_id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_local_progress_activity_operation_group_id` " +
+                        "ON `local_progress_activity` (`operation_group_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_progress_activity_account_id_activity_order` " +
+                        "ON `local_progress_activity` (`account_id`, `activity_order`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_progress_activity_collection_entry_id` " +
+                        "ON `local_progress_activity` (`collection_entry_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_progress_activity_media_id` " +
+                        "ON `local_progress_activity` (`media_id`)",
+                )
+            }
+        }
+
+    public val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

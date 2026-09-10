@@ -1,5 +1,7 @@
 package io.morgan.mio.feature.media.impl
 
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,9 +17,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,11 +36,17 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import coil3.ImageLoader
 import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
+import io.morgan.mio.core.designsystem.accessibility.MioHapticType
+import io.morgan.mio.core.designsystem.accessibility.rememberMioHaptics
 import io.morgan.mio.core.designsystem.component.MioErrorState
 import io.morgan.mio.core.designsystem.component.MioIconButton
+import io.morgan.mio.core.designsystem.component.MioSnackbarHost
+import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
 import io.morgan.mio.core.designsystem.icon.MioIcons
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
@@ -63,12 +73,36 @@ internal fun MediaDetailRoute(
             key = mediaId.value,
         ) { create(mediaId) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics by rememberUpdatedState(rememberMioHaptics())
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val timeoutMillis =
+        remember(context) {
+            (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager)
+                ?.getRecommendedTimeoutMillis(
+                    DEFAULT_UNDO_TIMEOUT_MILLIS,
+                    AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS,
+                )?.toLong()
+                ?: DEFAULT_UNDO_TIMEOUT_MILLIS.toLong()
+        }
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            viewModel.onAction(MediaDetailAction.VisibilityChanged(visible = true))
+            try {
+                viewModel.routineHaptics.collect { haptics.perform(MioHapticType.ROUTINE_TICK) }
+            } finally {
+                viewModel.onAction(MediaDetailAction.VisibilityChanged(visible = false))
+            }
+        }
+    }
     MediaDetailScreen(
         modifier = modifier,
         state = state,
         onBack = onBack,
         onRetry = { viewModel.onAction(MediaDetailAction.Retry) },
         onRelatedTitleClick = { relatedId -> onRelatedTitle(MediaId(relatedId)) },
+        onAction = viewModel::onAction,
+        timeoutMillis = timeoutMillis,
     )
 }
 
@@ -79,40 +113,44 @@ internal fun MediaDetailScreen(
     onRetry: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onAction: (MediaDetailAction) -> Unit = {},
+    timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
 ) {
     val loadingDescription = stringResource(R.string.media_detail_loading)
-    when (state) {
-        MediaDetailUiState.Loading ->
-            Box(
-                modifier =
-                    modifier
-                        .fillMaxSize()
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.semantics { contentDescription = loadingDescription },
-                )
-                MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
-            }
-        MediaDetailUiState.Error ->
-            Box(modifier = modifier.fillMaxSize()) {
-                MioErrorState(
-                    title = stringResource(R.string.media_detail_error_title),
-                    message = stringResource(R.string.media_detail_error_message),
-                    retryLabel = stringResource(R.string.media_detail_retry),
-                    onRetry = onRetry,
+    Box(modifier = modifier.fillMaxSize()) {
+        when (state) {
+            is MediaDetailUiState.Loading ->
+                Box(
+                    modifier = Modifier.fillMaxSize().semantics { liveRegion = LiveRegionMode.Polite },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.semantics { contentDescription = loadingDescription },
+                    )
+                    MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+                }
+            is MediaDetailUiState.Error ->
+                Box(modifier = Modifier.fillMaxSize()) {
+                    MioErrorState(
+                        title = stringResource(R.string.media_detail_error_title),
+                        message = stringResource(R.string.media_detail_error_message),
+                        retryLabel = stringResource(R.string.media_detail_retry),
+                        onRetry = onRetry,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+                }
+            is MediaDetailUiState.Content ->
+                MediaDetailContent(
+                    state = state,
+                    onBack = onBack,
+                    onRelatedTitleClick = onRelatedTitleClick,
+                    onAction = onAction,
+                    timeoutMillis = timeoutMillis,
                     modifier = Modifier.fillMaxSize(),
                 )
-                MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
-            }
-        is MediaDetailUiState.Content ->
-            MediaDetailContent(
-                state = state,
-                onBack = onBack,
-                onRelatedTitleClick = onRelatedTitleClick,
-                modifier = modifier,
-            )
+        }
+        MediaDetailSnackbar(state = state, onAction = onAction)
     }
 }
 
@@ -122,12 +160,16 @@ private fun MediaDetailContent(
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onAction: (MediaDetailAction) -> Unit = {},
+    timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
 ) {
     if (MioTheme.accessibility.reducedMotionEnabled) {
         ReducedMotionMediaDetailContent(
             state = state,
             onBack = onBack,
             onRelatedTitleClick = onRelatedTitleClick,
+            onAction = onAction,
+            timeoutMillis = timeoutMillis,
             modifier = modifier,
         )
     } else {
@@ -135,6 +177,8 @@ private fun MediaDetailContent(
             state = state,
             onBack = onBack,
             onRelatedTitleClick = onRelatedTitleClick,
+            onAction = onAction,
+            timeoutMillis = timeoutMillis,
             modifier = modifier,
         )
     }
@@ -145,6 +189,8 @@ private fun SheetRiseMediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
+    onAction: (MediaDetailAction) -> Unit,
+    timeoutMillis: Long,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -182,6 +228,8 @@ private fun SheetRiseMediaDetailContent(
                     MediaDetailSections(
                         state = state,
                         onRelatedTitleClick = onRelatedTitleClick,
+                        onAction = onAction,
+                        timeoutMillis = timeoutMillis,
                         modifier = Modifier.background(MioTheme.colors.surface),
                     )
                 }
@@ -196,6 +244,8 @@ private fun ReducedMotionMediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
+    onAction: (MediaDetailAction) -> Unit,
+    timeoutMillis: Long,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -223,7 +273,12 @@ private fun ReducedMotionMediaDetailContent(
             MediaDetailHeader(media = state.media, rise = rise, onBack = onBack)
         }
         item(key = "media-detail-sections") {
-            MediaDetailSections(state = state, onRelatedTitleClick = onRelatedTitleClick)
+            MediaDetailSections(
+                state = state,
+                onRelatedTitleClick = onRelatedTitleClick,
+                onAction = onAction,
+                timeoutMillis = timeoutMillis,
+            )
         }
     }
 }
@@ -232,6 +287,8 @@ private fun ReducedMotionMediaDetailContent(
 private fun MediaDetailSections(
     state: MediaDetailUiState.Content,
     onRelatedTitleClick: (String) -> Unit,
+    onAction: (MediaDetailAction) -> Unit,
+    timeoutMillis: Long,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -240,6 +297,27 @@ private fun MediaDetailSections(
     ) {
         MediaDetailCollectionContext(
             collection = state.collection,
+            onDecrease = {
+                onAction(
+                    MediaDetailAction.Step(
+                        mediaId = state.media.id,
+                        direction = MediaDetailProgressDirection.DECREASE,
+                        timeoutMillis = timeoutMillis,
+                    ),
+                )
+            },
+            onIncrease = {
+                onAction(
+                    MediaDetailAction.Step(
+                        mediaId = state.media.id,
+                        direction = MediaDetailProgressDirection.INCREASE,
+                        timeoutMillis = timeoutMillis,
+                    ),
+                )
+            },
+            onInteractionChanged = { pressed ->
+                onAction(MediaDetailAction.InteractionChanged(state.media.id, pressed))
+            },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         MediaDetailSynopsis(
@@ -293,6 +371,67 @@ private fun MediaDetailTotals(
     }
 }
 
+@Composable
+private fun MediaDetailSnackbar(
+    state: MediaDetailUiState,
+    onAction: (MediaDetailAction) -> Unit,
+) {
+    val error = state.progressErrorOrNull()
+    val undo = state.latestUndoOrNull()
+    val message =
+        when {
+            error != null ->
+                MioSnackbarMessage(
+                    id = PROGRESS_ERROR_SNACKBAR_ID,
+                    message = stringResource(R.string.media_detail_progress_error),
+                    actionLabel = stringResource(R.string.media_detail_retry_progress).takeIf { error.retryable },
+                )
+            undo != null ->
+                MioSnackbarMessage(
+                    id = undo.groupId,
+                    message =
+                        stringResource(
+                            when (undo.unit) {
+                                MediaDetailProgressUnit.EPISODE -> R.string.media_detail_saved_episode
+                                MediaDetailProgressUnit.CHAPTER -> R.string.media_detail_saved_chapter
+                                MediaDetailProgressUnit.VOLUME -> R.string.media_detail_saved_volume
+                            },
+                            undo.progress,
+                        ),
+                    actionLabel = stringResource(R.string.media_detail_undo),
+                )
+            else -> null
+        }
+    MioSnackbarHost(
+        snackbar = message,
+        bottomNavigationVisible = false,
+        onAction = { id ->
+            if (id == PROGRESS_ERROR_SNACKBAR_ID) {
+                onAction(MediaDetailAction.RetryProgress)
+            } else {
+                onAction(MediaDetailAction.Undo(id))
+            }
+        },
+    )
+}
+
+private fun MediaDetailUiState.progressErrorOrNull(): MediaDetailProgressErrorUiModel? =
+    when (this) {
+        is MediaDetailUiState.Loading -> progressError
+        is MediaDetailUiState.Error -> progressError
+        is MediaDetailUiState.Content -> progressError
+    }
+
+private fun MediaDetailUiState.latestUndoOrNull(): MediaDetailUndoUiModel? =
+    when (this) {
+        is MediaDetailUiState.Loading -> latestUndo
+        is MediaDetailUiState.Error -> latestUndo
+        is MediaDetailUiState.Content -> latestUndo
+    }
+
+private const val DEFAULT_UNDO_TIMEOUT_MILLIS: Int = 6_000
+private const val PROGRESS_ERROR_SNACKBAR_ID: String = "progress-error"
+
 private val PreviewImageLoader: @Composable () -> ImageLoader = {
     val context = LocalContext.current
     remember(context) { ImageLoader.Builder(context).build() }
@@ -319,13 +458,13 @@ private fun MediaDetailAbsentOptionalPreview() {
 @Preview(name = "Media detail loading", widthDp = 393, heightDp = 852)
 @Composable
 private fun MediaDetailLoadingPreview() {
-    MediaDetailPreview(MioPreviewConfiguration.Light, MediaDetailUiState.Loading)
+    MediaDetailPreview(MioPreviewConfiguration.Light, MediaDetailUiState.Loading())
 }
 
 @Preview(name = "Media detail failure", widthDp = 393, heightDp = 852)
 @Composable
 private fun MediaDetailFailurePreview() {
-    MediaDetailPreview(MioPreviewConfiguration.Light, MediaDetailUiState.Error)
+    MediaDetailPreview(MioPreviewConfiguration.Light, MediaDetailUiState.Error())
 }
 
 @Preview(name = "Media detail large text", widthDp = 320, heightDp = 852, fontScale = 2f)
@@ -338,6 +477,151 @@ private fun MediaDetailLargeTextPreview() {
 @Composable
 private fun MediaDetailReducedMotionPreview() {
     MediaDetailPreview(MioPreviewConfiguration.ReducedMotionLight, mediaDetailContentState())
+}
+
+@Preview(name = "Media progress COMPLETED", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressCompletedPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(
+            collection =
+                requireNotNull(
+                    state.collection,
+                ).copy(status = MediaDetailCollectionStatus.COMPLETED, progress = 12, controls = null),
+            latestUndo =
+                MediaDetailUndoUiModel(
+                    "preview-action",
+                    "preview-media",
+                    12,
+                    MediaDetailProgressUnit.EPISODE,
+                    true,
+                ),
+        ),
+    )
+}
+
+@Preview(name = "Media progress PLANNED", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressPlannedPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(
+            collection =
+                requireNotNull(
+                    state.collection,
+                ).copy(status = MediaDetailCollectionStatus.PLANNED, progress = 12, controls = null),
+        ),
+    )
+}
+
+@Preview(name = "Media progress PAUSED", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressPausedPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(
+            collection =
+                requireNotNull(
+                    state.collection,
+                ).copy(status = MediaDetailCollectionStatus.PAUSED, progress = 12, controls = null),
+        ),
+    )
+}
+
+@Preview(name = "Media progress DROPPED", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressDroppedPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(
+            collection =
+                requireNotNull(
+                    state.collection,
+                ).copy(status = MediaDetailCollectionStatus.DROPPED, progress = 12, controls = null),
+        ),
+    )
+}
+
+@Preview(name = "Media progress REPEATING", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressRepeatingPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(
+            collection =
+                requireNotNull(
+                    state.collection,
+                ).copy(status = MediaDetailCollectionStatus.REPEATING, progress = 12, controls = null),
+        ),
+    )
+}
+
+@Preview(name = "Media progress Zero", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressZeroPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(
+            collection =
+                requireNotNull(
+                    state.collection,
+                ).copy(progress = 0, total = null, controls = MediaDetailProgressControlsUiModel(false, true)),
+        ),
+    )
+}
+
+@Preview(name = "Media progress Chapter", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressChapterPreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(collection = requireNotNull(state.collection).copy(progressUnit = MediaDetailProgressUnit.CHAPTER)),
+    )
+}
+
+@Preview(name = "Media progress Volume", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressVolumePreview() {
+    val state = mediaDetailContentState()
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        state.copy(collection = requireNotNull(state.collection).copy(progressUnit = MediaDetailProgressUnit.VOLUME)),
+    )
+}
+
+@Preview(name = "Media progress save error", widthDp = 393, heightDp = 852)
+@Composable
+private fun MediaProgressSaveErrorPreview() {
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        mediaDetailContentState().copy(progressError = MediaDetailProgressErrorUiModel(true)),
+    )
+}
+
+@Preview(name = "Media Undo large text", widthDp = 320, heightDp = 852, fontScale = 2f)
+@Composable
+private fun MediaProgressUndoLargePreview() {
+    MediaDetailPreview(
+        MioPreviewConfiguration.Light,
+        mediaDetailContentState().copy(
+            latestUndo =
+                MediaDetailUndoUiModel(
+                    "preview-action",
+                    "preview-media",
+                    8,
+                    MediaDetailProgressUnit.EPISODE,
+                    false,
+                ),
+        ),
+    )
 }
 
 @Composable
@@ -398,5 +682,12 @@ private fun mediaDetailContentState(withOptionalData: Boolean = true): MediaDeta
             } else {
                 emptyList()
             },
-        collection = null,
+        collection =
+            MediaDetailCollectionUiModel(
+                status = MediaDetailCollectionStatus.CURRENT,
+                progress = 8,
+                progressUnit = MediaDetailProgressUnit.EPISODE,
+                total = 12,
+                controls = MediaDetailProgressControlsUiModel(true, true),
+            ),
     )

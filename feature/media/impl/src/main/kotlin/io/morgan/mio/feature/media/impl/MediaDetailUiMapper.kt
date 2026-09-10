@@ -8,17 +8,26 @@ import io.morgan.mio.domain.media.MediaFormat
 import io.morgan.mio.domain.media.MediaPublicationStatus
 import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.ProgressUnit
+import io.morgan.mio.domain.progress.ProgressAction
+import io.morgan.mio.domain.progress.ProgressDirection
+import io.morgan.mio.domain.progress.ProgressRules
 
 internal object MediaDetailUiMapper {
+    internal fun mapUndo(action: ProgressAction): MediaDetailUndoUiModel = action.toUiModel()
+
     internal fun mapContent(
         media: Media,
         related: List<Media>,
         collection: CollectionEntry?,
+        latestUndo: ProgressAction? = null,
+        progressError: MediaDetailProgressErrorUiModel? = null,
     ): MediaDetailUiState.Content =
         MediaDetailUiState.Content(
             media = media.toUiModel(),
             relatedTitles = related.map { item -> item.toRelatedUiModel() }.toList(),
             collection = collection?.toUiModel(),
+            latestUndo = latestUndo?.toUiModel(),
+            progressError = progressError,
         )
 
     internal fun mapSynopsis(value: String?): String? =
@@ -61,6 +70,28 @@ internal object MediaDetailUiMapper {
             progress = progress.value,
             progressUnit = progressUnit.toUiUnit(),
             total = total?.value,
+            controls = progressControls(),
+        )
+
+    private fun CollectionEntry.progressControls(): MediaDetailProgressControlsUiModel? =
+        if (status != CollectionStatus.CURRENT) {
+            null
+        } else {
+            MediaDetailProgressControlsUiModel(
+                decreaseEnabled =
+                    ProgressRules.decide(this, ProgressDirection.DECREASE) is ProgressRules.Decision.Change,
+                increaseEnabled =
+                    ProgressRules.decide(this, ProgressDirection.INCREASE) is ProgressRules.Decision.Change,
+            )
+        }
+
+    private fun ProgressAction.toUiModel(): MediaDetailUndoUiModel =
+        MediaDetailUndoUiModel(
+            groupId = id.value,
+            mediaId = mediaId.value,
+            progress = afterProgress.value,
+            unit = unit.toUiUnit(),
+            completed = afterStatus == CollectionStatus.COMPLETED,
         )
 
     private fun MediaType.toUiType(): MediaDetailMediaType =

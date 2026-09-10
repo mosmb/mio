@@ -354,6 +354,8 @@ Every feature API may depend only on `:core:navigation`, `:domain:model` for typ
 
 `:domain:queue` MAY depend on `:domain:media`, `:domain:collection`, and `:domain:model` so its pure Today rules and `ObserveTodayQueue` use case can combine Room-backed media, release, and collection repository contracts. It MUST NOT depend on feature, data, provider, Android, or persistence modules. `:feature:today` may inject those domain contracts only through its account-scoped composition; it still MUST NOT query Room or provider code directly.
 
+`:domain:progress` MAY depend only on `:domain:model` and `:domain:collection` among project modules, for shared identities, normalized progress values, and collection state. Its use cases decide progress, completion, and Undo changes using provider-neutral commands. It MUST NOT depend on `:domain:sync`; `:data:progress` maps the decided changes into outbox intent and persists them atomically through the existing pending-operation writer boundary. This dependency decision was reviewed separately from Task 19 feature implementation and explicitly approved on 2026-09-07. The two edges are acyclic because neither dependency may depend on `:domain:progress`; they add no presentation, provider, or persistence access to domain.
+
 ### 5.2 Initial data dependency matrix
 
 | Data module | Domain dependencies | Infrastructure/data dependencies allowed |

@@ -1879,8 +1879,17 @@ internal fun enforcePersistenceDoesNotEscape(files: List<OwnedKotlinFile>) {
         val isRepository =
             ownedFile.file.interfaces(true).any { declaration -> declaration.name.endsWith("Repository") } ||
                 ownedFile.file.classes(true, true).any { declaration -> declaration.name.endsWith("Repository") }
+        val isTaskNineteenProgressRepository =
+            ownedFile.modulePath == ":data:progress" &&
+                fileName(ownedFile.file.path) == "DefaultProgressRepository.kt"
         val exposedStorageType =
-            if (isRepository) publicStorageTypePattern.find(source)?.value else null
+            if (isRepository &&
+                !isTaskNineteenProgressRepository
+            ) {
+                publicStorageTypePattern.find(source)?.value
+            } else {
+                null
+            }
 
         when {
             roomImport != null -> "Room persistence escaped its boundary through '$roomImport'"

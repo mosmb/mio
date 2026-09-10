@@ -1,12 +1,17 @@
 package io.morgan.mio.feature.today.impl
 
 internal sealed interface TodayUiState {
-    data object Loading : TodayUiState
+    data class Loading(
+        val latestUndo: TodayUndoUiModel? = null,
+        val progressError: TodayProgressErrorUiModel? = null,
+    ) : TodayUiState
 
     data class Populated(
         val now: TodayNowUiModel,
         val newRecommendations: List<TodayNewUiModel>,
         val remainingReadyCount: Int,
+        val latestUndo: TodayUndoUiModel? = null,
+        val progressError: TodayProgressErrorUiModel? = null,
     ) : TodayUiState {
         init {
             require(remainingReadyCount >= 0)
@@ -21,6 +26,8 @@ internal sealed interface TodayUiState {
 
     data class CaughtUp(
         val receipt: TodayCaughtUpUiModel,
+        val latestUndo: TodayUndoUiModel? = null,
+        val progressError: TodayProgressErrorUiModel? = null,
     ) : TodayUiState
 }
 
@@ -33,8 +40,11 @@ internal data class TodayNowUiModel(
     val progress: Int,
     val progressUnit: TodayProgressUnit,
     val total: Int?,
-    val nextUnit: Int,
-    val availableUnitCount: Int,
+    val nextUnit: Int?,
+    val availableUnitCount: Int?,
+    val status: TodayCollectionStatus = TodayCollectionStatus.CURRENT,
+    val controls: TodayProgressControlsUiModel? = null,
+    val undo: TodayUndoUiModel? = null,
 )
 
 internal data class TodayNewUiModel(
@@ -45,10 +55,39 @@ internal data class TodayNewUiModel(
     val progress: Int,
     val progressUnit: TodayProgressUnit,
     val total: Int?,
-    val nextUnit: Int,
-    val availableUnitCount: Int,
-    val releaseAge: TodayRelativeTime,
+    val nextUnit: Int?,
+    val availableUnitCount: Int?,
+    val releaseAge: TodayRelativeTime?,
+    val status: TodayCollectionStatus = TodayCollectionStatus.CURRENT,
+    val controls: TodayProgressControlsUiModel? = null,
+    val undo: TodayUndoUiModel? = null,
 )
+
+internal data class TodayProgressControlsUiModel(
+    val decreaseEnabled: Boolean,
+    val increaseEnabled: Boolean,
+)
+
+internal data class TodayUndoUiModel(
+    val groupId: String,
+    val mediaId: String,
+    val progress: Int,
+    val unit: TodayProgressUnit,
+    val completed: Boolean,
+)
+
+internal data class TodayProgressErrorUiModel(
+    val retryable: Boolean,
+)
+
+internal enum class TodayCollectionStatus {
+    CURRENT,
+    PLANNED,
+    PAUSED,
+    COMPLETED,
+    DROPPED,
+    REPEATING,
+}
 
 internal data class TodayCaughtUpUiModel(
     val artwork: List<TodayCaughtUpArtworkUiModel>,

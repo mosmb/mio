@@ -6,6 +6,7 @@ import dev.zacsweers.metro.SingleIn
 import io.morgan.mio.core.common.di.AccountScope
 import io.morgan.mio.data.sync.local.RoomPendingOperationLocalDataSource
 import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.sync.PendingOperationGroup
 
 @ContributesBinding(AccountScope::class)
@@ -19,4 +20,7 @@ public class DefaultPendingOperationWriter(
         require(group.accountId == accountId)
         localDataSource.enqueue(group)
     }
+
+    override suspend fun cancelUndelivered(groupId: OperationGroupId): Boolean =
+        localDataSource.cancelUndelivered(accountId, groupId)
 }
