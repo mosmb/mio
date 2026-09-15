@@ -19,6 +19,7 @@ import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.network.NetworkClientFactory
 import io.morgan.mio.core.network.NetworkMonitor
 import io.morgan.mio.data.provider.api.ProviderCredentialStore
+import io.morgan.mio.data.sync.PendingSyncWorkDispatcher
 import io.morgan.mio.domain.account.AccountSessionRepository
 import io.morgan.mio.domain.preferences.PreferencesRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -42,6 +43,7 @@ internal interface AppGraph :
     val imageLoader: ImageLoader
     val workerFactory: WorkerFactory
     val workManagerConfiguration: Configuration
+    val pendingSyncWorkDispatcher: PendingSyncWorkDispatcher
 
     @get:ProcessCoroutineScope
     val processCoroutineScope: CoroutineScope

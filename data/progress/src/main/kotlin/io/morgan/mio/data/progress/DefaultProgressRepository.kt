@@ -5,6 +5,7 @@ import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
 import io.morgan.mio.core.database.model.StoredCollectionStatus
 import io.morgan.mio.core.database.model.StoredProgressUnit
 import io.morgan.mio.data.progress.local.RoomProgressLocalDataSource
+import io.morgan.mio.data.progress.mapper.toCompensatingOperationGroup
 import io.morgan.mio.data.progress.mapper.toPendingOperationGroup
 import io.morgan.mio.data.progress.mapper.toProgressAction
 import io.morgan.mio.data.progress.mapper.toProgressSnapshot
@@ -146,7 +147,8 @@ public class DefaultProgressRepository(
                     ?: return@inTransaction unavailable()
             val cancellationTime = clock.now()
             if (cancellationTime >= stored.undoUntilUtcMs) return@inTransaction unavailable()
-            if (!pendingOperationWriter.cancelUndelivered(change.action.id)) return@inTransaction unavailable()
+            val compensation = change.toCompensatingOperationGroup(cancellationTime)
+            if (!pendingOperationWriter.undo(change.action.id, compensation)) return@inTransaction unavailable()
 
             val restored =
                 localDataSource.updateEffectiveState(

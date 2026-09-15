@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":data:provider:api"))
 
+    testImplementation(project(":core:testing"))
     testImplementation(libs.room.runtime)
     testImplementation(libs.room.testing)
     testImplementation(libs.androidx.test.core)

@@ -17,6 +17,8 @@ class ProviderFailureTest {
         assertEquals(ProviderRecovery.DO_NOT_RETRY, ProviderFailure.InvalidAuthorizationCallback.recovery)
         assertEquals(ProviderRecovery.DO_NOT_RETRY, ProviderFailure.MalformedResponse.recovery)
         assertEquals(ProviderRecovery.DO_NOT_RETRY, ProviderFailure.UnsupportedMandatoryData.recovery)
+        assertEquals(ProviderRecovery.DO_NOT_RETRY, ProviderFailure.MutationRejected.recovery)
+        assertEquals(ProviderRecovery.DO_NOT_RETRY, ProviderFailure.MutationConflict.recovery)
         assertEquals(ProviderRecovery.DO_NOT_RETRY, ProviderFailure.Unexpected.recovery)
     }
 

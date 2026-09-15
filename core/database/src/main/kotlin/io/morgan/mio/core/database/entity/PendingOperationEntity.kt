@@ -173,6 +173,15 @@ public data class PendingOperationEntity(
                 require(attemptCount > 0)
                 require(lastAttemptAtUtcMs != null)
             }
+
+            StoredPendingOperationState.CANCELLED -> {
+                require(retryNotBeforeUtcMs == null)
+                if (attemptCount == 0) {
+                    require(lastAttemptAtUtcMs == null)
+                } else {
+                    require(lastAttemptAtUtcMs != null)
+                }
+            }
         }
     }
 }

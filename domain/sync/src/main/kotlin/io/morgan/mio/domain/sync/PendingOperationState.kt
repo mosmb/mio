@@ -7,4 +7,5 @@ public enum class PendingOperationState {
     DELIVERED,
     BLOCKED,
     TERMINAL_FAILURE,
+    CANCELLED,
 }

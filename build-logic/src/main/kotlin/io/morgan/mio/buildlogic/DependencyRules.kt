@@ -29,6 +29,7 @@ public object DependencyRules {
                     ":core:logging",
                     ":core:ui",
                     ":data:provider:api",
+                    ":domain:sync",
                     ":domain:model",
                     ":domain:account",
                     ":domain:media",

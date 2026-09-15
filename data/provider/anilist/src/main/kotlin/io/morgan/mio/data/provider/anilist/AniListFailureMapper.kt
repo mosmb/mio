@@ -19,6 +19,20 @@ internal object AniListFailureMapper {
             else -> ProviderFailure.MalformedResponse
         }
 
+    internal fun mapSyncHttpStatus(
+        code: Int,
+        retryAfterHeader: String?,
+    ): ProviderFailure =
+        when {
+            code == 401 -> ProviderFailure.AuthenticationRequired
+            code == 408 -> ProviderFailure.Timeout
+            code == 409 -> ProviderFailure.MutationConflict
+            code == 429 -> ProviderFailure.RateLimited(retryAfter(retryAfterHeader))
+            code in 500..599 -> ProviderFailure.ServiceUnavailable
+            code == 400 || code == 403 || code == 404 || code == 422 -> ProviderFailure.MutationRejected
+            else -> ProviderFailure.MalformedResponse
+        }
+
     internal fun mapThrowable(throwable: Throwable): ProviderFailure =
         when (throwable) {
             is SocketTimeoutException -> ProviderFailure.Timeout

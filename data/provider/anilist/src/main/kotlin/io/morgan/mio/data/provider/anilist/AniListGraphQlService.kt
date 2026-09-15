@@ -23,4 +23,16 @@ internal interface AniListGraphQlService {
         @Header("Authorization") authorization: String,
         @Body request: AniListMediaDetailsRequestDto,
     ): Response<AniListMediaDetailsResponseDto>
+
+    @POST(".")
+    suspend fun syncEntry(
+        @Header("Authorization") authorization: String,
+        @Body request: AniListSyncEntryRequestDto,
+    ): Response<AniListSyncEntryResponseDto>
+
+    @POST(".")
+    suspend fun syncMutation(
+        @Header("Authorization") authorization: String,
+        @Body request: AniListSyncMutationRequestDto,
+    ): Response<AniListSyncMutationResponseDto>
 }

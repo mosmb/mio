@@ -75,6 +75,15 @@ class MioTypeConvertersTest {
     }
 
     @Test
+    fun cancelledPendingOperationsRoundTripThroughTheNewLifecycleValue() {
+        assertEquals("cancelled", StoredPendingOperationState.CANCELLED.serializedValue)
+        assertEquals(
+            StoredPendingOperationState.CANCELLED,
+            converters.stringToStoredPendingOperationState("cancelled"),
+        )
+    }
+
+    @Test
     fun unknownEnumValuesAreRejected() {
         assertThrows(IllegalArgumentException::class.java) {
             StoredConnectedProvider.fromSerializedValue("unknown")

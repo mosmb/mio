@@ -141,6 +141,22 @@ class PendingOperationTest {
             lastAttemptAt = INSTANT,
             retryNotBefore = INSTANT,
         )
+        progressOperation(
+            id = "valid-cancelled-before-attempt",
+            base = 1,
+            target = 2,
+            kind = PendingOperationKind.SET_PROGRESS_FORWARD,
+            state = PendingOperationState.CANCELLED,
+        )
+        progressOperation(
+            id = "valid-cancelled-after-attempt",
+            base = 1,
+            target = 2,
+            kind = PendingOperationKind.SET_PROGRESS_FORWARD,
+            state = PendingOperationState.CANCELLED,
+            attemptCount = 1,
+            lastAttemptAt = INSTANT,
+        )
     }
 
     @Test

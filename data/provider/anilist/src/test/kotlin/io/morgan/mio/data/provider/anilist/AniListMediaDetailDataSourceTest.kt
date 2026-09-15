@@ -103,6 +103,16 @@ class AniListMediaDetailDataSourceTest {
                             authorization: String,
                             request: AniListMediaDetailsRequestDto,
                         ): Response<AniListMediaDetailsResponseDto> = throw cancellation
+
+                        override suspend fun syncEntry(
+                            authorization: String,
+                            request: AniListSyncEntryRequestDto,
+                        ): Response<AniListSyncEntryResponseDto> = error("unused")
+
+                        override suspend fun syncMutation(
+                            authorization: String,
+                            request: AniListSyncMutationRequestDto,
+                        ): Response<AniListSyncMutationResponseDto> = error("unused")
                     },
                 )
             val thrown =

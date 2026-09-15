@@ -139,6 +139,11 @@ class ProductionArchitectureKonsistTest {
     }
 
     @Test
+    fun synchronizationBoundaries() {
+        enforceSynchronizationBoundaries(productionFiles())
+    }
+
+    @Test
     fun metroBoundaries() {
         enforceMetroBoundaries(productionFiles())
     }
@@ -799,9 +804,9 @@ class ProductionArchitectureKonsistTest {
         assertTrue(
             files.any { ownedFile ->
                 ownedFile.modulePath == ":core:database" &&
-                    ownedFile.file.text.contains("version = 4")
+                    ownedFile.file.text.contains("version = 5")
             },
-            "production scan omitted the schema-3 database version",
+            "production scan omitted the current database version",
         )
         assertTrue(
             files.any { ownedFile ->
@@ -915,7 +920,7 @@ class ProductionArchitectureKonsistTest {
                         .replace('\\', '/')
                         .endsWith("/DefaultProgressRepository.kt") &&
                     ownedFile.file.text.contains("database.inTransaction") &&
-                    ownedFile.file.text.contains("cancelUndelivered")
+                    ownedFile.file.text.contains("pendingOperationWriter.undo")
             },
             "production scan omitted the Task 19 atomic repository boundary",
         )
@@ -929,9 +934,9 @@ class ProductionArchitectureKonsistTest {
         )
         assertTrue(
             files.any { ownedFile ->
-                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 4")
+                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 5")
             },
-            "production scan omitted the Task 19 database version",
+            "production scan omitted the Task 20 database version",
         )
         assertTrue(
             files.any { ownedFile ->

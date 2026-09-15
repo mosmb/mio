@@ -35,4 +35,17 @@ internal object AniListQueries {
             "title { userPreferred romaji english native } " +
             "coverImage { extraLarge large medium } " +
             "} } } }"
+
+    internal const val SYNC_ENTRY: String =
+        "query MioSyncEntry(\$id: Int!) { MediaList(id: \$id) { " +
+            "id userId mediaId status progress progressVolumes updatedAt " +
+            "media { id episodes chapters volumes } } }"
+
+    internal const val SYNC_MUTATION: String =
+        "mutation MioSaveMediaListEntry(\$id: Int!, \$progress: Int, " +
+            "\$progressVolumes: Int, \$status: MediaListStatus) { " +
+            "SaveMediaListEntry(id: \$id, progress: \$progress, " +
+            "progressVolumes: \$progressVolumes, status: \$status) { " +
+            "id userId mediaId status progress progressVolumes updatedAt " +
+            "media { id episodes chapters volumes } } }"
 }

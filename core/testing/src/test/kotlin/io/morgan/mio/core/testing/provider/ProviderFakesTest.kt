@@ -1,11 +1,14 @@
 package io.morgan.mio.core.testing.provider
 
+import io.morgan.mio.data.provider.api.ProviderAccountId
 import io.morgan.mio.data.provider.api.ProviderAuthorizationRedirect
 import io.morgan.mio.data.provider.api.ProviderAuthorizationRequest
 import io.morgan.mio.data.provider.api.ProviderAuthorizationTransaction
+import io.morgan.mio.data.provider.api.ProviderCollectionEntryId
 import io.morgan.mio.data.provider.api.ProviderFailure
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.data.provider.api.ProviderMediaId
+import io.morgan.mio.data.provider.api.ProviderProgressUnit
 import io.morgan.mio.data.provider.api.ProviderResult
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -164,5 +167,44 @@ class ProviderFakesTest {
             assertThrows<IllegalStateException> {
                 initialImport.fetchCompleteImport(anilistCredentials, accountId)
             }
+        }
+
+    @Test
+    fun syncFakeRecordsFixedUnitAndAbsoluteMutationInputs() =
+        runTest {
+            val fake = FakeProviderSyncDataSource(ProviderKey.ANILIST)
+            val credentials = providerCredentialsFixture()
+            val account = ProviderAccountId("42")
+            val entry = ProviderCollectionEntryId("7")
+            val media = ProviderMediaId("101")
+            val normalized =
+                providerCollectionEntryFixture(
+                    id = entry.value,
+                    accountId = account,
+                    mediaId = media.value,
+                    progressUnit = ProviderProgressUnit.VOLUME,
+                )
+            fake.enqueueRead { _, _, _, _, _ -> ProviderResult.Success(normalized) }
+            fake.enqueueProgress { _, _, _, _, _, _ -> ProviderResult.Success(normalized) }
+            fake.enqueueStatus { _, _, _, _, _, _ -> ProviderResult.Success(normalized) }
+
+            fake.readEntry(credentials, account, entry, media, ProviderProgressUnit.VOLUME)
+            fake.setProgress(credentials, account, entry, media, ProviderProgressUnit.VOLUME, 2)
+            fake.setStatus(
+                credentials,
+                account,
+                entry,
+                media,
+                ProviderProgressUnit.VOLUME,
+                io.morgan.mio.data.provider.api.ProviderCollectionStatus.COMPLETED,
+            )
+
+            assertEquals(3, fake.calls.size)
+            assertEquals(ProviderProgressUnit.VOLUME, fake.calls[0].unit)
+            assertEquals(2, (fake.calls[1] as SyncCall.Progress).target)
+            assertEquals(
+                io.morgan.mio.data.provider.api.ProviderCollectionStatus.COMPLETED,
+                (fake.calls[2] as SyncCall.Status).target,
+            )
         }
 }

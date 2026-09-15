@@ -81,6 +81,7 @@ private fun PendingOperationState.toStoredPendingOperationState(): StoredPending
         PendingOperationState.DELIVERED -> StoredPendingOperationState.DELIVERED
         PendingOperationState.BLOCKED -> StoredPendingOperationState.BLOCKED
         PendingOperationState.TERMINAL_FAILURE -> StoredPendingOperationState.TERMINAL_FAILURE
+        PendingOperationState.CANCELLED -> StoredPendingOperationState.CANCELLED
     }
 
 private fun CollectionStatus.toStoredCollectionStatus(): StoredCollectionStatus =

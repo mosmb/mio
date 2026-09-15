@@ -27,7 +27,7 @@ public sealed interface ProviderFailure {
         public val retryAfter: Duration?,
     ) : ProviderFailure {
         init {
-            require(retryAfter == null || !retryAfter.isNegative())
+            require(retryAfter == null || retryAfter.isFinite() && !retryAfter.isNegative())
         }
 
         override val recovery: ProviderRecovery = ProviderRecovery.RETRY
@@ -54,6 +54,14 @@ public sealed interface ProviderFailure {
     }
 
     public data object UnsupportedMandatoryData : ProviderFailure {
+        override val recovery: ProviderRecovery = ProviderRecovery.DO_NOT_RETRY
+    }
+
+    public data object MutationRejected : ProviderFailure {
+        override val recovery: ProviderRecovery = ProviderRecovery.DO_NOT_RETRY
+    }
+
+    public data object MutationConflict : ProviderFailure {
         override val recovery: ProviderRecovery = ProviderRecovery.DO_NOT_RETRY
     }
 

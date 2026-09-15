@@ -78,6 +78,26 @@ class MioDatabaseTest {
         }
 
     @Test
+    fun versionFiveExposesSynchronizationTablesAndDao() =
+        runTest {
+            assertEquals(5, MioDatabase.VERSION)
+            assertNotNull(database.syncDao())
+            assertEquals(
+                setOf("sync_lease", "sync_schedule", "sync_issue"),
+                database
+                    .openHelper
+                    .readableDatabase
+                    .query(
+                        "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'sync_%'",
+                    ).use { cursor ->
+                        buildSet {
+                            while (cursor.moveToNext()) add(cursor.getString(0))
+                        }
+                    },
+            )
+        }
+
+    @Test
     fun deletingSelectedAccountCascadesAccountAndCollectionRows() =
         runTest {
             database.selectedAccountDao().replaceSelectedAccount(account("account-1"), accountMapping("account-1"))

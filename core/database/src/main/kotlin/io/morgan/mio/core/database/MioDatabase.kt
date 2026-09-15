@@ -11,6 +11,7 @@ import io.morgan.mio.core.database.dao.ProgressDao
 import io.morgan.mio.core.database.dao.ProviderIdDao
 import io.morgan.mio.core.database.dao.ReleaseDao
 import io.morgan.mio.core.database.dao.SelectedAccountDao
+import io.morgan.mio.core.database.dao.SyncDao
 import io.morgan.mio.core.database.entity.AccountProviderIdEntity
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
 import io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity
@@ -24,6 +25,9 @@ import io.morgan.mio.core.database.entity.PendingOperationGroupEntity
 import io.morgan.mio.core.database.entity.RelatedMediaEntity
 import io.morgan.mio.core.database.entity.ReleaseEntity
 import io.morgan.mio.core.database.entity.SelectedAccountEntity
+import io.morgan.mio.core.database.entity.SyncIssueEntity
+import io.morgan.mio.core.database.entity.SyncLeaseEntity
+import io.morgan.mio.core.database.entity.SyncScheduleEntity
 import io.morgan.mio.core.database.model.MioTypeConverters
 
 @Database(
@@ -41,8 +45,11 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         PendingOperationEntity::class,
         PendingOperationDependencyEntity::class,
         LocalProgressActivityEntity::class,
+        SyncLeaseEntity::class,
+        SyncScheduleEntity::class,
+        SyncIssueEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -61,9 +68,11 @@ public abstract class MioDatabase : RoomDatabase() {
 
     public abstract fun progressDao(): ProgressDao
 
+    public abstract fun syncDao(): SyncDao
+
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 4
+        public const val VERSION: Int = 5
     }
 }

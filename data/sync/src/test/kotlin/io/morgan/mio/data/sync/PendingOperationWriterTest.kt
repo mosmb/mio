@@ -522,6 +522,213 @@ class PendingOperationWriterTest {
                 }
         }
 
+    @Test
+    fun attemptedUndoCancelsDeferredMembersAndAppendsOneValidatedCompensation() =
+        runTest {
+            val groupId = OperationGroupId("group-attempted-undo")
+            val progressId = OperationId("operation-attempted-progress")
+            val statusId = OperationId("operation-attempted-status")
+            writer.enqueue(
+                group(
+                    id = groupId.value,
+                    operations =
+                        listOf(
+                            operation(
+                                id = progressId.value,
+                                groupId = groupId,
+                                position = 0,
+                                targetProgress = 2,
+                            ),
+                            statusOperation(
+                                id = statusId.value,
+                                groupId = groupId,
+                                position = 1,
+                                dependsOn = setOf(progressId),
+                            ),
+                        ),
+                ),
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET lifecycle_state = 'delivered', attempt_count = 1, " +
+                    "last_attempt_at_utc_ms = ? WHERE operation_id = ?",
+                arrayOf<Any?>(INSTANT.toEpochMilliseconds(), progressId.value),
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET lifecycle_state = 'retryable_failure', attempt_count = 1, " +
+                    "last_attempt_at_utc_ms = ?, retry_not_before_utc_ms = ? WHERE operation_id = ?",
+                arrayOf<Any?>(INSTANT.toEpochMilliseconds(), INSTANT.toEpochMilliseconds(), statusId.value),
+            )
+
+            val compensationId = OperationGroupId("${groupId.value}:undo")
+            val inverseProgressId = OperationId("${groupId.value}:undo:progress")
+            val inverseStatusId = OperationId("${groupId.value}:undo:status")
+            val compensation =
+                PendingOperationGroup(
+                    id = compensationId,
+                    accountId = ACCOUNT_ID,
+                    createdAt = INSTANT,
+                    compensatesGroupId = groupId,
+                    operations =
+                        listOf(
+                            operation(
+                                id = inverseProgressId.value,
+                                groupId = compensationId,
+                                position = 0,
+                                baseProgress = 2,
+                                targetProgress = 1,
+                                kind = PendingOperationKind.SET_PROGRESS_CORRECTION,
+                            ),
+                            statusOperation(
+                                id = inverseStatusId.value,
+                                groupId = compensationId,
+                                position = 1,
+                                dependsOn = setOf(inverseProgressId),
+                                base = CollectionStatus.COMPLETED,
+                                target = CollectionStatus.CURRENT,
+                            ),
+                        ),
+                )
+
+            assertTrue(writer.undo(groupId, compensation))
+            assertEquals(
+                StoredPendingOperationState.DELIVERED,
+                database.pendingOperationDao().getOperation(progressId.value)?.lifecycleState,
+            )
+            assertEquals(
+                StoredPendingOperationState.CANCELLED,
+                database.pendingOperationDao().getOperation(statusId.value)?.lifecycleState,
+            )
+            assertEquals(
+                listOf(inverseProgressId.value, inverseStatusId.value),
+                database.pendingOperationDao().getOperationsForGroup(compensationId.value).map { it.operationId },
+            )
+            assertEquals(
+                1,
+                database.pendingOperationDao().getDependenciesForOperation(inverseStatusId.value).size,
+            )
+            assertEquals(2L, database.syncDao().getSchedule(ACCOUNT_ID.value)?.requestedGeneration)
+            assertFalse(writer.undo(groupId, compensation))
+        }
+
+    @Test
+    fun inFlightUndoAddsDeliveryDependenciesInsideTheWriter() =
+        runTest {
+            val groupId = OperationGroupId("group-attempted-undo")
+            val progressId = OperationId("operation-attempted-progress")
+            val statusId = OperationId("operation-attempted-status")
+            writer.enqueue(
+                group(
+                    id = groupId.value,
+                    operations =
+                        listOf(
+                            operation(
+                                id = progressId.value,
+                                groupId = groupId,
+                                position = 0,
+                                targetProgress = 2,
+                            ),
+                            statusOperation(
+                                id = statusId.value,
+                                groupId = groupId,
+                                position = 1,
+                                dependsOn = setOf(progressId),
+                            ),
+                        ),
+                ),
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET lifecycle_state = 'delivered', attempt_count = 1, " +
+                    "last_attempt_at_utc_ms = ? WHERE operation_id = ?",
+                arrayOf<Any?>(INSTANT.toEpochMilliseconds(), progressId.value),
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET lifecycle_state = 'in_flight', attempt_count = 1, " +
+                    "last_attempt_at_utc_ms = ?, retry_not_before_utc_ms = ? WHERE operation_id = ?",
+                arrayOf<Any?>(INSTANT.toEpochMilliseconds(), INSTANT.toEpochMilliseconds(), statusId.value),
+            )
+
+            val compensationId = OperationGroupId("${groupId.value}:undo")
+            val inverseProgressId = OperationId("${groupId.value}:undo:progress")
+            val inverseStatusId = OperationId("${groupId.value}:undo:status")
+            val compensation =
+                PendingOperationGroup(
+                    id = compensationId,
+                    accountId = ACCOUNT_ID,
+                    createdAt = INSTANT,
+                    compensatesGroupId = groupId,
+                    operations =
+                        listOf(
+                            operation(
+                                id = inverseProgressId.value,
+                                groupId = compensationId,
+                                position = 0,
+                                baseProgress = 2,
+                                targetProgress = 1,
+                                kind = PendingOperationKind.SET_PROGRESS_CORRECTION,
+                            ),
+                            statusOperation(
+                                id = inverseStatusId.value,
+                                groupId = compensationId,
+                                position = 1,
+                                dependsOn = setOf(inverseProgressId),
+                                base = CollectionStatus.COMPLETED,
+                                target = CollectionStatus.CURRENT,
+                            ),
+                        ),
+                )
+
+            assertTrue(writer.undo(groupId, compensation))
+            assertEquals(
+                StoredPendingOperationState.DELIVERED,
+                database.pendingOperationDao().getOperation(progressId.value)?.lifecycleState,
+            )
+            assertEquals(
+                StoredPendingOperationState.IN_FLIGHT,
+                database.pendingOperationDao().getOperation(statusId.value)?.lifecycleState,
+            )
+            assertEquals(
+                listOf(inverseProgressId.value, inverseStatusId.value),
+                database.pendingOperationDao().getOperationsForGroup(compensationId.value).map { it.operationId },
+            )
+            assertEquals(
+                2,
+                database.pendingOperationDao().getDependenciesForOperation(inverseStatusId.value).size,
+            )
+            assertEquals(2L, database.syncDao().getSchedule(ACCOUNT_ID.value)?.requestedGeneration)
+            assertFalse(writer.undo(groupId, compensation))
+        }
+
+    @Test
+    fun invalidCompensationDoesNotCancelAnUnattemptedGroup() =
+        runTest {
+            val groupId = OperationGroupId("group-unattempted-undo")
+            writer.enqueue(group(groupId.value))
+
+            val invalidCompensationId = OperationGroupId("${groupId.value}:undo")
+            val invalidCompensation =
+                PendingOperationGroup(
+                    id = invalidCompensationId,
+                    accountId = ACCOUNT_ID,
+                    createdAt = INSTANT,
+                    compensatesGroupId = groupId,
+                    operations =
+                        listOf(
+                            operation(
+                                id = "${groupId.value}:undo:progress",
+                                groupId = invalidCompensationId,
+                                position = 0,
+                                baseProgress = 2,
+                                targetProgress = 0,
+                                kind = PendingOperationKind.SET_PROGRESS_CORRECTION,
+                            ),
+                        ),
+                )
+
+            assertFalse(writer.undo(groupId, invalidCompensation))
+            assertNotNull(database.pendingOperationDao().getGroup(groupId.value))
+            assertNull(database.pendingOperationDao().getGroup(invalidCompensationId.value))
+        }
+
     private suspend fun insertOtherAccountAndEntry() {
         database.openHelper.writableDatabase.execSQL(
             "INSERT OR IGNORE INTO selected_account " +
@@ -594,12 +801,18 @@ class PendingOperationWriterTest {
         groupId: OperationGroupId,
         position: Int,
         dependsOn: Set<OperationId>,
+        base: CollectionStatus = CollectionStatus.CURRENT,
+        target: CollectionStatus = CollectionStatus.COMPLETED,
     ): PendingOperation =
-        operation(
-            id = id,
+        PendingOperation(
+            id = OperationId(id),
             groupId = groupId,
-            position = position,
+            accountId = ACCOUNT_ID,
+            collectionEntryId = ENTRY_ID,
             kind = PendingOperationKind.SET_STATUS,
+            base = OperationValue.Status(base),
+            target = OperationValue.Status(target),
+            positionInGroup = position,
             dependsOn = dependsOn,
         )
 

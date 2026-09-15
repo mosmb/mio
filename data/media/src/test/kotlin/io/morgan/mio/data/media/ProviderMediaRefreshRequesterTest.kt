@@ -7,6 +7,7 @@ import io.morgan.mio.core.database.MioDatabaseFactory
 import io.morgan.mio.core.database.model.StoredConnectedProvider
 import io.morgan.mio.core.testing.provider.FakeProviderCredentialStore
 import io.morgan.mio.core.testing.provider.FakeProviderMediaDetailDataSource
+import io.morgan.mio.core.testing.provider.FakeProviderSyncDataSource
 import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.core.testing.provider.providerCredentialsFixture
 import io.morgan.mio.core.testing.provider.providerMediaDetailsFixture
@@ -276,6 +277,7 @@ class ProviderMediaRefreshRequesterTest {
         identityDataSource = identityDataSource,
         initialImportDataSource = initialImportDataSource,
         mediaDetailDataSource = source,
+        syncDataSource = FakeProviderSyncDataSource(provider),
     )
 
     private suspend fun <T> kotlinx.coroutines.flow.Flow<T>.firstValue(): T = first()

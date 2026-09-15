@@ -29,7 +29,8 @@ public abstract class PendingOperationDao {
         "SELECT COUNT(*) FROM pending_operation_dependency AS dependency " +
             "INNER JOIN pending_operation AS dependent " +
             "ON dependent.operation_id = dependency.operation_id " +
-            "WHERE dependency.depends_on_operation_id IN " +
+            "WHERE dependent.lifecycle_state NOT IN ('delivered', 'cancelled', 'terminal_failure') " +
+            "AND dependency.depends_on_operation_id IN " +
             "(SELECT operation_id FROM pending_operation WHERE operation_group_id = :groupId) " +
             "AND dependent.operation_group_id != :groupId",
     )

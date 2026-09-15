@@ -53,6 +53,8 @@ class ArchitectureRuleFixturesTest {
                         "ValidProviderContractFake.kt" to ":core:testing",
                         "ValidCapabilityProviderConsumer.kt" to ":data:account",
                         "ValidPendingOperationWriterConsumer.kt" to ":data:progress",
+                        "ValidThinSyncWorker.kt" to ":sync:work",
+                        "ValidInvertedScheduler.kt" to ":domain:sync",
                         "ValidRouteScreen.kt" to ":feature:today:impl",
                         "ValidRouteUiEffect.kt" to ":feature:today:impl",
                         "ValidRouteUiMapper.kt" to ":feature:today:impl",
@@ -89,6 +91,7 @@ class ArchitectureRuleFixturesTest {
         enforcePersistenceDoesNotEscape(files)
         enforceOneMechanismPerDataSource(files)
         enforcePendingOperationBoundaries(files)
+        enforceSynchronizationBoundaries(files)
         enforceMetroBoundaries(files)
         enforceSharedUiOwnership(files)
         enforceRouteScreenConvention(files)
@@ -1132,6 +1135,66 @@ class ArchitectureRuleFixturesTest {
     }
 
     @Test
+    fun workerRoomImportIsRejected() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "WorkerReadsRoom.kt",
+            ":sync:work",
+            ::enforceSynchronizationBoundaries,
+        )
+    }
+
+    @Test
+    fun workerInlinePolicyIsRejected() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "WorkerOwnsReconciliation.kt",
+            ":sync:work",
+            ::enforceSynchronizationBoundaries,
+        )
+    }
+
+    @Test
+    fun dataWorkImportIsRejected() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "SyncImportsWorkScheduler.kt",
+            ":data:sync",
+            ::enforceSynchronizationBoundaries,
+        )
+    }
+
+    @Test
+    fun workProviderImportIsRejected() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "WorkImportsProvider.kt",
+            ":sync:work",
+            ::enforceSynchronizationBoundaries,
+        )
+    }
+
+    @Test
+    fun syncMutationRepositoryImportIsRejected() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "SyncImportsMutationRepository.kt",
+            ":data:sync",
+            ::enforceSynchronizationBoundaries,
+        )
+    }
+
+    @Test
+    fun domainSchedulerAndroidImportIsRejected() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "DomainSchedulerUsesAndroid.kt",
+            ":domain:sync",
+            ::enforceSynchronizationBoundaries,
+        )
+    }
+
+    @Test
     fun validPendingOperationWriterConsumerPassesTheNarrowBoundary() {
         val files =
             loadFixtureDirectory(
@@ -1269,6 +1332,7 @@ class ArchitectureRuleFixturesTest {
             rule == ::enforcePersistenceDoesNotEscape -> "Persistence escape"
             rule == ::enforceOneMechanismPerDataSource -> "One mechanism per data source"
             rule == ::enforcePendingOperationBoundaries -> "Pending operation boundaries"
+            rule == ::enforceSynchronizationBoundaries -> "Synchronization boundaries"
             rule == ::enforceMetroBoundaries -> "Metro boundaries"
             else -> fail("unknown architecture rule")
         }

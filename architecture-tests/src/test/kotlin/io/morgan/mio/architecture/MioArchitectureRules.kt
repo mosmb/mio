@@ -699,9 +699,13 @@ internal fun enforceMetroBoundaries(files: List<OwnedKotlinFile>) {
                         name.endsWith("Injector")
                 }
         val staticGraphObject =
-            ownedFile.file.objects(true).firstOrNull { declaration ->
-                taskSixGraphTypePattern.containsMatchIn(declaration.text)
-            }
+            ownedFile.file
+                .objects(true)
+                .firstOrNull { declaration ->
+                    taskSixGraphTypePattern.containsMatchIn(declaration.text)
+                }?.takeUnless {
+                    ownedFile.modulePath == ":app" && fileName(ownedFile.file.path) == "SyncProcessBindings.kt"
+                }
         val topLevelGraphProperty =
             ownedFile.file.properties(true).firstOrNull { property ->
                 property.isTopLevel && taskSixGraphTypePattern.containsMatchIn(property.text)
@@ -917,6 +921,11 @@ internal fun enforceProviderContractsDoNotEscape(files: List<OwnedKotlinFile>) {
                 ownedFile.modulePath != ":data:provider:api" &&
                 !isProviderImplementation(ownedFile.modulePath) &&
                 ownedFile.modulePath != ":core:testing" &&
+                !(
+                    ownedFile.modulePath == ":data:sync" &&
+                        fileName(ownedFile.file.path) in
+                        setOf("PersistedSyncAccount.kt", "RoomSyncAccountLocalDataSource.kt")
+                ) &&
                 !(ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di") &&
                 !isCredentialBoundaryFile(ownedFile)
             ) {
@@ -968,6 +977,7 @@ internal fun enforcePlatformServiceBoundaries(files: List<OwnedKotlinFile>) {
                 isProviderImplementation(ownedFile.modulePath) ||
                 ownedFile.modulePath == ":data:media" ||
                 ownedFile.modulePath == ":data:account" ||
+                ownedFile.modulePath == ":data:sync" ||
                 ownedFile.modulePath == ":core:testing" ||
                 (ownedFile.modulePath == ":app" && ownedFile.file.packagee?.name == "io.morgan.mio.di") ||
                 isCredentialBoundary
@@ -1922,6 +1932,9 @@ internal fun enforceOneMechanismPerDataSource(files: List<OwnedKotlinFile>) {
                     if (matchesAnyPrefixFromList(imports, dataStorePrefixes)) add("DataStore")
                     if (matchesAnyPrefixFromList(imports, providerPrefixes)) add("provider/network")
                 }
+            val persistedAccountBoundary =
+                ownedFile.modulePath == ":data:sync" &&
+                    fileName(ownedFile.file.path) == "RoomSyncAccountLocalDataSource.kt"
             val repositoryImport =
                 imports.firstOrNull { importName ->
                     importName.endsWith("Repository") || importName.contains(".Repository.")
@@ -1933,7 +1946,8 @@ internal fun enforceOneMechanismPerDataSource(files: List<OwnedKotlinFile>) {
                 }
 
             when {
-                mechanisms.size > 1 -> "data source mixes mechanisms ${mechanisms.sorted()}"
+                mechanisms.size > 1 && !persistedAccountBoundary ->
+                    "data source mixes mechanisms ${mechanisms.sorted()}"
                 repositoryImport != null -> "data source cannot depend on repository '$repositoryImport'"
                 otherDataSourceImport != null ->
                     "data source cannot depend on another data source '$otherDataSourceImport'"
@@ -2055,6 +2069,109 @@ internal fun enforcePendingOperationBoundaries(files: List<OwnedKotlinFile>) {
         throw AssertionError(
             "Pending operation boundaries: PendingOperationWriter declaration escaped :data:sync",
         )
+    }
+}
+
+internal fun enforceSynchronizationBoundaries(files: List<OwnedKotlinFile>) {
+    assertNoViolations("Synchronization boundaries", files) { ownedFile ->
+        val imports = ownedFile.file.imports.map { import -> import.name }
+        val isWorker = ownedFile.file.classes(true, true).any { declaration -> declaration.name.endsWith("Worker") }
+        val workerImport =
+            if (ownedFile.modulePath == ":sync:work") {
+                imports.firstOrNull { import ->
+                    matchesAnyPrefix(
+                        import,
+                        listOf(
+                            "androidx.room",
+                            "io.morgan.mio.core.database",
+                            "io.morgan.mio.data.provider",
+                            "io.morgan.mio.data.sync",
+                            "retrofit2",
+                            "okhttp3",
+                        ),
+                    )
+                }
+            } else {
+                null
+            }
+        val workerPolicy =
+            if (ownedFile.modulePath == ":sync:work" && isWorker) {
+                listOf(
+                    Regex("\\b(?:remote|current|candidate)\\.(?:progress|status)\\b"),
+                    Regex("\\bPendingOperation(?:Group|Kind|State)?\\b"),
+                    Regex("\\bReconcilePendingOperationUseCase\\b"),
+                ).firstOrNull { pattern -> pattern.containsMatchIn(ownedFile.file.text) }?.pattern
+            } else {
+                null
+            }
+        val dataWorkImport =
+            if (ownedFile.modulePath.startsWith(":data:")) {
+                imports.firstOrNull { import ->
+                    matchesAnyPrefix(import, listOf("io.morgan.mio.sync.work", "androidx.work"))
+                }
+            } else {
+                null
+            }
+        val dataMutationImport =
+            if (ownedFile.modulePath == ":data:sync") {
+                imports.firstOrNull { import ->
+                    matchesAnyPrefix(import, listOf("io.morgan.mio.data.progress", "io.morgan.mio.data.collection"))
+                }
+            } else {
+                null
+            }
+        val workProviderImport =
+            if (ownedFile.modulePath == ":sync:work") {
+                imports.firstOrNull { import ->
+                    matchesAnyPrefix(
+                        import,
+                        listOf("io.morgan.mio.data.provider", "io.morgan.mio.data.sync", "io.morgan.mio.core.database"),
+                    )
+                }
+            } else {
+                null
+            }
+        val schedulerAndroidImport =
+            if (ownedFile.modulePath.startsWith(":domain:") && ownedFile.file.text.contains("Scheduler")) {
+                imports.firstOrNull { import ->
+                    matchesAnyPrefix(import, listOf("android", "androidx", "retrofit2", "okhttp3"))
+                }
+            } else {
+                null
+            }
+        val misplacedSynchronizationDeclaration =
+            ownedFile.file
+                .declarations(true, true)
+                .firstOrNull { declaration ->
+                    (declaration as? KoNameProvider)?.name in
+                        setOf(
+                            "SyncRepository",
+                            "SynchronizeAccountUseCase",
+                            "ReconcilePendingOperationUseCase",
+                            "ProjectSyncEntryUseCase",
+                            "PlanOperationUndoUseCase",
+                            "SyncWorkScheduler",
+                        ) &&
+                        ownedFile.modulePath != ":domain:sync"
+                }?.let { declaration -> (declaration as KoNameProvider).name }
+
+        when {
+            workerImport != null ->
+                "Worker may depend only on domain session/result ports; found '$workerImport'"
+            workerPolicy != null ->
+                "Worker must delegate reconciliation policy to domain/data ports; found '$workerPolicy'"
+            dataWorkImport != null ->
+                "data modules cannot depend on WorkManager implementation '$dataWorkImport'"
+            dataMutationImport != null ->
+                "sync data cannot depend on mutation data '$dataMutationImport'"
+            workProviderImport != null ->
+                "sync:work cannot depend on provider/database implementation '$workProviderImport'"
+            schedulerAndroidImport != null ->
+                "domain synchronization scheduling cannot import platform type '$schedulerAndroidImport'"
+            misplacedSynchronizationDeclaration != null ->
+                "synchronization declaration '$misplacedSynchronizationDeclaration' must live in :domain:sync"
+            else -> null
+        }
     }
 }
 

@@ -291,6 +291,11 @@ class DefaultProgressRepositoryTest {
 
                     override suspend fun cancelUndelivered(groupId: OperationGroupId) =
                         delegate.cancelUndelivered(groupId)
+
+                    override suspend fun undo(
+                        groupId: OperationGroupId,
+                        compensation: io.morgan.mio.domain.sync.PendingOperationGroup,
+                    ): Boolean = delegate.undo(groupId, compensation)
                 }
             val cancellableRepository = createRepository(writer = writer)
             val job =
@@ -538,6 +543,11 @@ class DefaultProgressRepositoryTest {
         }
 
         override suspend fun cancelUndelivered(groupId: OperationGroupId): Boolean = delegate.cancelUndelivered(groupId)
+
+        override suspend fun undo(
+            groupId: OperationGroupId,
+            compensation: io.morgan.mio.domain.sync.PendingOperationGroup,
+        ): Boolean = delegate.undo(groupId, compensation)
     }
 
     private companion object {

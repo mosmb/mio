@@ -12,9 +12,11 @@ import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitTotal
+import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressChange
 import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressSnapshot
+import io.morgan.mio.domain.progress.ProgressUndo
 import io.morgan.mio.domain.sync.OperationValue
 import io.morgan.mio.domain.sync.PendingOperationKind
 import org.junit.Assert.assertEquals
@@ -25,21 +27,16 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class ProgressPersistenceMappersTest {
-    private val accountId = AccountId("account-1")
-    private val entryId = CollectionEntryId("entry-1")
-    private val mediaId = MediaId("media-1")
-    private val instant = Instant.parse("2026-08-23T12:00:00Z")
-
     @Test
     fun forwardChangeMapsToOneAbsoluteForwardOperation() {
         val change = change(ProgressDirection.INCREASE, ProgressUnit.EPISODE, 8, 9, CollectionStatus.CURRENT)
 
-        val group = change.toPendingOperationGroup(instant)
+        val group = change.toPendingOperationGroup(NOW)
         val operation = group.operations.single()
 
         assertEquals(OperationGroupId("group-increase"), group.id)
-        assertEquals(accountId, group.accountId)
-        assertEquals(instant, group.createdAt)
+        assertEquals(ACCOUNT, group.accountId)
+        assertEquals(NOW, group.createdAt)
         assertEquals(OperationGroupId("group-increase"), operation.groupId)
         assertEquals(PendingOperationKind.SET_PROGRESS_FORWARD, operation.kind)
         assertEquals(OperationValue.Progress(ProgressValue(8)), operation.base)
@@ -53,7 +50,7 @@ class ProgressPersistenceMappersTest {
     fun backwardChangeMapsToAnExplicitCorrectionWithTheSameUnit() {
         val change = change(ProgressDirection.DECREASE, ProgressUnit.CHAPTER, 41, 40, CollectionStatus.CURRENT)
 
-        val operation = change.toPendingOperationGroup(instant).operations.single()
+        val operation = change.toPendingOperationGroup(NOW).operations.single()
 
         assertEquals(PendingOperationKind.SET_PROGRESS_CORRECTION, operation.kind)
         assertEquals(OperationValue.Progress(ProgressValue(41)), operation.base)
@@ -65,7 +62,7 @@ class ProgressPersistenceMappersTest {
     fun finalChangeMapsProgressThenDependentCompletedStatus() {
         val change = change(ProgressDirection.INCREASE, ProgressUnit.VOLUME, 2, 3, CollectionStatus.COMPLETED)
 
-        val operations = change.toPendingOperationGroup(instant).operations
+        val operations = change.toPendingOperationGroup(NOW).operations
 
         assertEquals(2, operations.size)
         assertEquals(listOf(0, 1), operations.map { it.positionInGroup })
@@ -85,20 +82,20 @@ class ProgressPersistenceMappersTest {
             LocalProgressActivityEntity(
                 activityOrder = 7,
                 operationGroupId = "group-activity",
-                accountId = accountId.value,
-                collectionEntryId = entryId.value,
-                mediaId = mediaId.value,
+                accountId = ACCOUNT.value,
+                collectionEntryId = ENTRY.value,
+                mediaId = MEDIA.value,
                 direction = "decrease",
                 progressUnit = StoredProgressUnit.VOLUME,
                 beforeProgress = 3,
                 afterProgress = 2,
                 beforeStatus = StoredCollectionStatus.CURRENT,
                 afterStatus = StoredCollectionStatus.CURRENT,
-                beforeUpdatedAtUtcMs = instant,
-                afterUpdatedAtUtcMs = instant.plus(1.seconds),
+                beforeUpdatedAtUtcMs = NOW,
+                afterUpdatedAtUtcMs = NOW.plus(1.seconds),
                 afterRevision = 8,
-                createdAtUtcMs = instant.plus(1.seconds),
-                undoUntilUtcMs = instant.plus(7.seconds),
+                createdAtUtcMs = NOW.plus(1.seconds),
+                undoUntilUtcMs = NOW.plus(7.seconds),
                 undoneAtUtcMs = null,
             )
 
@@ -106,19 +103,115 @@ class ProgressPersistenceMappersTest {
 
         assertEquals(OperationGroupId("group-activity"), action.id)
         assertEquals(7, action.order)
-        assertEquals(accountId, action.accountId)
-        assertEquals(entryId, action.entryId)
-        assertEquals(mediaId, action.mediaId)
+        assertEquals(ACCOUNT, action.accountId)
+        assertEquals(ENTRY, action.entryId)
+        assertEquals(MEDIA, action.mediaId)
         assertEquals(ProgressDirection.DECREASE, action.direction)
         assertEquals(ProgressUnit.VOLUME, action.unit)
         assertEquals(ProgressValue(3), action.beforeProgress)
         assertEquals(ProgressValue(2), action.afterProgress)
-        assertEquals(instant, action.beforeUpdatedAt)
-        assertEquals(instant.plus(1.seconds), action.afterUpdatedAt)
+        assertEquals(NOW, action.beforeUpdatedAt)
+        assertEquals(NOW.plus(1.seconds), action.afterUpdatedAt)
         assertEquals(8, action.afterRevision)
-        assertEquals(instant.plus(7.seconds), action.undoUntil)
+        assertEquals(NOW.plus(7.seconds), action.undoUntil)
         assertNull(action.undoneAt)
     }
+
+    @Test
+    fun completionUndoMapsToDeterministicExplicitInverseWithStatusDependency() {
+        val action = action(beforeStatus = CollectionStatus.CURRENT, afterStatus = CollectionStatus.COMPLETED)
+        val compensation =
+            ProgressUndo(
+                action = action,
+                current =
+                    ProgressSnapshot(
+                        entry = entry(progress = 12, status = CollectionStatus.COMPLETED),
+                        revision = 8,
+                    ),
+                requestedAt = NOW,
+            ).toCompensatingOperationGroup(NOW)
+
+        assertEquals(OperationGroupId("action-1:undo"), compensation.id)
+        assertEquals(OperationGroupId("action-1"), compensation.compensatesGroupId)
+        assertEquals(
+            listOf("action-1:undo:progress", "action-1:undo:status"),
+            compensation.operations.map { it.id.value },
+        )
+        val progress = compensation.operations[0]
+        assertEquals(PendingOperationKind.SET_PROGRESS_CORRECTION, progress.kind)
+        assertEquals(12, (progress.base as io.morgan.mio.domain.sync.OperationValue.Progress).value.value)
+        assertEquals(11, (progress.target as io.morgan.mio.domain.sync.OperationValue.Progress).value.value)
+        val status = compensation.operations[1]
+        assertEquals(
+            io.morgan.mio.domain.sync.OperationValue
+                .Status(CollectionStatus.COMPLETED),
+            status.base,
+        )
+        assertEquals(
+            io.morgan.mio.domain.sync.OperationValue
+                .Status(CollectionStatus.CURRENT),
+            status.target,
+        )
+        assertEquals(setOf(progress.id), status.dependsOn)
+    }
+
+    @Test
+    fun unchangedStatusDoesNotCreateASecondInverseMember() {
+        val action = action(beforeStatus = CollectionStatus.CURRENT, afterStatus = CollectionStatus.CURRENT)
+        val compensation =
+            ProgressUndo(
+                action = action,
+                current = ProgressSnapshot(entry = entry(progress = 11), revision = 3),
+                requestedAt = NOW,
+            ).toCompensatingOperationGroup(NOW)
+
+        assertEquals(listOf("action-1:undo:progress"), compensation.operations.map { it.id.value })
+        assertTrue(
+            compensation.operations
+                .single()
+                .dependsOn
+                .isEmpty(),
+        )
+    }
+
+    private fun action(
+        beforeStatus: CollectionStatus,
+        afterStatus: CollectionStatus,
+    ): ProgressAction =
+        ProgressAction(
+            id = OperationGroupId("action-1"),
+            order = 1,
+            accountId = ACCOUNT,
+            entryId = ENTRY,
+            mediaId = MEDIA,
+            direction = ProgressDirection.INCREASE,
+            unit = ProgressUnit.EPISODE,
+            beforeProgress = ProgressValue(11),
+            afterProgress = ProgressValue(12),
+            beforeStatus = beforeStatus,
+            afterStatus = afterStatus,
+            beforeUpdatedAt = NOW - 1.seconds,
+            afterUpdatedAt = NOW,
+            afterRevision = 7,
+            createdAt = NOW - 1.seconds,
+            undoUntil = NOW + 6.seconds,
+            undoneAt = null,
+        )
+
+    private fun entry(
+        progress: Int,
+        status: CollectionStatus = CollectionStatus.CURRENT,
+    ): CollectionEntry =
+        CollectionEntry(
+            id = ENTRY,
+            accountId = ACCOUNT,
+            mediaId = MEDIA,
+            status = status,
+            progress = ProgressValue(progress),
+            progressUnit = ProgressUnit.EPISODE,
+            total = UnitTotal(12),
+            updatedAt = NOW,
+        )
 
     private fun change(
         direction: ProgressDirection,
@@ -133,14 +226,14 @@ class ProgressPersistenceMappersTest {
                 ProgressSnapshot(
                     entry =
                         CollectionEntry(
-                            id = entryId,
-                            accountId = accountId,
-                            mediaId = mediaId,
+                            id = ENTRY,
+                            accountId = ACCOUNT,
+                            mediaId = MEDIA,
                             status = CollectionStatus.CURRENT,
                             progress = ProgressValue(beforeProgress),
                             progressUnit = unit,
                             total = UnitTotal(12),
-                            updatedAt = instant,
+                            updatedAt = NOW,
                         ),
                     revision = 7,
                 ),
@@ -149,4 +242,11 @@ class ProgressPersistenceMappersTest {
             targetStatus = targetStatus,
             undoWindow = 6.seconds,
         )
+
+    private companion object {
+        val ACCOUNT = AccountId("account-1")
+        val ENTRY = CollectionEntryId("entry-1")
+        val MEDIA = MediaId("media-1")
+        val NOW = Instant.parse("2026-09-11T10:00:00Z")
+    }
 }

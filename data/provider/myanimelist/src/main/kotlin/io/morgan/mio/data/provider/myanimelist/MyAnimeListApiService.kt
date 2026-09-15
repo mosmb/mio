@@ -1,8 +1,11 @@
 package io.morgan.mio.data.provider.myanimelist
 
 import retrofit2.Response
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -43,4 +46,37 @@ internal interface MyAnimeListApiService {
         @Header("Authorization") authorization: String,
         @Query("fields") fields: String,
     ): Response<MyAnimeListMediaDetailsResponseDto>
+
+    @GET("anime/{id}")
+    suspend fun syncAnimeDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+        @Query("fields") fields: String,
+    ): Response<MyAnimeListSyncEntryResponseDto>
+
+    @GET("manga/{id}")
+    suspend fun syncMangaDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+        @Query("fields") fields: String,
+    ): Response<MyAnimeListSyncEntryResponseDto>
+
+    @FormUrlEncoded
+    @PATCH("anime/{id}/my_list_status")
+    suspend fun updateAnimeListStatus(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+        @Field("status") status: String? = null,
+        @Field("num_watched_episodes") numWatchedEpisodes: Int? = null,
+    ): Response<MyAnimeListSyncMutationResponseDto>
+
+    @FormUrlEncoded
+    @PATCH("manga/{id}/my_list_status")
+    suspend fun updateMangaListStatus(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+        @Field("status") status: String? = null,
+        @Field("num_chapters_read") numChaptersRead: Int? = null,
+        @Field("num_volumes_read") numVolumesRead: Int? = null,
+    ): Response<MyAnimeListSyncMutationResponseDto>
 }

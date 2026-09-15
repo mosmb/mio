@@ -61,6 +61,13 @@ class DependencyRulesTest {
     }
 
     @Test
+    fun taskTwentyKeepsSchedulingInvertedAtTheModuleBoundary() {
+        assertTrue(violations(":app", "implementation", ":domain:sync").isEmpty())
+        assertTrue(violations(":data:sync", "implementation", ":sync:work").isNotEmpty())
+        assertTrue(violations(":sync:work", "implementation", ":data:sync").isNotEmpty())
+    }
+
+    @Test
     fun opensOnlyTheTaskSeventeenTodayQueueEdges() {
         listOf(":domain:media", ":domain:collection", ":domain:model").forEach { dependency ->
             assertTrue(

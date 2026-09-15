@@ -12,6 +12,7 @@ import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.sync.SynchronizeAccountUseCase
 
 @GraphExtension(AccountScope::class)
 internal interface AccountGraph : ViewModelGraph {
@@ -21,6 +22,7 @@ internal interface AccountGraph : ViewModelGraph {
     val mediaRepository: MediaRepository
     val collectionRepository: CollectionRepository
     val preferencesRepository: PreferencesRepository
+    val synchronizeAccountUseCase: SynchronizeAccountUseCase
 
     @GraphExtension.Factory
     fun interface Factory {

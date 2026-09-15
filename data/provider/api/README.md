@@ -149,3 +149,25 @@ Task 16 adds one provider-neutral `ProviderMediaDetailDataSource` request that r
 The initial-import field sets now include only year and score. Relations remain absent from initial imports; the detail request is the sole enrichment path and never performs an N+1 request per related title. These fields are optional honest data: unknown, zero, out-of-range, or malformed values remain `null`, not fabricated defaults.
 
 The one-request shapes and nested relation fields were verified against the live AniList GraphQL schema and MyAnimeList detail endpoints during the task-13/task-14 planning checks (2026-08-19). The contract fixtures and provider tests in Task 16 preserve that evidence locally. Live limitations remain: provider relation completeness is not guaranteed, MyAnimeList has no banner or release schedule, and provider detail failures are normalized by the concrete provider before the capability layer writes any Room data.
+
+## Task 20 delivery boundary
+
+Task 20 adds `ProviderSyncDataSource` as the provider-neutral boundary for delivering an existing
+collection entry. Every read and mutation receives the persisted progress unit and must return a
+complete, normalized `ProviderCollectionEntry` before the sync layer can acknowledge the operation.
+Progress writes are absolute targets for exactly one unit; the other provider counter and unrelated
+list fields are not sent.
+
+AniList reads the authenticated `MediaList` entry and updates it by entry ID with
+`SaveMediaListEntry`, using `progress`, `progressVolumes`, or `status` as appropriate. MyAnimeList
+reads `my_list_status` and uses form-encoded `PATCH` requests; anime progress is sent as
+`num_watched_episodes` and read back as `num_episodes_watched`, while manga uses
+`num_chapters_read` or `num_volumes_read`. Neither implementation recreates a missing entry.
+
+The concrete sources perform a read-before-write and an authenticated read-back. Provider APIs do
+not expose a server-side compare-and-set for this v0 boundary, so that read/write sequence cannot
+eliminate a deletion race; the sync layer treats mismatched identity, unit, status, or malformed
+success payloads as non-acknowledgements. Retrofit contract tests cover serialized fields,
+fixed-unit zero values, GraphQL HTTP-200 errors, terminal HTTP categories, identity validation, and
+preservation of unrelated fields. The tests use fictional MockWebServer payloads and do not claim
+live-provider mutation evidence.

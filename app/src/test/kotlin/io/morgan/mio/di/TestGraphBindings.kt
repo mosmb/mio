@@ -32,12 +32,16 @@ import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.data.provider.api.ProviderCredentialStore
+import io.morgan.mio.data.sync.PendingSyncWorkDispatcher
 import io.morgan.mio.domain.account.AccountRepository
 import io.morgan.mio.domain.account.AccountSessionRepository
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.sync.SyncAccountSessionFactory
+import io.morgan.mio.domain.sync.SyncWorkScheduler
 import io.morgan.mio.session.FakeProviderAccountSessionRepository
+import io.morgan.mio.sync.work.factory.MioWorkerFactory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -69,6 +73,8 @@ internal class TestGraphBindings(
     private val collectionRepository: CollectionRepository,
     private val preferencesRepository: PreferencesRepository,
     private val accountSessionRepository: AccountSessionRepository,
+    private val pendingSyncWorkDispatcher: PendingSyncWorkDispatcher =
+        PendingSyncWorkDispatcher(database, SyncWorkScheduler { }),
 ) {
     @Provides
     fun provideDatabase(): MioDatabase = database
@@ -105,7 +111,7 @@ internal class TestGraphBindings(
     fun provideImageLoader(): ImageLoader = imageLoader
 
     @Provides
-    fun provideWorkerFactory(): WorkerFactory = workerFactory
+    fun provideWorkerFactory(factories: Set<MioWorkerFactory>): WorkerFactory = factories.let { workerFactory }
 
     @Provides
     fun provideWorkManagerConfiguration(): Configuration = workManagerConfiguration
@@ -126,6 +132,12 @@ internal class TestGraphBindings(
 
     @Provides
     fun provideAccountSessionRepository(): AccountSessionRepository = accountSessionRepository
+
+    @Provides
+    fun provideSyncAccountSessionFactory(): SyncAccountSessionFactory = SyncAccountSessionFactory { null }
+
+    @Provides
+    fun providePendingSyncWorkDispatcher(): PendingSyncWorkDispatcher = pendingSyncWorkDispatcher
 
     @Provides
     fun provideNavigationRegistry(

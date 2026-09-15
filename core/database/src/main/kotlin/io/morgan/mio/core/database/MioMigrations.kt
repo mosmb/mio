@@ -153,5 +153,82 @@ public object MioMigrations {
             }
         }
 
-    public val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    public val MIGRATION_4_5: Migration =
+        object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sync_lease` (
+                        `account_id` TEXT NOT NULL,
+                        `owner_token` TEXT NOT NULL,
+                        `expires_at_utc_ms` INTEGER NOT NULL,
+                        PRIMARY KEY(`account_id`),
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sync_schedule` (
+                        `account_id` TEXT NOT NULL,
+                        `requested_generation` INTEGER NOT NULL,
+                        `dispatched_generation` INTEGER NOT NULL,
+                        PRIMARY KEY(`account_id`),
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sync_issue` (
+                        `issue_id` TEXT NOT NULL,
+                        `account_id` TEXT NOT NULL,
+                        `collection_entry_id` TEXT NOT NULL,
+                        `operation_group_id` TEXT NOT NULL,
+                        `operation_id` TEXT NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `base_progress` INTEGER,
+                        `base_status` TEXT,
+                        `target_progress` INTEGER,
+                        `target_status` TEXT,
+                        `progress_unit` TEXT NOT NULL,
+                        `local_progress` INTEGER NOT NULL,
+                        `local_status` TEXT NOT NULL,
+                        `local_total` INTEGER,
+                        `local_updated_at_utc_ms` INTEGER NOT NULL,
+                        `local_revision` INTEGER NOT NULL,
+                        `remote_progress` INTEGER,
+                        `remote_status` TEXT,
+                        `remote_total` INTEGER,
+                        `remote_updated_at_utc_ms` INTEGER,
+                        `detected_at_utc_ms` INTEGER NOT NULL,
+                        PRIMARY KEY(`issue_id`),
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`collection_entry_id`) REFERENCES `collection_entry`(`collection_entry_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sync_issue_account_id` ON `sync_issue` (`account_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sync_issue_collection_entry_id` " +
+                        "ON `sync_issue` (`collection_entry_id`)",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_sync_issue_account_id_operation_id` " +
+                        "ON `sync_issue` (`account_id`, `operation_id`)",
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `sync_schedule` (`account_id`, `requested_generation`, `dispatched_generation`)
+                    SELECT DISTINCT `account_id`, 1, 0
+                    FROM `pending_operation_group`
+                    """.trimIndent(),
+                )
+            }
+        }
+
+    public val ALL: Array<Migration> =
+        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 }

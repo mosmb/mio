@@ -23,4 +23,12 @@ public class DefaultPendingOperationWriter(
 
     override suspend fun cancelUndelivered(groupId: OperationGroupId): Boolean =
         localDataSource.cancelUndelivered(accountId, groupId)
+
+    override suspend fun undo(
+        groupId: OperationGroupId,
+        compensation: PendingOperationGroup,
+    ): Boolean {
+        require(compensation.accountId == accountId)
+        return localDataSource.undo(accountId, groupId, compensation)
+    }
 }

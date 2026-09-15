@@ -128,6 +128,33 @@ class MyAnimeListMediaDetailDataSourceTest {
                             authorization: String,
                             fields: String,
                         ): Response<MyAnimeListMediaDetailsResponseDto> = error("unused")
+
+                        override suspend fun syncAnimeDetails(
+                            id: Int,
+                            authorization: String,
+                            fields: String,
+                        ): Response<MyAnimeListSyncEntryResponseDto> = error("unused")
+
+                        override suspend fun syncMangaDetails(
+                            id: Int,
+                            authorization: String,
+                            fields: String,
+                        ): Response<MyAnimeListSyncEntryResponseDto> = error("unused")
+
+                        override suspend fun updateAnimeListStatus(
+                            id: Int,
+                            authorization: String,
+                            status: String?,
+                            numWatchedEpisodes: Int?,
+                        ): Response<MyAnimeListSyncMutationResponseDto> = error("unused")
+
+                        override suspend fun updateMangaListStatus(
+                            id: Int,
+                            authorization: String,
+                            status: String?,
+                            numChaptersRead: Int?,
+                            numVolumesRead: Int?,
+                        ): Response<MyAnimeListSyncMutationResponseDto> = error("unused")
                     },
                 )
 

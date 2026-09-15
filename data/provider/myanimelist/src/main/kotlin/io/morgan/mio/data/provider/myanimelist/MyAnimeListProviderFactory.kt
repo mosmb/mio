@@ -43,6 +43,7 @@ public class MyAnimeListProviderFactory(
             identityDataSource = identityDataSource,
             initialImportDataSource = initialImportDataSource,
             mediaDetailDataSource = mediaDetailDataSource,
+            syncDataSource = MyAnimeListSyncDataSource(apiService),
         )
     }
 }

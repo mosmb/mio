@@ -4,6 +4,7 @@ import io.morgan.mio.core.testing.provider.FakeProviderAuthenticator
 import io.morgan.mio.core.testing.provider.FakeProviderIdentityDataSource
 import io.morgan.mio.core.testing.provider.FakeProviderInitialImportDataSource
 import io.morgan.mio.core.testing.provider.FakeProviderMediaDetailDataSource
+import io.morgan.mio.core.testing.provider.FakeProviderSyncDataSource
 import io.morgan.mio.core.testing.provider.completeProviderImportFixture
 import io.morgan.mio.core.testing.provider.providerAuthorizationLaunchFixture
 import io.morgan.mio.core.testing.provider.providerCredentialsFixture
@@ -117,6 +118,7 @@ class FakeProviderAccountSessionRepositoryTest {
             val identity = FakeProviderIdentityDataSource(ProviderKey.ANILIST)
             val initialImport = FakeProviderInitialImportDataSource(ProviderKey.ANILIST)
             val mediaDetails = FakeProviderMediaDetailDataSource(ProviderKey.ANILIST)
+            val sync = FakeProviderSyncDataSource(ProviderKey.ANILIST)
             val release = kotlinx.coroutines.CompletableDeferred<Unit>()
             authenticator.enqueueBeginAuthorization {
                 release.await()
@@ -136,6 +138,7 @@ class FakeProviderAccountSessionRepositoryTest {
                             identityDataSource = identity,
                             initialImportDataSource = initialImport,
                             mediaDetailDataSource = mediaDetails,
+                            syncDataSource = sync,
                         ),
                 )
             repository.restore()
@@ -350,6 +353,7 @@ class FakeProviderAccountSessionRepositoryTest {
         identity: FakeProviderIdentityDataSource,
         initialImport: FakeProviderInitialImportDataSource,
         mediaDetails: FakeProviderMediaDetailDataSource = FakeProviderMediaDetailDataSource(providerKey),
+        sync: FakeProviderSyncDataSource = FakeProviderSyncDataSource(providerKey),
     ): FakeProviderAccountSessionRepository =
         FakeProviderAccountSessionRepository(
             providerBinding =
@@ -359,6 +363,7 @@ class FakeProviderAccountSessionRepositoryTest {
                     identityDataSource = identity,
                     initialImportDataSource = initialImport,
                     mediaDetailDataSource = mediaDetails,
+                    syncDataSource = sync,
                 ),
         )
 }

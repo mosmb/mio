@@ -17,6 +17,7 @@ import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressChange
 import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressSnapshot
+import io.morgan.mio.domain.progress.ProgressUndo
 import io.morgan.mio.domain.sync.OperationValue
 import io.morgan.mio.domain.sync.PendingOperation
 import io.morgan.mio.domain.sync.PendingOperationGroup
@@ -110,6 +111,50 @@ internal fun ProgressChange.toPendingOperationGroup(createdAt: kotlin.time.Insta
         accountId = entry.accountId,
         createdAt = createdAt,
         operations = operations,
+    )
+}
+
+internal fun ProgressUndo.toCompensatingOperationGroup(createdAt: kotlin.time.Instant): PendingOperationGroup {
+    val action = action
+    val progressId = OperationId("${action.id.value}:undo:progress")
+    val progress =
+        PendingOperation(
+            id = progressId,
+            groupId = OperationGroupId("${action.id.value}:undo"),
+            accountId = action.accountId,
+            collectionEntryId = action.entryId,
+            kind = PendingOperationKind.SET_PROGRESS_CORRECTION,
+            base = OperationValue.Progress(action.afterProgress),
+            target = OperationValue.Progress(action.beforeProgress),
+            positionInGroup = 0,
+            state = PendingOperationState.ENQUEUED,
+        )
+    val operations =
+        buildList {
+            add(progress)
+            if (action.beforeStatus != action.afterStatus) {
+                add(
+                    PendingOperation(
+                        id = OperationId("${action.id.value}:undo:status"),
+                        groupId = progress.groupId,
+                        accountId = action.accountId,
+                        collectionEntryId = action.entryId,
+                        kind = PendingOperationKind.SET_STATUS,
+                        base = OperationValue.Status(action.afterStatus),
+                        target = OperationValue.Status(action.beforeStatus),
+                        positionInGroup = 1,
+                        dependsOn = setOf(progressId),
+                        state = PendingOperationState.ENQUEUED,
+                    ),
+                )
+            }
+        }
+    return PendingOperationGroup(
+        id = progress.groupId,
+        accountId = action.accountId,
+        createdAt = createdAt,
+        operations = operations,
+        compensatesGroupId = action.id,
     )
 }
 

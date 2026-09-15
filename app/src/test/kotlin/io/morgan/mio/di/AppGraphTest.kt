@@ -48,6 +48,7 @@ class AppGraphTest {
             assertNotNull(graph.imageLoader)
             assertNotNull(graph.workerFactory)
             assertNotNull(graph.workManagerConfiguration)
+            assertNotNull(graph.pendingSyncWorkDispatcher)
         } finally {
             graph.database.close()
             graph.processCoroutineScope.cancel()
@@ -76,6 +77,7 @@ class AppGraphTest {
             assertSame(graph.imageLoader, graph.imageLoader)
             assertSame(graph.workerFactory, graph.workerFactory)
             assertSame(graph.workManagerConfiguration, graph.workManagerConfiguration)
+            assertSame(graph.pendingSyncWorkDispatcher, graph.pendingSyncWorkDispatcher)
         } finally {
             graph.database.close()
             graph.processCoroutineScope.cancel()

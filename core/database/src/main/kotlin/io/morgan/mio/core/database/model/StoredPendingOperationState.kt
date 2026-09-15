@@ -9,6 +9,7 @@ public enum class StoredPendingOperationState(
     DELIVERED("delivered"),
     BLOCKED("blocked"),
     TERMINAL_FAILURE("terminal_failure"),
+    CANCELLED("cancelled"),
     ;
 
     public companion object {

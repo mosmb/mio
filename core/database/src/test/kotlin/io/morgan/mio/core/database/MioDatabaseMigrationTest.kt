@@ -33,6 +33,7 @@ class MioDatabaseMigrationTest {
         context.deleteDatabase(TEST_DATABASE_NAME)
         context.deleteDatabase(TEST_DATABASE_V2_NAME)
         context.deleteDatabase(TEST_DATABASE_V3_NAME)
+        context.deleteDatabase(TEST_DATABASE_V4_NAME)
     }
 
     @Test
@@ -59,7 +60,7 @@ class MioDatabaseMigrationTest {
         }
 
         helper
-            .runMigrationsAndValidate(TEST_DATABASE_NAME, 4, true, *MioMigrations.ALL)
+            .runMigrationsAndValidate(TEST_DATABASE_NAME, 5, true, *MioMigrations.ALL)
             .use { migrated ->
                 assertEquals(1, countRows(migrated, "selected_account"))
                 assertEquals(1, countRows(migrated, "media"))
@@ -90,13 +91,15 @@ class MioDatabaseMigrationTest {
         assertNotNull(current.providerIdDao())
         assertNotNull(current.pendingOperationDao())
         assertNotNull(current.progressDao())
+        assertNotNull(current.syncDao())
         current.close()
 
-        assertEquals(4, MioDatabase.VERSION)
-        assertEquals(3, MioMigrations.ALL.size)
+        assertEquals(5, MioDatabase.VERSION)
+        assertEquals(4, MioMigrations.ALL.size)
         assertTrue(MioMigrations.ALL[0] === MioMigrations.MIGRATION_1_2)
         assertTrue(MioMigrations.ALL[1] === MioMigrations.MIGRATION_2_3)
         assertTrue(MioMigrations.ALL[2] === MioMigrations.MIGRATION_3_4)
+        assertTrue(MioMigrations.ALL[3] === MioMigrations.MIGRATION_4_5)
     }
 
     @Test
@@ -181,6 +184,36 @@ class MioDatabaseMigrationTest {
             }
     }
 
+    @Test
+    fun versionFourPendingGroupsRecoverAnUndispatchedSynchronizationGeneration() {
+        helper.createDatabase(TEST_DATABASE_V4_NAME, 4).use { database ->
+            database.execSQL(
+                "INSERT INTO selected_account " +
+                    "(selection_key, account_id, connected_provider, display_name, avatar_reference) " +
+                    "VALUES ('selected', 'account-v4', 'anilist', 'Migration account', NULL)",
+            )
+            database.execSQL(
+                "INSERT INTO pending_operation_group " +
+                    "(operation_group_id, account_id, created_at_utc_ms, compensates_group_id) " +
+                    "VALUES ('group-v4', 'account-v4', 1767225600000, NULL)",
+            )
+        }
+
+        helper
+            .runMigrationsAndValidate(TEST_DATABASE_V4_NAME, 5, true, MioMigrations.MIGRATION_4_5)
+            .use { migrated ->
+                migrated
+                    .query(
+                        "SELECT requested_generation, dispatched_generation FROM sync_schedule " +
+                            "WHERE account_id = 'account-v4'",
+                    ).use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        assertEquals(1L, cursor.getLong(0))
+                        assertEquals(0L, cursor.getLong(1))
+                    }
+            }
+    }
+
     private fun countRows(
         database: SupportSQLiteDatabase,
         tableName: String,
@@ -206,5 +239,6 @@ class MioDatabaseMigrationTest {
         const val TEST_DATABASE_NAME: String = "mio-migration-test.db"
         const val TEST_DATABASE_V2_NAME: String = "mio-migration-v2-test.db"
         const val TEST_DATABASE_V3_NAME: String = "mio-migration-v3-test.db"
+        const val TEST_DATABASE_V4_NAME: String = "mio-migration-v4-test.db"
     }
 }

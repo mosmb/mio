@@ -83,6 +83,15 @@ public class PendingOperation(
                 require(attemptCount > 0)
                 require(lastAttemptAt != null)
             }
+
+            PendingOperationState.CANCELLED -> {
+                require(retryNotBefore == null)
+                if (attemptCount == 0) {
+                    require(lastAttemptAt == null)
+                } else {
+                    require(lastAttemptAt != null)
+                }
+            }
         }
     }
 

@@ -27,12 +27,16 @@ fun oauthClientId(
 
 fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
+val mioTestInstrumentationRunner =
+    providers.gradleProperty("mio.testRunner").orNull
+        ?: "androidx.test.runner.AndroidJUnitRunner"
+
 android {
     buildFeatures {
         buildConfig = true
     }
     defaultConfig {
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = mioTestInstrumentationRunner
         buildConfigField(
             "String",
             "MIO_ANILIST_CLIENT_ID",
@@ -62,6 +66,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":data:provider:api"))
     implementation(project(":domain:model"))
+    implementation(project(":domain:sync"))
     implementation(project(":domain:account"))
     implementation(project(":domain:media"))
     implementation(project(":domain:collection"))
