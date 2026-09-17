@@ -229,6 +229,28 @@ public object MioMigrations {
             }
         }
 
+    public val MIGRATION_5_6: Migration =
+        object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sync_account_issue` (
+                        `issue_id` TEXT NOT NULL,
+                        `account_id` TEXT NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `detected_at_utc_ms` INTEGER NOT NULL,
+                        PRIMARY KEY(`issue_id`),
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_sync_account_issue_account_id` " +
+                        "ON `sync_account_issue` (`account_id`)",
+                )
+            }
+        }
+
     public val ALL: Array<Migration> =
-        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 }

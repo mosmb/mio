@@ -2,11 +2,13 @@ package io.morgan.mio
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import dev.zacsweers.metro.createDynamicGraphFactory
 import io.morgan.mio.core.testing.provider.FakeProviderAuthenticator
@@ -16,8 +18,6 @@ import io.morgan.mio.core.testing.provider.completeProviderImportFixture
 import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.core.testing.provider.providerCredentialsFixture
 import io.morgan.mio.core.testing.provider.providerIdentityFixture
-import io.morgan.mio.data.account.AccountRefreshRequester
-import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderResult
 import io.morgan.mio.di.AccountGraphRequest
 import io.morgan.mio.di.AppGraph
@@ -117,8 +117,6 @@ class MainActivitySessionTest {
                 AccountGraphRequest(
                     accountId = AccountId("fixture-account"),
                     providerBinding = providerBindingFixture(),
-                    accountRefreshRequester = AccountRefreshRequester {},
-                    collectionRefreshRequester = CollectionRefreshRequester {},
                 ),
             )
 
@@ -198,16 +196,115 @@ class MainActivitySessionTest {
     }
 
     @Test
+    fun returningWithoutAnOAuthRedirectAllowsAnotherReconnect() {
+        prepareReconnect()
+        composeRule.onNodeWithText("Reconnect").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        awaitReconnectAuthorization()
+        activityRule.backgroundAndReturn()
+        activityRule.scheduler.runCurrent()
+        assertEquals(
+            io.morgan.mio.domain.account.AccountReconnectionState.Idle,
+            activityRule.graph.accountReconnectionRepository.state.value,
+        )
+        composeRule.onNodeWithText("Reconnect").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        awaitReconnectAuthorization()
+    }
+
+    @Test
+    fun reconnectRetainsCapturedIssuesAcrossConfigurationAndConsumesTheRedirectOnce() {
+        prepareReconnect()
+        composeRule.onNodeWithText("Reconnect").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        awaitReconnectAuthorization()
+        activityRule.configurationChange()
+        activityRule.scheduler.runCurrent()
+        val binding = activityRule.fixture.accountSessionRepository.providerBinding
+        (binding.authenticator as FakeProviderAuthenticator).enqueueCompleteAuthorization { _, _ ->
+            ProviderResult.Success(providerCredentialsFixture())
+        }
+        (binding.identityDataSource as FakeProviderIdentityDataSource).enqueue {
+            ProviderResult.Success(providerIdentityFixture())
+        }
+        activityRule.deliverIntent(Intent(Intent.ACTION_VIEW, Uri.parse("mio://oauth/anilist?code=fixture")))
+        composeRule.waitUntil(10_000) {
+            activityRule.scheduler.runCurrent()
+            kotlinx.coroutines.runBlocking {
+                activityRule.graph.database
+                    .syncDao()
+                    .getAccountIssue("fixture-account") ==
+                    null
+            }
+        }
+        activityRule.configurationChange()
+        activityRule.scheduler.runCurrent()
+        assertEquals(1, (binding.authenticator as FakeProviderAuthenticator).completeCalls.size)
+    }
+
+    private fun awaitReconnectAuthorization() {
+        composeRule.waitUntil(10_000) {
+            activityRule.scheduler.runCurrent()
+            activityRule.graph.accountReconnectionRepository.state.value is
+                io.morgan.mio.domain.account.AccountReconnectionState.Authorizing
+        }
+    }
+
+    private fun prepareReconnect() {
+        activityRule.scheduler.runCurrent()
+        val fixture = activityRule.fixture
+        kotlinx.coroutines.runBlocking {
+            fixture.database.selectedAccountDao().replaceSelectedAccount(
+                io.morgan.mio.core.database.entity.SelectedAccountEntity(
+                    "selected",
+                    "fixture-account",
+                    io.morgan.mio.core.database.model.StoredConnectedProvider.ANILIST,
+                    "Fixture",
+                    null,
+                ),
+                io.morgan.mio.core.database.entity.AccountProviderIdEntity(
+                    "fixture-account",
+                    io.morgan.mio.core.database.model.StoredConnectedProvider.ANILIST,
+                    "account-fixture",
+                ),
+            )
+            fixture.database.syncDao().upsertAccountIssue(
+                io.morgan.mio.core.database.entity.SyncAccountIssueEntity(
+                    "reconnect-test",
+                    "fixture-account",
+                    "authentication",
+                    fixture.clock.now(),
+                ),
+            )
+        }
+        activityRule.activateAccountGraph("fixture-account")
+        fixture.accountSessionRepository.setStateForTest(
+            AccountSessionState.Authenticated(AccountId("fixture-account"), ConnectedProvider.ANILIST),
+        )
+        val authenticator = fixture.accountSessionRepository.providerBinding.authenticator as FakeProviderAuthenticator
+        repeat(2) {
+            authenticator.enqueueBeginAuthorization {
+                ProviderResult.Success(
+                    io.morgan.mio.core.testing.provider
+                        .providerAuthorizationLaunchFixture(),
+                )
+            }
+        }
+        activityRule.scheduler.runCurrent()
+        composeRule.waitUntil(10_000) {
+            activityRule.scheduler.runCurrent()
+            composeRule.onAllNodesWithText("Reconnect").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
     fun onboardingViewModelSurvivesConfigurationAndIsRecreatedAfterRootDisposal() {
         activityRule.scheduler.runCurrent()
         composeRule.waitForIdle()
         val repository = activityRule.fixture.accountSessionRepository
-        assertEquals(2, repository.stateReads)
+        assertEquals(3, repository.stateReads)
 
         activityRule.configurationChange()
         activityRule.scheduler.runCurrent()
         composeRule.waitForIdle()
-        assertEquals(2, repository.stateReads)
+        assertEquals(3, repository.stateReads)
 
         repository.setStateForTest(
             AccountSessionState.Authenticated(
@@ -224,7 +321,7 @@ class MainActivitySessionTest {
         activityRule.scheduler.runCurrent()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Continue with AniList").assertIsDisplayed()
-        assertEquals(3, repository.stateReads)
+        assertEquals(4, repository.stateReads)
     }
 }
 
@@ -276,6 +373,11 @@ class MainActivityRule : TestRule {
         activity = controller.get()
     }
 
+    fun backgroundAndReturn() {
+        controller.pause().stop()
+        controller.restart().start().resume()
+    }
+
     fun deliverIntent(intent: Intent) {
         controller.newIntent(intent)
         activity = controller.get()
@@ -287,8 +389,6 @@ class MainActivityRule : TestRule {
             AccountGraphRequest(
                 accountId = AccountId(accountId),
                 providerBinding = providerBindingFixture(),
-                accountRefreshRequester = AccountRefreshRequester {},
-                collectionRefreshRequester = CollectionRefreshRequester {},
             ),
         )
     }

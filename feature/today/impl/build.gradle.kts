@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":domain:collection"))
     implementation(project(":domain:preferences"))
     implementation(project(":domain:model"))
+    implementation(project(":domain:sync"))
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.metrox.viewmodel.compose)
 

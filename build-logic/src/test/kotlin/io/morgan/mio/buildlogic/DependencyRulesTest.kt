@@ -68,6 +68,27 @@ class DependencyRulesTest {
     }
 
     @Test
+    fun taskTwentyOneAllowsOnlyDomainSyncRecoveryForTodayAndMedia() {
+        listOf(":feature:today:impl", ":feature:media:impl").forEach { owner ->
+            assertTrue(violations(owner, "implementation", ":domain:sync").isEmpty())
+            listOf(":data:sync", ":sync:work", ":core:database", ":data:provider:api").forEach { dependency ->
+                assertTrue(
+                    violations(owner, "implementation", dependency).isNotEmpty(),
+                    "Expected $owner -> $dependency to remain forbidden",
+                )
+            }
+        }
+        listOf(
+            ":feature:today:api",
+            ":feature:media:api",
+            ":feature:library:impl",
+            ":feature:discover:impl",
+        ).forEach { owner ->
+            assertTrue(violations(owner, "implementation", ":domain:sync").isNotEmpty())
+        }
+    }
+
+    @Test
     fun opensOnlyTheTaskSeventeenTodayQueueEdges() {
         listOf(":domain:media", ":domain:collection", ":domain:model").forEach { dependency ->
             assertTrue(

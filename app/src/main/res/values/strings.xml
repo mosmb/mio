@@ -6,4 +6,7 @@
     <string name="navigation_discover">Discover</string>
     <string name="navigation_you">You</string>
     <string name="library_imported">Library imported</string>
+    <string name="provider_anilist">AniList</string>
+    <string name="provider_myanimelist">MyAnimeList</string>
+    <string name="provider_unknown">Provider</string>
 </resources>

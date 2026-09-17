@@ -21,13 +21,17 @@ public class SynchronizeAccountUseCase(
     private val repository: SyncRepository,
     private val clock: Clock,
     private val reconcile: ReconcilePendingOperationUseCase,
+    private val refreshRepository: RefreshRepository,
     private val newLeaseOwner: () -> String,
 ) {
-    public suspend operator fun invoke(): SyncRunResult {
+    public suspend operator fun invoke(refreshContent: Boolean = false): SyncRunResult {
         val startedAt = clock.now()
         val lease =
             repository.acquireLease(newLeaseOwner(), startedAt, startedAt + LEASE_TTL)
-                ?: return SyncRunResult.Retry(startedAt + LEASE_TTL)
+                ?: return SyncRunResult.Retry(
+                    notBefore = startedAt + LEASE_TTL,
+                    reason = SyncRunResult.RetryReason.LEASE_BUSY,
+                )
         val leaseLost = AtomicBoolean(false)
         val accountGone = AtomicBoolean(false)
         val activeLease =
@@ -50,7 +54,38 @@ public class SynchronizeAccountUseCase(
                         }
                     }
                 try {
-                    while (isActive && !leaseLost.get() && !accountGone.get()) {
+                    var authenticationBlocked = refreshRepository.isAuthenticationBlocked()
+                    if (!authenticationBlocked && refreshContent && isActive) {
+                        when (
+                            val result =
+                                withLeaseTimeout(activeLease.get()) { refreshRepository.refresh(activeLease.get()) }
+                        ) {
+                            SyncRefreshResult.Success,
+                            SyncRefreshResult.Transient,
+                            -> Unit
+                            SyncRefreshResult.Authentication ->
+                                refreshRepository
+                                    .recordFailure(
+                                        activeLease.get(),
+                                        SyncAccountIssueKind.AUTHENTICATION,
+                                    ).also { commit ->
+                                        handleCommitResult(commit, leaseLost, accountGone)
+                                        authenticationBlocked = true
+                                    }
+                            SyncRefreshResult.InvalidData ->
+                                handleCommitResult(
+                                    refreshRepository.recordFailure(
+                                        activeLease.get(),
+                                        SyncAccountIssueKind.INVALID_REMOTE_DATA,
+                                    ),
+                                    leaseLost,
+                                    accountGone,
+                                )
+                            SyncRefreshResult.AccountUnavailable -> accountGone.set(true)
+                            null -> Unit
+                        }
+                    }
+                    while (isActive && !leaseLost.get() && !accountGone.get() && !authenticationBlocked) {
                         val candidate = repository.claimNext(activeLease.get(), clock.now()) ?: break
                         if (candidate.attemptBudgetExhausted) {
                             handleCommitResult(

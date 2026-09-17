@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -51,6 +53,7 @@ import io.morgan.mio.core.designsystem.icon.MioIcons
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
+import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.feature.media.impl.component.MediaDetailBackdrop
@@ -73,6 +76,7 @@ internal fun MediaDetailRoute(
             key = mediaId.value,
         ) { create(mediaId) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val recoveryActions = LocalAccountRecoveryActions.current
     val haptics by rememberUpdatedState(rememberMioHaptics())
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
@@ -103,6 +107,9 @@ internal fun MediaDetailRoute(
         onRelatedTitleClick = { relatedId -> onRelatedTitle(MediaId(relatedId)) },
         onAction = viewModel::onAction,
         timeoutMillis = timeoutMillis,
+        providerLabel = recoveryActions.providerLabel,
+        onReconnect = recoveryActions.onReconnect,
+        onRetryRefresh = recoveryActions.onRetryRefresh,
     )
 }
 
@@ -115,6 +122,9 @@ internal fun MediaDetailScreen(
     modifier: Modifier = Modifier,
     onAction: (MediaDetailAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
+    providerLabel: String? = null,
+    onReconnect: () -> Unit = {},
+    onRetryRefresh: () -> Unit = {},
 ) {
     val loadingDescription = stringResource(R.string.media_detail_loading)
     Box(modifier = modifier.fillMaxSize()) {
@@ -147,6 +157,9 @@ internal fun MediaDetailScreen(
                     onRelatedTitleClick = onRelatedTitleClick,
                     onAction = onAction,
                     timeoutMillis = timeoutMillis,
+                    providerLabel = providerLabel,
+                    onReconnect = onReconnect,
+                    onRetryRefresh = onRetryRefresh,
                     modifier = Modifier.fillMaxSize(),
                 )
         }
@@ -162,6 +175,9 @@ private fun MediaDetailContent(
     modifier: Modifier = Modifier,
     onAction: (MediaDetailAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
+    providerLabel: String? = null,
+    onReconnect: () -> Unit = {},
+    onRetryRefresh: () -> Unit = {},
 ) {
     if (MioTheme.accessibility.reducedMotionEnabled) {
         ReducedMotionMediaDetailContent(
@@ -170,6 +186,9 @@ private fun MediaDetailContent(
             onRelatedTitleClick = onRelatedTitleClick,
             onAction = onAction,
             timeoutMillis = timeoutMillis,
+            providerLabel = providerLabel,
+            onReconnect = onReconnect,
+            onRetryRefresh = onRetryRefresh,
             modifier = modifier,
         )
     } else {
@@ -179,6 +198,9 @@ private fun MediaDetailContent(
             onRelatedTitleClick = onRelatedTitleClick,
             onAction = onAction,
             timeoutMillis = timeoutMillis,
+            providerLabel = providerLabel,
+            onReconnect = onReconnect,
+            onRetryRefresh = onRetryRefresh,
             modifier = modifier,
         )
     }
@@ -191,6 +213,9 @@ private fun SheetRiseMediaDetailContent(
     onRelatedTitleClick: (String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
+    providerLabel: String?,
+    onReconnect: () -> Unit,
+    onRetryRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -230,6 +255,9 @@ private fun SheetRiseMediaDetailContent(
                         onRelatedTitleClick = onRelatedTitleClick,
                         onAction = onAction,
                         timeoutMillis = timeoutMillis,
+                        providerLabel = providerLabel,
+                        onReconnect = onReconnect,
+                        onRetryRefresh = onRetryRefresh,
                         modifier = Modifier.background(MioTheme.colors.surface),
                     )
                 }
@@ -246,6 +274,9 @@ private fun ReducedMotionMediaDetailContent(
     onRelatedTitleClick: (String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
+    providerLabel: String?,
+    onReconnect: () -> Unit,
+    onRetryRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -278,6 +309,9 @@ private fun ReducedMotionMediaDetailContent(
                 onRelatedTitleClick = onRelatedTitleClick,
                 onAction = onAction,
                 timeoutMillis = timeoutMillis,
+                providerLabel = providerLabel,
+                onReconnect = onReconnect,
+                onRetryRefresh = onRetryRefresh,
             )
         }
     }
@@ -289,12 +323,23 @@ private fun MediaDetailSections(
     onRelatedTitleClick: (String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
+    providerLabel: String?,
+    onReconnect: () -> Unit,
+    onRetryRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
+        MediaDetailRecovery(
+            syncIssues = state.syncIssues,
+            accountIssue = state.accountIssue,
+            providerLabel = providerLabel,
+            onReconnect = onReconnect,
+            onRetryRefresh = onRetryRefresh,
+            onAction = onAction,
+        )
         MediaDetailCollectionContext(
             collection = state.collection,
             onDecrease = {
@@ -317,6 +362,9 @@ private fun MediaDetailSections(
             },
             onInteractionChanged = { pressed ->
                 onAction(MediaDetailAction.InteractionChanged(state.media.id, pressed))
+            },
+            onMotionChanged = { generation, active ->
+                onAction(MediaDetailAction.MotionChanged(state.media.id, generation, active))
             },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
@@ -348,6 +396,106 @@ private fun MediaDetailBackButton(
         modifier = modifier.padding(8.dp),
     )
 }
+
+@Composable
+private fun MediaDetailRecovery(
+    syncIssues: List<MediaDetailUiState.SyncIssueUiModel>,
+    accountIssue: MediaDetailUiState.AccountIssueUiModel?,
+    providerLabel: String?,
+    onReconnect: () -> Unit,
+    onRetryRefresh: () -> Unit,
+    onAction: (MediaDetailAction) -> Unit,
+) {
+    if (syncIssues.isEmpty() && accountIssue == null) return
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        accountIssue?.let { issue ->
+            Text(
+                text =
+                    if (issue.kind == AccountIssueKind.AUTHENTICATION && providerLabel != null) {
+                        stringResource(R.string.media_detail_sync_authentication, providerLabel)
+                    } else {
+                        stringResource(R.string.media_detail_sync_refresh_issue)
+                    },
+                style = MioTheme.typography.bodyStrong,
+            )
+            if (issue.kind == AccountIssueKind.AUTHENTICATION && providerLabel != null) {
+                TextButton(
+                    onClick = onReconnect,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                ) {
+                    Text(stringResource(R.string.media_detail_sync_reconnect))
+                }
+            } else if (issue.kind == AccountIssueKind.INVALID_REMOTE_DATA) {
+                TextButton(
+                    onClick = onRetryRefresh,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                ) {
+                    Text(stringResource(R.string.media_detail_sync_retry_refresh))
+                }
+            }
+        }
+        syncIssues.forEach { issue ->
+            Text(text = issue.title, style = MioTheme.typography.bodyStrong)
+            Text(text = issue.message(), style = MioTheme.typography.body)
+            Text(
+                text =
+                    stringResource(
+                        R.string.media_detail_sync_local_value,
+                        issue.localProgress,
+                        issue.localUnit.displayName(),
+                    ),
+                style = MioTheme.typography.caption,
+            )
+            if (issue.remoteProgress != null && issue.remoteUnit != null) {
+                Text(
+                    text =
+                        stringResource(
+                            R.string.media_detail_sync_remote_value,
+                            issue.remoteProgress,
+                            issue.remoteUnit.displayName(),
+                        ),
+                    style = MioTheme.typography.caption,
+                )
+            }
+            if (issue.kind == SyncIssueKind.AUTHENTICATION && providerLabel != null) {
+                TextButton(
+                    onClick = onReconnect,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                ) {
+                    Text(stringResource(R.string.media_detail_sync_reconnect))
+                }
+            } else if (issue.canRetry) {
+                TextButton(
+                    onClick = { onAction(MediaDetailAction.RetrySync(issue.operationId)) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                ) {
+                    Text(stringResource(R.string.media_detail_sync_retry))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaDetailUiState.SyncIssueUiModel.message(): String =
+    when (kind) {
+        SyncIssueKind.AUTHENTICATION -> stringResource(R.string.media_detail_sync_authentication_required)
+        SyncIssueKind.REJECTED -> stringResource(R.string.media_detail_sync_rejected)
+        SyncIssueKind.CONFLICT -> stringResource(R.string.media_detail_sync_conflict)
+        SyncIssueKind.RETRY_EXHAUSTED -> stringResource(R.string.media_detail_sync_retry_exhausted)
+        SyncIssueKind.INVALID_REMOTE_DATA -> stringResource(R.string.media_detail_sync_invalid_data)
+    }
+
+@Composable
+private fun MediaDetailProgressUnit.displayName(): String =
+    when (this) {
+        MediaDetailProgressUnit.EPISODE -> stringResource(R.string.media_detail_sync_episodes)
+        MediaDetailProgressUnit.CHAPTER -> stringResource(R.string.media_detail_sync_chapters)
+        MediaDetailProgressUnit.VOLUME -> stringResource(R.string.media_detail_sync_volumes)
+    }
 
 @Composable
 private fun MediaDetailTotals(

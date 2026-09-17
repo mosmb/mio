@@ -1,8 +1,6 @@
 package io.morgan.mio.di
 
 import dev.zacsweers.metro.Inject
-import io.morgan.mio.data.account.AccountRefreshRequester
-import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBindingResolver
 import io.morgan.mio.data.sync.local.RoomSyncAccountLocalDataSource
 import io.morgan.mio.domain.model.AccountId
@@ -26,17 +24,11 @@ internal class MetroSyncAccountSessionFactory(
             accountGraphFactory.createAccountGraph(
                 accountId = persisted.accountId,
                 providerBinding = binding,
-                accountRefreshRequester = AccountRefreshRequester { error(REFRESH_NOT_AVAILABLE) },
-                collectionRefreshRequester = CollectionRefreshRequester { error(REFRESH_NOT_AVAILABLE) },
             )
         return object : SyncAccountSession {
             override val synchronize = graph.synchronizeAccountUseCase
 
             override fun close() = Unit
         }
-    }
-
-    private companion object {
-        const val REFRESH_NOT_AVAILABLE: String = "Foreground refresh is not available from synchronization"
     }
 }

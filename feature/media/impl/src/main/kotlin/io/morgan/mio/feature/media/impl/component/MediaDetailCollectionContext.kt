@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -25,7 +28,22 @@ internal fun MediaDetailCollectionContext(
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
+    onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
+    val motionGeneration = remember { mutableLongStateOf(0L) }
+    val motionActive = remember { mutableStateOf(false) }
+    val reportMotion: (Boolean) -> Unit = { active ->
+        if (active) {
+            if (!motionActive.value) {
+                motionGeneration.longValue += 1L
+                motionActive.value = true
+            }
+            onMotionChanged(motionGeneration.longValue, true)
+        } else if (motionActive.value) {
+            motionActive.value = false
+            onMotionChanged(motionGeneration.longValue, false)
+        }
+    }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(MioTheme.spacing.space2),
@@ -58,6 +76,7 @@ internal fun MediaDetailCollectionContext(
                         value = collection.progress,
                         total = collection.total,
                         description = collection.progressDescription(),
+                        onMotionChanged = reportMotion,
                     )
                 }
                 collection.controls?.let { controls ->

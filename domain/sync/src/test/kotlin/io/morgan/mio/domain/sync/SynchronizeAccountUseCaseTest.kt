@@ -31,8 +31,86 @@ class SynchronizeAccountUseCaseTest {
     fun busyLeaseKeepsWorkScheduledForTakeoverInsteadOfReportingSuccess() =
         runTest {
             val repository = RecordingRepository(emptyList(), leaseBusy = true)
-            assertEquals(SyncRunResult.Retry(now + 120.seconds), synchronize(repository))
+            assertEquals(
+                SyncRunResult.Retry(now + 120.seconds, SyncRunResult.RetryReason.LEASE_BUSY),
+                synchronize(repository),
+            )
             assertEquals(0, repository.readCount)
+        }
+
+    @Test
+    fun foregroundRefreshesWithEmptyOutbox() =
+        runTest {
+            val repository = RecordingRepository(emptyList())
+            val refresh = RecordingRefreshRepository()
+
+            assertEquals(
+                SyncRunResult.Complete,
+                synchronize(repository, refreshContent = true, refreshRepository = refresh),
+            )
+            assertEquals(1, refresh.refreshCalls)
+            assertTrue(repository.failures.isEmpty())
+            assertEquals(0, repository.readCount)
+        }
+
+    @Test
+    fun workerDefaultDoesNotFetchCollection() =
+        runTest {
+            val repository = RecordingRepository(emptyList())
+            val refresh = RecordingRefreshRepository()
+
+            assertEquals(SyncRunResult.Complete, synchronize(repository, refreshRepository = refresh))
+            assertEquals(0, refresh.refreshCalls)
+        }
+
+    @Test
+    fun transientRefreshStillDrainsPending() =
+        runTest {
+            val operation = progressOperation(target = 5, state = PendingOperationState.IN_FLIGHT)
+            val repository = RecordingRepository(listOf(candidate(operation)))
+            val refresh = RecordingRefreshRepository(result = SyncRefreshResult.Transient)
+
+            assertEquals(
+                SyncRunResult.Complete,
+                synchronize(repository, refreshContent = true, refreshRepository = refresh),
+            )
+            assertEquals(1, refresh.refreshCalls)
+            assertEquals(1, repository.readCount)
+            assertEquals(setOf(operation.id), repository.settledOperationIds)
+        }
+
+    @Test
+    fun authenticationRefreshRecordsIssueAndStopsFurtherTransport() =
+        runTest {
+            val operation = progressOperation(target = 5, state = PendingOperationState.IN_FLIGHT)
+            val repository = RecordingRepository(listOf(candidate(operation)))
+            val refresh = RecordingRefreshRepository(result = SyncRefreshResult.Authentication)
+
+            assertEquals(
+                SyncRunResult.Complete,
+                synchronize(repository, refreshContent = true, refreshRepository = refresh),
+            )
+            assertEquals(listOf(SyncAccountIssueKind.AUTHENTICATION), refresh.failureKinds)
+            assertEquals(0, repository.readCount)
+            assertTrue(repository.writes.isEmpty())
+        }
+
+    @Test
+    fun cancelledRefreshReleasesOwnedLease() =
+        runTest {
+            val repository = RecordingRepository(emptyList())
+            val refresh = RecordingRefreshRepository(cancel = true)
+            var cancelled = false
+
+            try {
+                synchronize(repository, refreshContent = true, refreshRepository = refresh)
+            } catch (_: CancellationException) {
+                cancelled = true
+            }
+
+            assertTrue(cancelled)
+            assertTrue(repository.released)
+            assertEquals(1, repository.releaseCount)
         }
 
     @Test
@@ -175,13 +253,18 @@ class SynchronizeAccountUseCaseTest {
             assertEquals(1, repository.releaseCount)
         }
 
-    private suspend fun synchronize(repository: RecordingRepository): SyncRunResult =
+    private suspend fun synchronize(
+        repository: RecordingRepository,
+        refreshContent: Boolean = false,
+        refreshRepository: RecordingRefreshRepository = RecordingRefreshRepository(),
+    ): SyncRunResult =
         SynchronizeAccountUseCase(
             repository = repository,
             clock = clock,
             reconcile = ReconcilePendingOperationUseCase(),
+            refreshRepository = refreshRepository,
             newLeaseOwner = { "owner" },
-        )()
+        )(refreshContent = refreshContent)
 
     private fun candidate(operation: PendingOperation): SyncCandidate =
         SyncCandidate(
@@ -322,4 +405,29 @@ class SynchronizeAccountUseCaseTest {
         val kind: SyncIssueKind?,
         val retryAt: Instant?,
     )
+
+    private class RecordingRefreshRepository(
+        private val blocked: Boolean = false,
+        private val result: SyncRefreshResult = SyncRefreshResult.Success,
+        private val cancel: Boolean = false,
+    ) : RefreshRepository {
+        var refreshCalls: Int = 0
+        val failureKinds = mutableListOf<SyncAccountIssueKind>()
+
+        override suspend fun isAuthenticationBlocked(): Boolean = blocked
+
+        override suspend fun refresh(lease: SyncLease): SyncRefreshResult {
+            refreshCalls += 1
+            if (cancel) throw CancellationException("refresh cancellation")
+            return result
+        }
+
+        override suspend fun recordFailure(
+            lease: SyncLease,
+            kind: SyncAccountIssueKind,
+        ): SyncCommitResult {
+            failureKinds += kind
+            return SyncCommitResult.Applied
+        }
+    }
 }

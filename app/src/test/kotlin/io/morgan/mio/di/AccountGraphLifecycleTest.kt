@@ -6,8 +6,6 @@ import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.core.testing.provider.FakeProviderAuthenticator
 import io.morgan.mio.core.testing.provider.FakeProviderInitialImportDataSource
 import io.morgan.mio.core.testing.provider.providerBindingFixture
-import io.morgan.mio.data.account.AccountRefreshRequester
-import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBinding
 import io.morgan.mio.data.provider.api.ProviderBindingResolver
 import io.morgan.mio.data.provider.api.ProviderKey
@@ -39,14 +37,10 @@ class AccountGraphLifecycleTest {
             assertNull(lifecycle.activeHandle())
 
             val anilistBinding = providerBindingFixture(provider = ProviderKey.ANILIST)
-            val accountRefreshCalls = mutableListOf<Unit>()
-            val collectionRefreshCalls = mutableListOf<Unit>()
             val anilistRequest =
                 request(
                     providerBinding = anilistBinding,
                     accountId = "anilist-account",
-                    accountRefreshCalls = accountRefreshCalls,
-                    collectionRefreshCalls = collectionRefreshCalls,
                 )
             val first = lifecycle.create(anilistRequest)
             assertSame(first, lifecycle.activeHandle())
@@ -97,15 +91,11 @@ class AccountGraphLifecycleTest {
                 appGraph.createAccountGraph(
                     AccountId("ordinary-one"),
                     providerBindingFixture(provider = ProviderKey.ANILIST),
-                    AccountRefreshRequester {},
-                    CollectionRefreshRequester {},
                 )
             val ordinaryTwo =
                 appGraph.createAccountGraph(
                     AccountId("ordinary-two"),
                     providerBindingFixture(provider = ProviderKey.ANILIST),
-                    AccountRefreshRequester {},
-                    CollectionRefreshRequester {},
                 )
             assertNotSame(ordinaryOne.accountRepository, ordinaryTwo.accountRepository)
             assertNotSame(ordinaryOne.mediaRepository, ordinaryTwo.mediaRepository)
@@ -127,8 +117,6 @@ class AccountGraphLifecycleTest {
             assertTrue(anilistAuthenticator.completeCalls.isEmpty())
             assertTrue(anilistAuthenticator.refreshCredentials.isEmpty())
             assertTrue(anilistImport.calls.isEmpty())
-            assertTrue(accountRefreshCalls.isEmpty())
-            assertTrue(collectionRefreshCalls.isEmpty())
 
             lifecycle.destroy()
             assertNull(lifecycle.activeHandle())
@@ -157,15 +145,11 @@ class AccountGraphLifecycleTest {
                     AccountGraph.Factory {
                         accountId,
                         providerBinding,
-                        accountRefreshRequester,
-                        collectionRefreshRequester,
                         ->
                         if (fail) throw expected
                         appGraph.createAccountGraph(
                             accountId,
                             providerBinding,
-                            accountRefreshRequester,
-                            collectionRefreshRequester,
                         )
                     },
                 )
@@ -233,14 +217,10 @@ class AccountGraphLifecycleTest {
     private fun request(
         providerBinding: ProviderBinding,
         accountId: String,
-        accountRefreshCalls: MutableList<Unit> = mutableListOf(),
-        collectionRefreshCalls: MutableList<Unit> = mutableListOf(),
     ): AccountGraphRequest =
         AccountGraphRequest(
             accountId = AccountId(accountId),
             providerBinding = providerBinding,
-            accountRefreshRequester = AccountRefreshRequester { accountRefreshCalls += Unit },
-            collectionRefreshRequester = CollectionRefreshRequester { collectionRefreshCalls += Unit },
         )
 }
 

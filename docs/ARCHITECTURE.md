@@ -343,12 +343,14 @@ Feature modules SHOULD depend on fewer modules when possible. The following matr
 | Feature implementation | Own API | Other feature APIs allowed | Domain capabilities allowed |
 |---|---|---|---|
 | `onboarding` | `onboarding:api` | none; authenticated-root transition is owned by app | `account`, `sync`, `model` |
-| `today` | `today:api` | `media:api`, `library:api` | `queue`, `media`, `progress`, `collection`, `preferences`, `model` |
+| `today` | `today:api` | `media:api`, `library:api` | `queue`, `media`, `progress`, `collection`, `preferences`, `sync`, `model` |
 | `library` | `library:api` | `media:api`, `progress:api` | `collection`, `progress`, `preferences`, `model` |
 | `discover` | `discover:api` | `media:api` | `media`, `collection`, `model` |
 | `you` | `you:api` | none | `account`, `sync`, `preferences`, `model` |
-| `media` | `media:api` | `progress:api` | `media`, `collection`, `progress`, `model` |
+| `media` | `media:api` | `progress:api` | `media`, `collection`, `progress`, `sync`, `model` |
 | `progress` | `progress:api` | none | `progress`, `collection`, `sync`, `model` |
+
+Task 21's prerequisite decision, reviewed separately from feature implementation on 2026-09-16 under the user's delegated decision authority, allows Today and media implementations to consume `:domain:sync` for persisted issue presentation and recovery use cases. Synchronization policy remains in domain; delivery/persistence remains in data and WorkManager execution in `:sync:work`. These features gain no data, provider, database, Worker, or additional cross-feature access. Their API modules remain unchanged.
 
 Every feature API may depend only on `:core:navigation`, `:domain:model` for typed IDs, Kotlin serialization, and Navigation 3 runtime APIs required to define keys. It MUST NOT depend on its implementation or on broader domain capabilities.
 

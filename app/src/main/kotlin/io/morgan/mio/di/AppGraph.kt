@@ -20,6 +20,7 @@ import io.morgan.mio.core.network.NetworkClientFactory
 import io.morgan.mio.core.network.NetworkMonitor
 import io.morgan.mio.data.provider.api.ProviderCredentialStore
 import io.morgan.mio.data.sync.PendingSyncWorkDispatcher
+import io.morgan.mio.domain.account.AccountReconnectionRepository
 import io.morgan.mio.domain.account.AccountSessionRepository
 import io.morgan.mio.domain.preferences.PreferencesRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -31,6 +32,8 @@ internal interface AppGraph :
     AccountGraph.Factory,
     ViewModelGraph {
     val accountGraphLifecycle: AccountGraphLifecycle
+    val accountRefreshObserver: io.morgan.mio.AccountRefreshObserver
+    val accountReconnectionRepository: AccountReconnectionRepository
     val accountSessionRepository: AccountSessionRepository
     val database: MioDatabase
     val networkClientFactory: NetworkClientFactory

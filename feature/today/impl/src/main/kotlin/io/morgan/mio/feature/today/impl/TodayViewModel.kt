@@ -9,9 +9,11 @@ import io.morgan.mio.core.common.di.AccountScope
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationGroupId
+import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressDirection
@@ -20,9 +22,9 @@ import io.morgan.mio.domain.progress.ProgressWriteResult
 import io.morgan.mio.domain.progress.StepProgressUseCase
 import io.morgan.mio.domain.progress.UndoProgressUseCase
 import io.morgan.mio.domain.queue.ObserveTodayQueueUseCase
+import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
+import io.morgan.mio.domain.sync.SyncRecoveryRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -37,6 +42,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @ContributesIntoMap(AccountScope::class)
 @ViewModelKey
 @Inject
@@ -44,9 +50,12 @@ internal class TodayViewModel(
     private val accountId: AccountId,
     observeTodayQueue: ObserveTodayQueueUseCase,
     private val collectionRepository: CollectionRepository,
+    private val mediaRepository: MediaRepository,
     private val stepProgress: StepProgressUseCase,
     private val undoProgress: UndoProgressUseCase,
     observeUndoUseCase: ObserveProgressUndoUseCase,
+    private val syncRecoveryRepository: SyncRecoveryRepository,
+    private val retrySyncIssue: RetrySyncIssueUseCase,
 ) : ViewModel() {
     private val progressError = MutableStateFlow<TodayProgressErrorUiModel?>(null)
     private val latestHiddenUndoId = MutableStateFlow<String?>(null)
@@ -57,7 +66,7 @@ internal class TodayViewModel(
     private val routineHapticEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var lastRequest: PendingProgressRequest? = null
     private var previousState: TodayUiState? = null
-    private val settlingJobs = mutableMapOf<String, Job>()
+    private val motionGenerations = mutableMapOf<String, Long>()
 
     internal val routineHaptics: SharedFlow<Unit> = routineHapticEvents
 
@@ -66,14 +75,48 @@ internal class TodayViewModel(
             action?.takeIf { value -> value.id.value != hiddenId }
         }
 
+    private val recoveryPresentation: Flow<TodayRecoveryUiModel> =
+        combine(
+            syncRecoveryRepository.observeState(),
+            collectionRepository.observeCollection(accountId),
+        ) { recovery, collection ->
+            RecoveryInput(recovery = recovery, collection = collection)
+        }.distinctUntilChanged()
+            .flatMapLatest { input ->
+                val affectedEntries = input.recovery.entryIssues.mapTo(hashSetOf()) { it.entryId }
+                val mediaIds =
+                    input.collection
+                        .filter { it.id in affectedEntries }
+                        .map { it.mediaId }
+                        .distinct()
+                val mediaFlows = mediaIds.map { mediaId -> mediaRepository.observeMedia(mediaId) }
+                if (mediaFlows.isEmpty()) {
+                    flowOf(input.toRecoveryUi(emptyMap()))
+                } else {
+                    combine(mediaFlows) { mediaValues ->
+                        mediaIds
+                            .zip(mediaValues.toList())
+                            .associate { (mediaId, media) -> mediaId.value to media?.title?.value }
+                    }.map(input::toRecoveryUi)
+                }
+            }
+
     private val baseState: Flow<TodayUiState> =
         combine(
             observeTodayQueue(accountId),
             collectionRepository.observeCollection(accountId),
             latestUndo,
             progressError,
-        ) { queue, collection, undo, error ->
-            TodayUiMapper.map(queue, collection, undo, error)
+            recoveryPresentation,
+        ) { queue, collection, undo, error, recovery ->
+            TodayUiMapper.map(
+                queue = queue,
+                collection = collection,
+                latestUndo = undo,
+                progressError = error,
+                syncIssues = recovery.syncIssues,
+                accountIssue = recovery.accountIssue,
+            )
         }
 
     private val presentationProtection: Flow<PresentationProtection> =
@@ -112,10 +155,22 @@ internal class TodayViewModel(
         when (action) {
             is TodayAction.Step -> startStep(action)
             is TodayAction.Undo -> startUndo(action)
+            is TodayAction.RetrySync -> startSyncRetry(action)
             TodayAction.RetryProgress -> lastRequest?.let(::startRequest)
             is TodayAction.InteractionChanged ->
                 touchedMediaIds.update { ids ->
                     if (action.pressed) ids + action.mediaId else ids - action.mediaId
+                }
+            is TodayAction.MotionChanged ->
+                if (action.active) {
+                    val current = motionGenerations[action.mediaId] ?: Long.MIN_VALUE
+                    if (action.generation >= current) {
+                        motionGenerations[action.mediaId] = action.generation
+                        settlingMediaIds.update { ids -> ids + action.mediaId }
+                    }
+                } else if (motionGenerations[action.mediaId] == action.generation) {
+                    motionGenerations.remove(action.mediaId)
+                    settlingMediaIds.update { ids -> ids - action.mediaId }
                 }
             is TodayAction.VisibilityChanged -> {
                 visible.value = action.visible
@@ -123,8 +178,7 @@ internal class TodayViewModel(
                     touchedMediaIds.value = emptySet()
                     pendingRequests.value = emptyMap()
                     settlingMediaIds.value = emptySet()
-                    settlingJobs.values.toList().forEach(Job::cancel)
-                    settlingJobs.clear()
+                    motionGenerations.clear()
                 }
             }
             TodayAction.DismissError -> progressError.value = null
@@ -168,7 +222,6 @@ internal class TodayViewModel(
                 is ProgressWriteResult.Committed -> {
                     latestHiddenUndoId.value = null
                     routineHapticEvents.tryEmit(Unit)
-                    if (visible.value) settle(request.mediaId.value)
                 }
                 is ProgressWriteResult.AlreadyHandled -> latestHiddenUndoId.value = null
                 ProgressWriteResult.Stale -> {
@@ -178,6 +231,17 @@ internal class TodayViewModel(
                 is ProgressWriteResult.Rejected -> {
                     progressError.value = TodayProgressErrorUiModel(retryable = false)
                 }
+            }
+        }
+    }
+
+    private fun startSyncRetry(action: TodayAction.RetrySync) {
+        val operationId = runCatching { OperationId(action.operationId) }.getOrNull() ?: return
+        viewModelScope.launch {
+            try {
+                retrySyncIssue(operationId)
+            } catch (_: io.morgan.mio.domain.sync.SyncInfrastructureException) {
+                progressError.value = TodayProgressErrorUiModel(retryable = false)
             }
         }
     }
@@ -196,7 +260,6 @@ internal class TodayViewModel(
             when (result) {
                 is ProgressWriteResult.Committed -> {
                     latestHiddenUndoId.value = groupId.value
-                    if (visible.value) settle(result.action.mediaId.value)
                 }
                 is ProgressWriteResult.AlreadyHandled -> latestHiddenUndoId.value = groupId.value
                 else -> {
@@ -207,21 +270,8 @@ internal class TodayViewModel(
         }
     }
 
-    private fun settle(mediaId: String) {
-        settlingJobs.remove(mediaId)?.cancel()
-        settlingMediaIds.update { ids -> ids + mediaId }
-        val job =
-            viewModelScope.launch {
-                delay(220)
-                settlingMediaIds.update { ids -> ids - mediaId }
-                settlingJobs.remove(mediaId)
-            }
-        settlingJobs[mediaId] = job
-    }
-
     override fun onCleared() {
-        settlingJobs.values.toList().forEach(Job::cancel)
-        settlingJobs.clear()
+        motionGenerations.clear()
     }
 
     private fun preserveProtectedState(
@@ -261,6 +311,8 @@ internal class TodayViewModel(
                         is TodayUiState.CaughtUp -> base.progressError
                         is TodayUiState.Loading -> base.progressError
                     },
+                syncIssues = base.syncIssues(),
+                accountIssue = base.accountIssue(),
             )
         previousState = result
         return result
@@ -285,6 +337,20 @@ internal class TodayViewModel(
         val settlingMediaIds: Set<String>,
         val visible: Boolean,
     )
+
+    private data class RecoveryInput(
+        val recovery: io.morgan.mio.domain.sync.SyncRecoveryState,
+        val collection: List<CollectionEntry>,
+    ) {
+        fun toRecoveryUi(titlesByMediaId: Map<String, String?>): TodayRecoveryUiModel {
+            val titleByEntryId =
+                collection.associate { entry ->
+                    entry.id.value to titlesByMediaId[entry.mediaId.value]
+                }
+            val mediaIdByEntryId = collection.associate { entry -> entry.id.value to entry.mediaId.value }
+            return TodayUiMapper.mapRecovery(recovery, titleByEntryId, mediaIdByEntryId)
+        }
+    }
 }
 
 private fun TodayUiState.latestUndoMediaId(): String? =
@@ -292,6 +358,20 @@ private fun TodayUiState.latestUndoMediaId(): String? =
         is TodayUiState.Loading -> null
         is TodayUiState.Populated -> latestUndo?.mediaId
         is TodayUiState.CaughtUp -> latestUndo?.mediaId
+    }
+
+private fun TodayUiState.syncIssues(): List<TodayUiState.SyncIssueUiModel> =
+    when (this) {
+        is TodayUiState.Loading -> syncIssues
+        is TodayUiState.Populated -> syncIssues
+        is TodayUiState.CaughtUp -> syncIssues
+    }
+
+private fun TodayUiState.accountIssue(): TodayUiState.AccountIssueUiModel? =
+    when (this) {
+        is TodayUiState.Loading -> accountIssue
+        is TodayUiState.Populated -> accountIssue
+        is TodayUiState.CaughtUp -> accountIssue
     }
 
 private fun TodayNowUiModel.withCollection(

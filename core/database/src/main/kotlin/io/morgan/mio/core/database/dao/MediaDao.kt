@@ -27,6 +27,15 @@ public abstract class MediaDao {
     )
     public abstract fun observeRelatedMedia(mediaId: String): Flow<List<MediaAggregate>>
 
+    @Query("SELECT * FROM media WHERE media_id = :mediaId")
+    public abstract suspend fun getMedia(mediaId: String): MediaEntity?
+
+    @Query("SELECT * FROM media_genre WHERE media_id = :mediaId ORDER BY position")
+    public abstract suspend fun getGenres(mediaId: String): List<MediaGenreEntity>
+
+    @Query("SELECT * FROM related_media WHERE media_id = :mediaId ORDER BY position")
+    public abstract suspend fun getRelatedMedia(mediaId: String): List<RelatedMediaEntity>
+
     @Upsert
     public abstract suspend fun upsertMedia(media: List<MediaEntity>)
 

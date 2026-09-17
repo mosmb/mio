@@ -4,18 +4,11 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.morgan.mio.core.common.di.AppScope
-import io.morgan.mio.data.account.AccountRefreshRequester
 import io.morgan.mio.data.account.AuthenticatedAccountSessionActivator
-import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.provider.api.ProviderBindingResolver
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.domain.account.ConnectedProvider
 import io.morgan.mio.domain.model.AccountId
-
-private const val ACCOUNT_REFRESH_NOT_AVAILABLE =
-    "Account refresh is unavailable until synchronization is implemented"
-private const val COLLECTION_REFRESH_NOT_AVAILABLE =
-    "Collection refresh is unavailable until synchronization is implemented"
 
 @ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
@@ -45,8 +38,6 @@ internal class MetroAuthenticatedAccountSessionActivator(
             AccountGraphRequest(
                 accountId = accountId,
                 providerBinding = providerBinding,
-                accountRefreshRequester = AccountRefreshRequester { error(ACCOUNT_REFRESH_NOT_AVAILABLE) },
-                collectionRefreshRequester = CollectionRefreshRequester { error(COLLECTION_REFRESH_NOT_AVAILABLE) },
             )
         if (current == null) {
             accountGraphLifecycle.create(request)

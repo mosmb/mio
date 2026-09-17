@@ -8,6 +8,7 @@ import io.morgan.mio.domain.media.Release
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationGroupId
+import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressChange
@@ -17,6 +18,10 @@ import io.morgan.mio.domain.progress.ProgressUndo
 import io.morgan.mio.domain.progress.ProgressWriteResult
 import io.morgan.mio.domain.progress.StepProgressUseCase
 import io.morgan.mio.domain.progress.UndoProgressUseCase
+import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
+import io.morgan.mio.domain.sync.SyncIssue
+import io.morgan.mio.domain.sync.SyncRecoveryRepository
+import io.morgan.mio.domain.sync.SyncRecoveryState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -217,6 +222,8 @@ class MediaDetailViewModelTest {
             accountId = accountId,
             mediaRepository = repository,
             collectionRepository = TestCollectionRepository(),
+            syncRecoveryRepository = EmptySyncRecoveryRepository(),
+            retrySyncIssue = RetrySyncIssueUseCase(EmptySyncRecoveryRepository()),
             stepProgress = StepProgressUseCase(progress, fixedClock()),
             undoProgress = UndoProgressUseCase(progress, fixedClock()),
             observeUndoUseCase = ObserveProgressUndoUseCase(progress, fixedClock()),
@@ -264,6 +271,19 @@ class MediaDetailViewModelTest {
             genres = emptyList(),
             relatedMediaIds = emptyList(),
         )
+}
+
+private class EmptySyncRecoveryRepository : SyncRecoveryRepository {
+    override fun observeState() = flowOf(SyncRecoveryState(accountIssue = null, entryIssues = emptyList()))
+
+    override suspend fun readIssue(operationId: OperationId): SyncIssue? = null
+
+    override suspend fun rearm(issue: SyncIssue): Boolean = false
+
+    override suspend fun recoverAuthentication(
+        accountId: AccountId,
+        issueIds: Set<String>,
+    ): Boolean = false
 }
 
 private class TestProgressRepository : ProgressRepository {

@@ -10,6 +10,7 @@ import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
 import io.morgan.mio.core.database.entity.MediaProviderIdEntity
 import io.morgan.mio.core.database.entity.PendingOperationEntity
 import io.morgan.mio.core.database.entity.SelectedAccountEntity
+import io.morgan.mio.core.database.entity.SyncAccountIssueEntity
 import io.morgan.mio.core.database.entity.SyncIssueEntity
 import io.morgan.mio.core.database.entity.SyncLeaseEntity
 import io.morgan.mio.core.database.entity.SyncScheduleEntity
@@ -76,6 +77,11 @@ public abstract class SyncDao {
           )
           AND NOT EXISTS (
               SELECT 1 FROM sync_issue account_issue
+              WHERE account_issue.account_id = :accountId
+                AND account_issue.kind = 'authentication'
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM sync_account_issue account_issue
               WHERE account_issue.account_id = :accountId
                 AND account_issue.kind = 'authentication'
           )
@@ -208,6 +214,15 @@ public abstract class SyncDao {
         provider: io.morgan.mio.core.database.model.StoredConnectedProvider,
     ): CollectionEntryProviderIdEntity?
 
+    @Query(
+        "SELECT * FROM collection_entry_provider_id " +
+            "WHERE provider = :provider AND remote_collection_entry_id = :remoteEntryId LIMIT 1",
+    )
+    public abstract suspend fun findEntryProviderIdByRemote(
+        provider: io.morgan.mio.core.database.model.StoredConnectedProvider,
+        remoteEntryId: String,
+    ): CollectionEntryProviderIdEntity?
+
     @Query("SELECT * FROM collection_entry_provider_id WHERE collection_entry_id = :entryId LIMIT 1")
     public abstract suspend fun getEntryProviderId(entryId: String): CollectionEntryProviderIdEntity?
 
@@ -217,6 +232,15 @@ public abstract class SyncDao {
     public abstract suspend fun getMediaProviderId(
         mediaId: String,
         provider: io.morgan.mio.core.database.model.StoredConnectedProvider,
+    ): MediaProviderIdEntity?
+
+    @Query(
+        "SELECT * FROM media_provider_id " +
+            "WHERE provider = :provider AND remote_media_id = :remoteMediaId LIMIT 1",
+    )
+    public abstract suspend fun findMediaProviderIdByRemote(
+        provider: io.morgan.mio.core.database.model.StoredConnectedProvider,
+        remoteMediaId: String,
     ): MediaProviderIdEntity?
 
     @Query("SELECT * FROM sync_schedule ORDER BY account_id")
@@ -305,6 +329,18 @@ public abstract class SyncDao {
         groupId: String,
     ): List<SyncIssueEntity>
 
+    @Query("SELECT * FROM sync_issue WHERE account_id = :accountId AND issue_id = :issueId")
+    public abstract suspend fun getIssue(
+        accountId: String,
+        issueId: String,
+    ): SyncIssueEntity?
+
+    @Query("SELECT * FROM sync_issue WHERE account_id = :accountId AND issue_id IN (:issueIds)")
+    public abstract suspend fun getIssuesByIds(
+        accountId: String,
+        issueIds: Set<String>,
+    ): List<SyncIssueEntity>
+
     @Upsert
     public abstract suspend fun upsertIssue(issue: SyncIssueEntity)
 
@@ -312,6 +348,41 @@ public abstract class SyncDao {
     public abstract suspend fun deleteIssue(
         accountId: String,
         issueId: String,
+    ): Int
+
+    @Query("SELECT * FROM sync_account_issue WHERE account_id = :accountId")
+    public abstract fun observeAccountIssue(accountId: String): Flow<SyncAccountIssueEntity?>
+
+    @Query("SELECT * FROM sync_account_issue WHERE account_id = :accountId")
+    public abstract suspend fun getAccountIssue(accountId: String): SyncAccountIssueEntity?
+
+    @Upsert
+    public abstract suspend fun upsertAccountIssue(issue: SyncAccountIssueEntity)
+
+    @Query("DELETE FROM sync_account_issue WHERE account_id = :accountId AND issue_id = :issueId")
+    public abstract suspend fun deleteAccountIssue(
+        accountId: String,
+        issueId: String,
+    ): Int
+
+    @Query(
+        "DELETE FROM sync_account_issue " +
+            "WHERE account_id = :accountId AND kind = :kind",
+    )
+    public abstract suspend fun deleteAccountIssueIfKind(
+        accountId: String,
+        kind: String,
+    ): Int
+
+    @Query(
+        "UPDATE pending_operation SET lifecycle_state = 'enqueued', attempt_count = 0, " +
+            "last_attempt_at_utc_ms = NULL, retry_not_before_utc_ms = NULL " +
+            "WHERE operation_id = :operationId AND account_id = :accountId " +
+            "AND lifecycle_state IN ('retryable_failure', 'terminal_failure', 'blocked')",
+    )
+    public abstract suspend fun rearmOperation(
+        accountId: String,
+        operationId: String,
     ): Int
 
     @Query(

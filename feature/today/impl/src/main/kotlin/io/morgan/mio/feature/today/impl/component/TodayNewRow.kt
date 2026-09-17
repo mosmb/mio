@@ -12,8 +12,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -42,12 +47,28 @@ internal fun TodayNewRow(
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
+    onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     val largeText = LocalDensity.current.fontScale > 1.3f
+    val motionGeneration = remember { mutableLongStateOf(0L) }
+    val motionActive = remember { mutableStateOf(false) }
+    val reportMotion: (Boolean) -> Unit = { active ->
+        if (active) {
+            if (!motionActive.value) {
+                motionGeneration.longValue += 1L
+                motionActive.value = true
+            }
+            onMotionChanged(motionGeneration.longValue, true)
+        } else if (motionActive.value) {
+            motionActive.value = false
+            onMotionChanged(motionGeneration.longValue, false)
+        }
+    }
     val actionLabel = stringResource(R.string.today_open_details, recommendation.title)
     FlowRow(
         modifier =
             modifier
+                .observeTodayPointer(onInteractionChanged)
                 .fillMaxWidth()
                 .heightIn(min = 104.dp)
                 .clip(MioTheme.shapes.sm)
@@ -80,29 +101,38 @@ internal fun TodayNewRow(
                 text = recommendation.title,
                 style = MioTheme.typography.bodyStrong,
             )
-            recommendation.releaseAge?.let { age ->
-                Text(
-                    text = age.recencyText(),
-                    style = MioTheme.typography.caption,
-                    color = MioTheme.colors.textMuted,
-                )
-            }
-            recommendation.nextUnit?.let { nextUnit ->
-                Text(
-                    text = stringResource(recommendation.progressUnit.nextUnitLabelRes, nextUnit),
-                    style = MioTheme.typography.body,
-                )
-            }
-            recommendation.availableUnitCount?.let { availableCount ->
-                Text(
-                    text =
-                        pluralStringResource(
-                            recommendation.progressUnit.availableUnitsRes,
-                            availableCount,
-                            availableCount,
-                        ),
-                    style = MioTheme.typography.caption,
-                )
+            val claimHeight = remember(recommendation.mediaId) { mutableIntStateOf(0) }
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(min = with(LocalDensity.current) { claimHeight.intValue.toDp() })
+                        .onSizeChanged { claimHeight.intValue = maxOf(claimHeight.intValue, it.height) },
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                recommendation.releaseAge?.let { age ->
+                    Text(
+                        text = age.recencyText(),
+                        style = MioTheme.typography.caption,
+                        color = MioTheme.colors.textMuted,
+                    )
+                }
+                recommendation.nextUnit?.let { nextUnit ->
+                    Text(
+                        text = stringResource(recommendation.progressUnit.nextUnitLabelRes, nextUnit),
+                        style = MioTheme.typography.body,
+                    )
+                }
+                recommendation.availableUnitCount?.let { availableCount ->
+                    Text(
+                        text =
+                            pluralStringResource(
+                                recommendation.progressUnit.availableUnitsRes,
+                                availableCount,
+                                availableCount,
+                            ),
+                        style = MioTheme.typography.caption,
+                    )
+                }
             }
             if (recommendation.status != TodayCollectionStatus.CURRENT) {
                 Text(
@@ -114,6 +144,7 @@ internal fun TodayNewRow(
                 value = recommendation.progress,
                 total = recommendation.total,
                 description = recommendation.progressLabel(),
+                onMotionChanged = reportMotion,
             )
         }
         recommendation.controls?.let { controls ->
@@ -133,7 +164,6 @@ internal fun TodayNewRow(
                 increaseEnabled = controls.increaseEnabled,
                 onDecrease = onDecrease,
                 onIncrease = onIncrease,
-                onInteractionChanged = onInteractionChanged,
                 modifier = Modifier.padding(start = 8.dp),
             )
         }

@@ -113,6 +113,24 @@ class MediaDetailScreenTest {
     }
 
     @Test
+    fun accountRefreshIssueOffersFunctionalReadOnlyRetry() {
+        var refreshRequests = 0
+        show(
+            state =
+                populatedState().copy(
+                    accountIssue = MediaDetailUiState.AccountIssueUiModel(AccountIssueKind.INVALID_REMOTE_DATA),
+                ),
+            onRetryRefresh = { refreshRequests += 1 },
+        )
+
+        composeRule.onNodeWithText("Saved content could not be refreshed").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Retry refresh").performScrollTo().performClick()
+        assertEquals(1, refreshRequests)
+        composeRule.onAllNodesWithText("Reconnect").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Retry sync").assertCountEquals(0)
+    }
+
+    @Test
     fun normalMotionAnchorsTheHeroWhileTheOpaqueSheetMovesAndReverses() {
         show(state = populatedState())
         val scroll = composeRule.onNode(verticalScrollMatcher())
@@ -216,6 +234,7 @@ class MediaDetailScreenTest {
         state: MediaDetailUiState,
         onBack: () -> Unit = {},
         onRetry: () -> Unit = {},
+        onRetryRefresh: () -> Unit = {},
         onRelatedTitleClick: (String) -> Unit = {},
         reducedMotion: Boolean = false,
     ) {
@@ -227,6 +246,7 @@ class MediaDetailScreenTest {
                         state = state,
                         onBack = onBack,
                         onRetry = onRetry,
+                        onRetryRefresh = onRetryRefresh,
                         onRelatedTitleClick = onRelatedTitleClick,
                     )
                 }

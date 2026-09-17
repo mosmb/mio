@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
@@ -62,6 +63,65 @@ class TodayScreenTest {
     @After
     fun closeImageLoader() {
         imageLoader?.shutdown()
+    }
+
+    @Test
+    fun bodyPointerProtectsTheCardUntilCancellationWithoutOpeningDetail() {
+        val actions = mutableListOf<TodayAction>()
+        val opened = mutableListOf<String>()
+        show(state = populatedState(), onAction = actions::add, onMediaDetail = opened::add)
+        val title = composeRule.onNodeWithText("Readable title")
+        title.performTouchInput { down(center) }
+        composeRule.runOnIdle {
+            assertTrue(actions.any { it is TodayAction.InteractionChanged && it.pressed })
+            assertTrue(opened.isEmpty())
+        }
+        title.performTouchInput { cancel() }
+        composeRule.runOnIdle {
+            assertFalse(actions.filterIsInstance<TodayAction.InteractionChanged>().last().pressed)
+            assertTrue(opened.isEmpty())
+        }
+    }
+
+    @Test
+    fun expiredClaimsDisappearWithoutMovingTheNowTitle() {
+        val initial = populatedState(newRecommendations = emptyList())
+        val state = show(initial)
+        val title = composeRule.onNodeWithText("Readable title")
+        val before = title.fetchSemanticsNode().boundsInRoot.topLeft
+        composeRule.onNodeWithText("Next episode 9").assertIsDisplayed()
+        composeRule.onNodeWithText("4 episodes ready").assertIsDisplayed()
+        composeRule.runOnIdle {
+            state.value = initial.copy(now = initial.now.copy(nextUnit = null, availableUnitCount = null))
+        }
+        assertEquals(before, title.fetchSemanticsNode().boundsInRoot.topLeft)
+        composeRule.onAllNodesWithText("Next episode 9").assertCountEquals(0)
+        composeRule.onAllNodesWithText("4 episodes ready").assertCountEquals(0)
+    }
+
+    @Test
+    fun expiredNewClaimsDoNotMoveProgressOrFollowingRows() {
+        val first = previewNewRecommendations().first().copy(progress = 7)
+        val initial = populatedState(newRecommendations = listOf(first, previewNewRecommendations()[1]))
+        val state = show(initial)
+        val progress = composeRule.onNodeWithContentDescription("Episode 7 of 12")
+        val following = composeRule.onNodeWithText("A Longer Evening")
+        val progressBefore = progress.fetchSemanticsNode().boundsInRoot
+        val followingBefore = following.fetchSemanticsNode().boundsInRoot
+        composeRule.onAllNodesWithText("2 episodes ready").assertCountEquals(2)
+        composeRule.runOnIdle {
+            state.value =
+                initial.copy(
+                    newRecommendations =
+                        listOf(
+                            first.copy(releaseAge = null, nextUnit = null, availableUnitCount = null),
+                            initial.newRecommendations[1],
+                        ),
+                )
+        }
+        assertEquals(progressBefore, progress.fetchSemanticsNode().boundsInRoot)
+        assertEquals(followingBefore, following.fetchSemanticsNode().boundsInRoot)
+        composeRule.onAllNodesWithText("2 episodes ready").assertCountEquals(1)
     }
 
     @Test
@@ -188,6 +248,24 @@ class TodayScreenTest {
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
                 useUnmergedTree = true,
             ).assertDoesNotExist()
+    }
+
+    @Test
+    fun accountRefreshIssueOffersOnlyTheReadOnlyRefreshRetry() {
+        var refreshRequests = 0
+        show(
+            state =
+                caughtUpState().copy(
+                    accountIssue = TodayUiState.AccountIssueUiModel(AccountIssueKind.INVALID_REMOTE_DATA),
+                ),
+            onRetryRefresh = { refreshRequests += 1 },
+        )
+
+        composeRule.onNodeWithText("Saved content could not be refreshed").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Retry refresh").performScrollTo().performClick()
+        assertEquals(1, refreshRequests)
+        composeRule.onAllNodesWithText("Reconnect").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Retry sync").assertCountEquals(0)
     }
 
     @Test
@@ -339,6 +417,10 @@ class TodayScreenTest {
     private fun show(
         state: TodayUiState,
         onMediaDetail: (String) -> Unit = {},
+        onAction: (TodayAction) -> Unit = {},
+        providerLabel: String? = null,
+        onReconnect: () -> Unit = {},
+        onRetryRefresh: () -> Unit = {},
         modifier: Modifier = Modifier,
         fontScale: Float = 1f,
         onDensity: ((Density) -> Unit)? = null,
@@ -355,6 +437,10 @@ class TodayScreenTest {
                             modifier = modifier,
                             state = stateHolder.value,
                             onMediaDetail = onMediaDetail,
+                            onAction = onAction,
+                            providerLabel = providerLabel,
+                            onReconnect = onReconnect,
+                            onRetryRefresh = onRetryRefresh,
                         )
                     }
                 }

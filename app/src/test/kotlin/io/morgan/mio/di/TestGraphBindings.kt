@@ -11,6 +11,7 @@ import androidx.work.WorkerParameters
 import coil3.ImageLoader
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.Provides
+import io.morgan.mio.core.common.di.ApplicationContext
 import io.morgan.mio.core.common.di.DefaultDispatcher
 import io.morgan.mio.core.common.di.IoDispatcher
 import io.morgan.mio.core.common.di.MainDispatcher
@@ -22,6 +23,8 @@ import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.OnboardingDestination
 import io.morgan.mio.core.navigation.TopLevelDestination
+import io.morgan.mio.core.network.NetworkAvailability
+import io.morgan.mio.core.network.NetworkMonitor
 import io.morgan.mio.core.testing.provider.FakeProviderCredentialStore
 import io.morgan.mio.core.testing.provider.providerBindingFixture
 import io.morgan.mio.core.testing.repository.FakeAccountRepository
@@ -46,9 +49,10 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
-import kotlinx.coroutines.test.TestDispatcher
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.time.Clock
@@ -57,6 +61,7 @@ import kotlin.time.Instant
 @BindingContainer
 internal class TestGraphBindings(
     private val database: MioDatabase,
+    private val providerBinding: ProviderBinding = providerBindingFixture(),
     private val dataStore: DataStore<Preferences>,
     private val clock: Clock,
     private val defaultDispatcher: CoroutineDispatcher,
@@ -65,7 +70,7 @@ internal class TestGraphBindings(
     private val processCoroutineScope: CoroutineScope,
     private val logger: MioLogger,
     private val providerCredentialStore: ProviderCredentialStore,
-    private val imageLoader: ImageLoader,
+    private val imageLoader: TrackingImageLoader,
     private val workerFactory: WorkerFactory,
     private val workManagerConfiguration: Configuration,
     private val accountRepository: AccountRepository,
@@ -73,9 +78,16 @@ internal class TestGraphBindings(
     private val collectionRepository: CollectionRepository,
     private val preferencesRepository: PreferencesRepository,
     private val accountSessionRepository: AccountSessionRepository,
+    private val networkMonitor: NetworkMonitor,
     private val pendingSyncWorkDispatcher: PendingSyncWorkDispatcher =
         PendingSyncWorkDispatcher(database, SyncWorkScheduler { }),
 ) {
+    @Provides
+    fun provideBindingResolver(): io.morgan.mio.data.provider.api.ProviderBindingResolver =
+        io.morgan.mio.data.provider.api.ProviderBindingResolver { provider ->
+            providerBinding.takeIf { it.provider == provider }
+        }
+
     @Provides
     fun provideDatabase(): MioDatabase = database
 
@@ -108,7 +120,12 @@ internal class TestGraphBindings(
     fun provideProviderCredentialStore(): ProviderCredentialStore = providerCredentialStore
 
     @Provides
-    fun provideImageLoader(): ImageLoader = imageLoader
+    fun provideImageLoader(
+        @ApplicationContext applicationContext: Context,
+    ): ImageLoader {
+        require(applicationContext.applicationContext.packageName == imageLoader.applicationPackageName)
+        return imageLoader
+    }
 
     @Provides
     fun provideWorkerFactory(factories: Set<MioWorkerFactory>): WorkerFactory = factories.let { workerFactory }
@@ -134,6 +151,9 @@ internal class TestGraphBindings(
     fun provideAccountSessionRepository(): AccountSessionRepository = accountSessionRepository
 
     @Provides
+    fun provideNetworkMonitor(): NetworkMonitor = networkMonitor
+
+    @Provides
     fun provideSyncAccountSessionFactory(): SyncAccountSessionFactory = SyncAccountSessionFactory { null }
 
     @Provides
@@ -156,8 +176,10 @@ internal class TestGraphFixture(
     context: Context,
     scheduler: TestCoroutineScheduler,
     providerBinding: ProviderBinding = providerBindingFixture(),
+    taskClock: Clock? = null,
+    testDispatcher: CoroutineDispatcher? = null,
 ) : AutoCloseable {
-    val dispatcher: TestDispatcher = StandardTestDispatcher(scheduler)
+    val dispatcher: CoroutineDispatcher = testDispatcher ?: StandardTestDispatcher(scheduler)
     private val dataStoreScope = CoroutineScope(SupervisorJob() + dispatcher)
     val processCoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
     private val temporaryDirectory: Path = Files.createTempDirectory("mio-task-six")
@@ -169,9 +191,11 @@ internal class TestGraphFixture(
             produceFile = { dataStoreFile.toFile() },
         )
     val clock: Clock =
-        object : Clock {
-            override fun now(): Instant = Instant.parse("2026-08-11T12:00:00Z")
-        }
+        taskClock
+            ?: object : Clock {
+                override fun now(): Instant = Instant.parse("2026-08-11T12:00:00Z")
+            }
+    val networkMonitor = TestNetworkMonitor()
     val accountRepository = FakeAccountRepository()
     val mediaRepository = FakeMediaRepository()
     val collectionRepository = FakeCollectionRepository()
@@ -183,7 +207,11 @@ internal class TestGraphFixture(
             providerBinding = providerBinding,
             providerCredentialStore = providerCredentialStore,
         )
-    val imageLoader: TrackingImageLoader = TrackingImageLoader(ImageLoader.Builder(context).build())
+    val imageLoader: TrackingImageLoader =
+        TrackingImageLoader(
+            applicationPackageName = context.applicationContext.packageName,
+            delegate = ImageLoader.Builder(context).build(),
+        )
     val workerFactory: WorkerFactory =
         object : WorkerFactory() {
             override fun createWorker(
@@ -197,6 +225,7 @@ internal class TestGraphFixture(
     val bindings =
         TestGraphBindings(
             database = database,
+            providerBinding = providerBinding,
             dataStore = dataStore,
             clock = clock,
             defaultDispatcher = dispatcher,
@@ -213,6 +242,7 @@ internal class TestGraphFixture(
             collectionRepository = collectionRepository,
             preferencesRepository = preferencesRepository,
             accountSessionRepository = accountSessionRepository,
+            networkMonitor = networkMonitor,
         )
 
     override fun close() {
@@ -225,7 +255,13 @@ internal class TestGraphFixture(
     }
 }
 
+internal class TestNetworkMonitor : NetworkMonitor {
+    val values = MutableStateFlow(NetworkAvailability.UNAVAILABLE)
+    override val availability: Flow<NetworkAvailability> = values
+}
+
 internal class TrackingImageLoader(
+    internal val applicationPackageName: String,
     private val delegate: ImageLoader,
 ) : ImageLoader by delegate {
     var shutdownCalls: Int = 0

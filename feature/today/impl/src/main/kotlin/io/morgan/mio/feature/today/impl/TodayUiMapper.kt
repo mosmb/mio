@@ -12,8 +12,12 @@ import io.morgan.mio.domain.queue.NewRecommendation
 import io.morgan.mio.domain.queue.NextReleaseRecommendation
 import io.morgan.mio.domain.queue.NowRecommendation
 import io.morgan.mio.domain.queue.TodayQueue
+import io.morgan.mio.domain.sync.SyncAccountIssueKind
+import io.morgan.mio.domain.sync.SyncIssue
+import io.morgan.mio.domain.sync.SyncRecoveryState
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import io.morgan.mio.domain.sync.SyncIssueKind as DomainSyncIssueKind
 
 internal object TodayUiMapper {
     fun map(queue: TodayQueue): TodayUiState = map(queue, emptyList(), null, null)
@@ -23,6 +27,8 @@ internal object TodayUiMapper {
         collection: List<CollectionEntry>,
         latestUndo: ProgressAction?,
         progressError: TodayProgressErrorUiModel?,
+        syncIssues: List<TodayUiState.SyncIssueUiModel> = emptyList(),
+        accountIssue: TodayUiState.AccountIssueUiModel? = null,
     ): TodayUiState {
         val entriesByMediaId = collection.associateBy { entry -> entry.mediaId }
         val undo = latestUndo?.toUndoUiModel()
@@ -36,13 +42,36 @@ internal object TodayUiMapper {
                 remainingReadyCount = queue.remainingReadyCount,
                 latestUndo = undo,
                 progressError = progressError,
+                syncIssues = syncIssues,
+                accountIssue = accountIssue,
             )
         } ?: TodayUiState.CaughtUp(
             receipt = requireNotNull(queue.caughtUp).toUiModel(),
             latestUndo = undo,
             progressError = progressError,
+            syncIssues = syncIssues,
+            accountIssue = accountIssue,
         )
     }
+
+    internal fun mapRecovery(
+        recovery: SyncRecoveryState,
+        titleByEntryId: Map<String, String?>,
+        mediaIdByEntryId: Map<String, String>,
+    ): TodayRecoveryUiModel =
+        TodayRecoveryUiModel(
+            syncIssues =
+                recovery.entryIssues.map { issue ->
+                    issue.toUiModel(
+                        title = titleByEntryId[issue.entryId.value],
+                        mediaId = mediaIdByEntryId[issue.entryId.value],
+                    )
+                },
+            accountIssue =
+                recovery.accountIssue?.let { issue ->
+                    TodayUiState.AccountIssueUiModel(issue.kind.toUiKind())
+                },
+        )
 
     private fun NowRecommendation.toUiModel(
         entry: CollectionEntry?,
@@ -188,4 +217,54 @@ internal object TodayUiMapper {
             ProgressUnit.CHAPTER -> TodayProgressUnit.CHAPTER
             ProgressUnit.VOLUME -> TodayProgressUnit.VOLUME
         }
+
+    private fun SyncIssue.toUiModel(
+        title: String?,
+        mediaId: String?,
+    ): TodayUiState.SyncIssueUiModel =
+        TodayUiState.SyncIssueUiModel(
+            operationId = operationId.value,
+            entryId = entryId.value,
+            mediaId = mediaId,
+            title = title,
+            kind = kind.toUiKind(),
+            localProgress = local.progress.value,
+            localUnit = local.unit.toUiUnit(),
+            localStatus = local.status.toTodayStatus(),
+            localTotal = local.total?.value,
+            remoteProgress = remote?.progress?.value,
+            remoteUnit = remote?.unit?.toUiUnit(),
+            remoteStatus = remote?.status?.toTodayStatus(),
+            canRetry = kind == DomainSyncIssueKind.REJECTED || kind == DomainSyncIssueKind.RETRY_EXHAUSTED,
+        )
+
+    private fun DomainSyncIssueKind.toUiKind(): SyncIssueKind =
+        when (this) {
+            DomainSyncIssueKind.AUTHENTICATION -> SyncIssueKind.AUTHENTICATION
+            DomainSyncIssueKind.REJECTED -> SyncIssueKind.REJECTED
+            DomainSyncIssueKind.CONFLICT -> SyncIssueKind.CONFLICT
+            DomainSyncIssueKind.RETRY_EXHAUSTED -> SyncIssueKind.RETRY_EXHAUSTED
+            DomainSyncIssueKind.INVALID_REMOTE_DATA -> SyncIssueKind.INVALID_REMOTE_DATA
+        }
+
+    private fun SyncAccountIssueKind.toUiKind(): AccountIssueKind =
+        when (this) {
+            SyncAccountIssueKind.AUTHENTICATION -> AccountIssueKind.AUTHENTICATION
+            SyncAccountIssueKind.INVALID_REMOTE_DATA -> AccountIssueKind.INVALID_REMOTE_DATA
+        }
 }
+
+internal data class TodayRecoveryUiModel(
+    val syncIssues: List<TodayUiState.SyncIssueUiModel>,
+    val accountIssue: TodayUiState.AccountIssueUiModel?,
+)
+
+private fun io.morgan.mio.domain.collection.CollectionStatus.toTodayStatus(): TodayCollectionStatus =
+    when (this) {
+        CollectionStatus.CURRENT -> TodayCollectionStatus.CURRENT
+        CollectionStatus.PLANNED -> TodayCollectionStatus.PLANNED
+        CollectionStatus.PAUSED -> TodayCollectionStatus.PAUSED
+        CollectionStatus.COMPLETED -> TodayCollectionStatus.COMPLETED
+        CollectionStatus.DROPPED -> TodayCollectionStatus.DROPPED
+        CollectionStatus.REPEATING -> TodayCollectionStatus.REPEATING
+    }

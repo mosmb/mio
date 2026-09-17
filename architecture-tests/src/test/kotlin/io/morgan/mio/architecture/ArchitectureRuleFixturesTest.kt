@@ -34,6 +34,8 @@ class ArchitectureRuleFixturesTest {
                         "ValidAccountRepository.kt" to ":domain:account",
                         "FakeValidRepository.kt" to ":core:testing",
                         "ValidFeatureImpl.kt" to ":feature:today:impl",
+                        "ValidTodaySyncRecovery.kt" to ":feature:today:impl",
+                        "ValidMediaSyncRecovery.kt" to ":feature:media:impl",
                         "ValidCapabilityData.kt" to ":data:progress",
                         "ValidProvider.kt" to ":data:provider:anilist",
                         "ValidLogging.kt" to ":core:logging",
@@ -120,6 +122,26 @@ class ArchitectureRuleFixturesTest {
             "presentation-isolation",
             "FeatureImportsData.kt",
             ":feature:today:impl",
+            ::enforcePresentationIsolation,
+        )
+    }
+
+    @Test
+    fun todaySyncRecoveryCannotImportSyncData() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "TodayImportsSyncData.kt",
+            ":feature:today:impl",
+            ::enforcePresentationIsolation,
+        )
+    }
+
+    @Test
+    fun mediaSyncRecoveryCannotImportWorkers() {
+        assertFixtureRejected(
+            "synchronization-boundary",
+            "MediaImportsSyncWorker.kt",
+            ":feature:media:impl",
             ::enforcePresentationIsolation,
         )
     }

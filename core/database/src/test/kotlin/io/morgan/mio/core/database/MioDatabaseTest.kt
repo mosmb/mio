@@ -78,12 +78,12 @@ class MioDatabaseTest {
         }
 
     @Test
-    fun versionFiveExposesSynchronizationTablesAndDao() =
+    fun versionSixExposesSynchronizationTablesAndDao() =
         runTest {
-            assertEquals(5, MioDatabase.VERSION)
+            assertEquals(6, MioDatabase.VERSION)
             assertNotNull(database.syncDao())
             assertEquals(
-                setOf("sync_lease", "sync_schedule", "sync_issue"),
+                setOf("sync_lease", "sync_schedule", "sync_issue", "sync_account_issue"),
                 database
                     .openHelper
                     .readableDatabase

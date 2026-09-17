@@ -15,9 +15,19 @@ internal sealed interface MediaDetailAction {
 
     data object RetryProgress : MediaDetailAction
 
+    data class RetrySync(
+        val operationId: String,
+    ) : MediaDetailAction
+
     data class InteractionChanged(
         val mediaId: String,
         val pressed: Boolean,
+    ) : MediaDetailAction
+
+    data class MotionChanged(
+        val mediaId: String,
+        val generation: Long,
+        val active: Boolean,
     ) : MediaDetailAction
 
     data class VisibilityChanged(

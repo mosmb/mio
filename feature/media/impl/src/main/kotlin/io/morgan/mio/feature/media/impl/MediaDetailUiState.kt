@@ -4,11 +4,15 @@ internal sealed interface MediaDetailUiState {
     data class Loading(
         val latestUndo: MediaDetailUndoUiModel? = null,
         val progressError: MediaDetailProgressErrorUiModel? = null,
+        val syncIssues: List<SyncIssueUiModel> = emptyList(),
+        val accountIssue: AccountIssueUiModel? = null,
     ) : MediaDetailUiState
 
     data class Error(
         val latestUndo: MediaDetailUndoUiModel? = null,
         val progressError: MediaDetailProgressErrorUiModel? = null,
+        val syncIssues: List<SyncIssueUiModel> = emptyList(),
+        val accountIssue: AccountIssueUiModel? = null,
     ) : MediaDetailUiState
 
     data class Content(
@@ -17,7 +21,28 @@ internal sealed interface MediaDetailUiState {
         val collection: MediaDetailCollectionUiModel?,
         val latestUndo: MediaDetailUndoUiModel? = null,
         val progressError: MediaDetailProgressErrorUiModel? = null,
+        val syncIssues: List<SyncIssueUiModel> = emptyList(),
+        val accountIssue: AccountIssueUiModel? = null,
     ) : MediaDetailUiState
+
+    data class SyncIssueUiModel(
+        val operationId: String,
+        val entryId: String,
+        val title: String,
+        val kind: SyncIssueKind,
+        val localProgress: Int,
+        val localUnit: MediaDetailProgressUnit,
+        val localStatus: MediaDetailCollectionStatus,
+        val localTotal: Int?,
+        val remoteProgress: Int?,
+        val remoteUnit: MediaDetailProgressUnit?,
+        val remoteStatus: MediaDetailCollectionStatus?,
+        val canRetry: Boolean,
+    )
+
+    data class AccountIssueUiModel(
+        val kind: AccountIssueKind,
+    )
 }
 
 internal data class MediaDetailUiModel(
@@ -113,4 +138,17 @@ internal enum class MediaDetailProgressUnit {
     EPISODE,
     CHAPTER,
     VOLUME,
+}
+
+internal enum class SyncIssueKind {
+    AUTHENTICATION,
+    REJECTED,
+    CONFLICT,
+    RETRY_EXHAUSTED,
+    INVALID_REMOTE_DATA,
+}
+
+internal enum class AccountIssueKind {
+    AUTHENTICATION,
+    INVALID_REMOTE_DATA,
 }

@@ -1,5 +1,6 @@
 package io.morgan.mio
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -25,6 +26,8 @@ import io.morgan.mio.core.database.model.StoredMediaPublicationStatus
 import io.morgan.mio.core.database.model.StoredMediaType
 import io.morgan.mio.core.database.model.StoredProgressUnit
 import io.morgan.mio.core.database.model.StoredReleaseTimeKind
+import io.morgan.mio.core.ui.AccountRecoveryActions
+import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.collection.DefaultCollectionRepository
 import io.morgan.mio.data.collection.local.RoomCollectionLocalDataSource
@@ -205,6 +208,7 @@ class ProgressRoomNavigationTest {
                     ),
                 preferencesRepository = fixture.preferencesRepository,
                 accountSessionRepository = fixture.accountSessionRepository,
+                networkMonitor = fixture.networkMonitor,
             ),
         ).create(activityRule.activity)
 
@@ -215,10 +219,6 @@ class ProgressRoomNavigationTest {
                 providerBinding =
                     io.morgan.mio.core.testing.provider
                         .providerBindingFixture(ProviderKey.ANILIST),
-                accountRefreshRequester =
-                    io.morgan.mio.data.account
-                        .AccountRefreshRequester {},
-                collectionRefreshRequester = CollectionRefreshRequester {},
             ),
         )
 
@@ -227,12 +227,16 @@ class ProgressRoomNavigationTest {
         handle: io.morgan.mio.di.AccountGraphHandle,
     ) {
         composeRule.setContent {
-            MioApp(
-                root = AppRoot.AUTHENTICATED,
-                navigationRegistry = graph.navigationRegistry,
-                imageLoader = graph.imageLoader,
-                viewModelFactory = handle.withGraph { accountGraph -> accountGraph.metroViewModelFactory },
-            )
+            CompositionLocalProvider(
+                LocalAccountRecoveryActions provides AccountRecoveryActions("AniList", {}, {}),
+            ) {
+                MioApp(
+                    root = AppRoot.AUTHENTICATED,
+                    navigationRegistry = graph.navigationRegistry,
+                    imageLoader = graph.imageLoader,
+                    viewModelFactory = handle.withGraph { accountGraph -> accountGraph.metroViewModelFactory },
+                )
+            }
         }
     }
 

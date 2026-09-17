@@ -36,6 +36,36 @@ class MioProgressValueTest {
         AndroidComposeTestRule(activityRule) { rule -> rule.activity }
 
     @Test
+    fun motionRemainsProtectedUntilTheAnimatedNumberActuallySettles() {
+        val value = mutableIntStateOf(8)
+        var active = false
+        composeRule.setContent {
+            MioTheme {
+                MioProgressValue(value.intValue, null, "Episode ${value.intValue}", onMotionChanged = { active = it })
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            value.intValue = 9
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { assertTrue(active) }
+        composeRule.runOnIdle {
+            value.intValue = 10
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeBy(96)
+        composeRule.runOnIdle { assertTrue(active) }
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.runOnIdle { org.junit.Assert.assertFalse(active) }
+    }
+
+    @Test
     fun committedValueIsImmediatelyAccessibleAndKnownTotalsExposeOneBar() {
         composeRule.setContent {
             MioTheme {

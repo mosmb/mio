@@ -3,6 +3,7 @@ package io.morgan.mio.feature.today.impl
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,7 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +46,7 @@ import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
+import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.feature.today.impl.component.TodayCaughtUpReceipt
@@ -58,6 +62,7 @@ internal fun TodayRoute(
 ) {
     val viewModel = metroViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val recoveryActions = LocalAccountRecoveryActions.current
     val haptics by rememberUpdatedState(rememberMioHaptics())
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
@@ -86,6 +91,9 @@ internal fun TodayRoute(
         onMediaDetail = { mediaId -> onMediaDetail(MediaId(mediaId)) },
         onAction = viewModel::onAction,
         timeoutMillis = timeoutMillis,
+        providerLabel = recoveryActions.providerLabel,
+        onReconnect = recoveryActions.onReconnect,
+        onRetryRefresh = recoveryActions.onRetryRefresh,
     )
 }
 
@@ -96,6 +104,9 @@ internal fun TodayScreen(
     onMediaDetail: (String) -> Unit,
     onAction: (TodayAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
+    providerLabel: String? = null,
+    onReconnect: () -> Unit = {},
+    onRetryRefresh: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     Box(modifier = modifier.fillMaxSize()) {
@@ -149,6 +160,9 @@ internal fun TodayScreen(
                         onInteractionChanged = { pressed ->
                             onAction(TodayAction.InteractionChanged(state.now.mediaId, pressed))
                         },
+                        onMotionChanged = { generation, active ->
+                            onAction(TodayAction.MotionChanged(state.now.mediaId, generation, active))
+                        },
                         modifier = Modifier.padding(top = 12.dp),
                     )
                     if (state.newRecommendations.isNotEmpty()) {
@@ -183,6 +197,9 @@ internal fun TodayScreen(
                                 onInteractionChanged = { pressed ->
                                     onAction(TodayAction.InteractionChanged(recommendation.mediaId, pressed))
                                 },
+                                onMotionChanged = { generation, active ->
+                                    onAction(TodayAction.MotionChanged(recommendation.mediaId, generation, active))
+                                },
                                 modifier = Modifier.padding(top = if (index == 0) 12.dp else 0.dp),
                             )
                         }
@@ -208,6 +225,16 @@ internal fun TodayScreen(
                     }
                 }
             }
+            TodayRecovery(
+                syncIssues = state.syncIssues(),
+                accountIssue = state.accountIssue(),
+                providerLabel = providerLabel,
+                onReconnect = onReconnect,
+                onRetryRefresh = onRetryRefresh,
+                onMediaDetail = onMediaDetail,
+                onAction = onAction,
+                modifier = Modifier.padding(top = 24.dp),
+            )
         }
         TodaySnackbar(
             state = state,
@@ -215,6 +242,131 @@ internal fun TodayScreen(
         )
     }
 }
+
+@Composable
+private fun TodayRecovery(
+    syncIssues: List<TodayUiState.SyncIssueUiModel>,
+    accountIssue: TodayUiState.AccountIssueUiModel?,
+    providerLabel: String?,
+    onReconnect: () -> Unit,
+    onRetryRefresh: () -> Unit,
+    onMediaDetail: (String) -> Unit,
+    onAction: (TodayAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (syncIssues.isEmpty() && accountIssue == null) return
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement =
+            androidx.compose.foundation.layout.Arrangement
+                .spacedBy(12.dp),
+    ) {
+        accountIssue?.let { issue ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text =
+                        if (issue.kind == AccountIssueKind.AUTHENTICATION && providerLabel != null) {
+                            stringResource(R.string.today_sync_authentication, providerLabel)
+                        } else {
+                            stringResource(R.string.today_sync_refresh_issue)
+                        },
+                    style = MioTheme.typography.bodyStrong,
+                )
+                if (issue.kind == AccountIssueKind.AUTHENTICATION && providerLabel != null) {
+                    TextButton(
+                        onClick = onReconnect,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                    ) {
+                        Text(stringResource(R.string.today_sync_reconnect))
+                    }
+                } else if (issue.kind == AccountIssueKind.INVALID_REMOTE_DATA) {
+                    TextButton(
+                        onClick = onRetryRefresh,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                    ) {
+                        Text(stringResource(R.string.today_sync_retry_refresh))
+                    }
+                }
+            }
+        }
+        syncIssues.forEach { issue ->
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (issue.mediaId != null) {
+                                Modifier.clickable { onMediaDetail(issue.mediaId) }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                verticalArrangement =
+                    androidx.compose.foundation.layout.Arrangement
+                        .spacedBy(4.dp),
+            ) {
+                Text(
+                    text = issue.title ?: stringResource(R.string.today_sync_saved_title),
+                    style = MioTheme.typography.bodyStrong,
+                )
+                Text(text = issue.message(), style = MioTheme.typography.body)
+                Text(
+                    text =
+                        stringResource(
+                            R.string.today_sync_local_value,
+                            issue.localProgress,
+                            issue.localUnit.displayName(),
+                        ),
+                    style = MioTheme.typography.caption,
+                )
+                if (issue.remoteProgress != null && issue.remoteUnit != null) {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.today_sync_remote_value,
+                                issue.remoteProgress,
+                                issue.remoteUnit.displayName(),
+                            ),
+                        style = MioTheme.typography.caption,
+                    )
+                }
+                if (issue.kind == SyncIssueKind.AUTHENTICATION && providerLabel != null) {
+                    TextButton(
+                        onClick = onReconnect,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                    ) {
+                        Text(stringResource(R.string.today_sync_reconnect))
+                    }
+                } else if (issue.canRetry) {
+                    TextButton(
+                        onClick = { onAction(TodayAction.RetrySync(issue.operationId)) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                    ) {
+                        Text(stringResource(R.string.today_sync_retry))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayUiState.SyncIssueUiModel.message(): String =
+    when (kind) {
+        SyncIssueKind.AUTHENTICATION -> stringResource(R.string.today_sync_authentication_required)
+        SyncIssueKind.REJECTED -> stringResource(R.string.today_sync_rejected)
+        SyncIssueKind.CONFLICT -> stringResource(R.string.today_sync_conflict)
+        SyncIssueKind.RETRY_EXHAUSTED -> stringResource(R.string.today_sync_retry_exhausted)
+        SyncIssueKind.INVALID_REMOTE_DATA -> stringResource(R.string.today_sync_invalid_data)
+    }
+
+@Composable
+private fun TodayProgressUnit.displayName(): String =
+    when (this) {
+        TodayProgressUnit.EPISODE -> stringResource(R.string.today_sync_episodes)
+        TodayProgressUnit.CHAPTER -> stringResource(R.string.today_sync_chapters)
+        TodayProgressUnit.VOLUME -> stringResource(R.string.today_sync_volumes)
+    }
 
 @Composable
 private fun TodaySnackbar(
@@ -285,6 +437,20 @@ private fun TodayUiState.latestUndoOrNull(): TodayUndoUiModel? =
         is TodayUiState.Loading -> latestUndo
         is TodayUiState.Populated -> latestUndo
         is TodayUiState.CaughtUp -> latestUndo
+    }
+
+private fun TodayUiState.syncIssues(): List<TodayUiState.SyncIssueUiModel> =
+    when (this) {
+        is TodayUiState.Loading -> syncIssues
+        is TodayUiState.Populated -> syncIssues
+        is TodayUiState.CaughtUp -> syncIssues
+    }
+
+private fun TodayUiState.accountIssue(): TodayUiState.AccountIssueUiModel? =
+    when (this) {
+        is TodayUiState.Loading -> accountIssue
+        is TodayUiState.Populated -> accountIssue
+        is TodayUiState.CaughtUp -> accountIssue
     }
 
 private const val DEFAULT_UNDO_TIMEOUT_MILLIS: Int = 6_000

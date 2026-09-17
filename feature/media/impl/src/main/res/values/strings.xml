@@ -67,4 +67,19 @@
     <string name="media_detail_saved_episode">Saved episode %1$d</string>
     <string name="media_detail_saved_chapter">Saved chapter %1$d</string>
     <string name="media_detail_saved_volume">Saved volume %1$d</string>
+    <string name="media_detail_sync_authentication">Reconnect to %1$s to continue syncing</string>
+    <string name="media_detail_sync_authentication_required">This update needs account authentication</string>
+    <string name="media_detail_sync_refresh_issue">Saved content could not be refreshed</string>
+    <string name="media_detail_sync_retry_refresh">Retry refresh</string>
+    <string name="media_detail_sync_reconnect">Reconnect</string>
+    <string name="media_detail_sync_retry">Retry sync</string>
+    <string name="media_detail_sync_rejected">This update was not accepted; your saved value is unchanged</string>
+    <string name="media_detail_sync_conflict">This update conflicts with a provider change</string>
+    <string name="media_detail_sync_retry_exhausted">This update needs another attempt</string>
+    <string name="media_detail_sync_invalid_data">Provider data needs attention</string>
+    <string name="media_detail_sync_local_value">Saved value: %1$d %2$s</string>
+    <string name="media_detail_sync_remote_value">Provider value: %1$d %2$s</string>
+    <string name="media_detail_sync_episodes">episodes</string>
+    <string name="media_detail_sync_chapters">chapters</string>
+    <string name="media_detail_sync_volumes">volumes</string>
 </resources>

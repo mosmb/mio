@@ -25,6 +25,7 @@ import io.morgan.mio.core.database.entity.PendingOperationGroupEntity
 import io.morgan.mio.core.database.entity.RelatedMediaEntity
 import io.morgan.mio.core.database.entity.ReleaseEntity
 import io.morgan.mio.core.database.entity.SelectedAccountEntity
+import io.morgan.mio.core.database.entity.SyncAccountIssueEntity
 import io.morgan.mio.core.database.entity.SyncIssueEntity
 import io.morgan.mio.core.database.entity.SyncLeaseEntity
 import io.morgan.mio.core.database.entity.SyncScheduleEntity
@@ -48,8 +49,9 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         SyncLeaseEntity::class,
         SyncScheduleEntity::class,
         SyncIssueEntity::class,
+        SyncAccountIssueEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -73,6 +75,6 @@ public abstract class MioDatabase : RoomDatabase() {
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 5
+        public const val VERSION: Int = 6
     }
 }

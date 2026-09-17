@@ -14,12 +14,15 @@ import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationGroupId
+import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressWriteResult
 import io.morgan.mio.domain.progress.StepProgressUseCase
 import io.morgan.mio.domain.progress.UndoProgressUseCase
+import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
+import io.morgan.mio.domain.sync.SyncRecoveryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,12 +46,16 @@ internal class MediaDetailViewModel(
     private val stepProgress: StepProgressUseCase,
     private val undoProgress: UndoProgressUseCase,
     observeUndoUseCase: ObserveProgressUndoUseCase,
+    private val syncRecoveryRepository: SyncRecoveryRepository,
+    private val retrySyncIssue: RetrySyncIssueUseCase,
 ) : ViewModel() {
     private val requestPhase = MutableStateFlow(RequestPhase.IDLE)
     private val progressError = MutableStateFlow<MediaDetailProgressErrorUiModel?>(null)
     private val latestHiddenUndoId = MutableStateFlow<String?>(null)
     private val pendingRequests = MutableStateFlow<Map<OperationGroupId, PendingProgressRequest>>(emptyMap())
     private val routineHapticEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val interactionMediaIds = MutableStateFlow<Set<String>>(emptySet())
+    private val motionGenerations = mutableMapOf<String, Long>()
     private var lastRequest: PendingProgressRequest? = null
 
     internal val routineHaptics: SharedFlow<Unit> = routineHapticEvents
@@ -70,10 +77,17 @@ internal class MediaDetailViewModel(
     internal val uiState: StateFlow<MediaDetailUiState> =
         combine(
             observedContent,
+            syncRecoveryRepository.observeState(),
             requestPhase,
             latestUndo,
             progressError,
-        ) { content, phase, undo, error ->
+        ) { content, recovery, phase, undo, error ->
+            val recoveryUi =
+                MediaDetailUiMapper.mapRecovery(
+                    recovery = recovery,
+                    collection = content.collection,
+                    title = content.media?.title?.value ?: "Saved title",
+                )
             when {
                 content.media != null ->
                     MediaDetailUiMapper.mapContent(
@@ -82,16 +96,22 @@ internal class MediaDetailViewModel(
                         collection = content.collection,
                         latestUndo = undo,
                         progressError = error,
+                        syncIssues = recoveryUi.syncIssues,
+                        accountIssue = recoveryUi.accountIssue,
                     )
                 phase == RequestPhase.FAILED ->
                     MediaDetailUiState.Error(
                         latestUndo = undo?.let(MediaDetailUiMapper::mapUndo),
                         progressError = error,
+                        syncIssues = recoveryUi.syncIssues,
+                        accountIssue = recoveryUi.accountIssue,
                     )
                 else ->
                     MediaDetailUiState.Loading(
                         latestUndo = undo?.let(MediaDetailUiMapper::mapUndo),
                         progressError = error,
+                        syncIssues = recoveryUi.syncIssues,
+                        accountIssue = recoveryUi.accountIssue,
                     )
             }
         }.stateIn(
@@ -112,8 +132,19 @@ internal class MediaDetailViewModel(
                 }
             is MediaDetailAction.Step -> startStep(action)
             is MediaDetailAction.Undo -> startUndo(action)
+            is MediaDetailAction.RetrySync -> startSyncRetry(action)
             MediaDetailAction.RetryProgress -> lastRequest?.let(::startRequest)
-            is MediaDetailAction.InteractionChanged -> Unit
+            is MediaDetailAction.InteractionChanged ->
+                interactionMediaIds.update { ids ->
+                    if (action.pressed) ids + action.mediaId else ids - action.mediaId
+                }
+            is MediaDetailAction.MotionChanged ->
+                if (action.active) {
+                    val current = motionGenerations[action.mediaId] ?: Long.MIN_VALUE
+                    if (action.generation >= current) motionGenerations[action.mediaId] = action.generation
+                } else if (motionGenerations[action.mediaId] == action.generation) {
+                    motionGenerations.remove(action.mediaId)
+                }
             is MediaDetailAction.VisibilityChanged -> Unit
             MediaDetailAction.DismissError -> progressError.value = null
         }
@@ -170,6 +201,17 @@ internal class MediaDetailViewModel(
         }
     }
 
+    private fun startSyncRetry(action: MediaDetailAction.RetrySync) {
+        val operationId = runCatching { OperationId(action.operationId) }.getOrNull() ?: return
+        viewModelScope.launch {
+            try {
+                retrySyncIssue(operationId)
+            } catch (_: io.morgan.mio.domain.sync.SyncInfrastructureException) {
+                progressError.value = MediaDetailProgressErrorUiModel(retryable = false)
+            }
+        }
+    }
+
     private fun startUndo(action: MediaDetailAction.Undo) {
         val groupId = runCatching { OperationGroupId(action.groupId) }.getOrNull() ?: return
         viewModelScope.launch {
@@ -205,6 +247,11 @@ internal class MediaDetailViewModel(
                 requestPhase.value = RequestPhase.FAILED
             }
         }
+    }
+
+    override fun onCleared() {
+        interactionMediaIds.value = emptySet()
+        motionGenerations.clear()
     }
 
     private fun MediaDetailProgressDirection.toDomainDirection(): ProgressDirection =

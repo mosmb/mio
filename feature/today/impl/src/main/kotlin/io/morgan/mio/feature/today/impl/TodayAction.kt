@@ -13,9 +13,19 @@ internal sealed interface TodayAction {
 
     data object RetryProgress : TodayAction
 
+    data class RetrySync(
+        val operationId: String,
+    ) : TodayAction
+
     data class InteractionChanged(
         val mediaId: String,
         val pressed: Boolean,
+    ) : TodayAction
+
+    data class MotionChanged(
+        val mediaId: String,
+        val generation: Long,
+        val active: Boolean,
     ) : TodayAction
 
     data class VisibilityChanged(

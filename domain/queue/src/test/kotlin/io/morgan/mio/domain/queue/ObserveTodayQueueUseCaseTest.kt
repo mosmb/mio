@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -40,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -162,6 +164,72 @@ class ObserveTodayQueueUseCaseTest {
         }
 
     @Test
+    fun cachedNewExpiresAtSevenDayPlusOneMillisecondWithoutRepositoryEmission() =
+        runTest {
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val mutableClock = MutableTestClock(now)
+            collection.entries.value =
+                listOf(
+                    entry(mediaId = "current", updatedAt = "2026-08-23T11:00:00Z"),
+                    entry(mediaId = "new", updatedAt = "2026-08-23T10:00:00Z"),
+                )
+            media.media("current").value = media("current")
+            media.media("new").value = media("new")
+            media.releases("current").value = listOf(release("current", 2, ReleaseTime.Trusted(now)))
+            media.releases("new").value = listOf(release("new", 2, ReleaseTime.Trusted(now - 7.days)))
+            val observed = mutableListOf<TodayQueue>()
+            val job =
+                launch {
+                    ObserveTodayQueueUseCase(collection, media, mutableClock)(accountId).collect(observed::add)
+                }
+
+            runCurrent()
+            assertEquals(listOf(MediaId("new")), observed.last().newRecommendations.map { item -> item.mediaId })
+            val collectionEmissions = collection.observationEmissions
+            mutableClock.current = now + 1.milliseconds
+            advanceTimeBy(1.milliseconds)
+            runCurrent()
+
+            assertTrue(observed.last().newRecommendations.isEmpty())
+            assertEquals(1, observed.last().remainingReadyCount)
+            assertEquals(collectionEmissions, collection.observationEmissions)
+            assertTrue(media.refreshCalls.isEmpty())
+            assertTrue(collection.refreshCalls.isEmpty())
+            job.cancel()
+        }
+
+    @Test
+    fun futureReleaseBecomesNowAtItsInstantWithoutRepositoryEmission() =
+        runTest {
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val mutableClock = MutableTestClock(now)
+            collection.entries.value = listOf(entry(mediaId = "future"))
+            media.media("future").value = media("future")
+            media.releases("future").value =
+                listOf(release("future", 2, ReleaseTime.Trusted(now + 1.hours)))
+            val observed = mutableListOf<TodayQueue>()
+            val job =
+                launch {
+                    ObserveTodayQueueUseCase(collection, media, mutableClock)(accountId).collect(observed::add)
+                }
+
+            runCurrent()
+            assertNull(observed.last().now)
+            val collectionEmissions = collection.observationEmissions
+            mutableClock.current = now + 1.hours
+            advanceTimeBy(1.hours)
+            runCurrent()
+
+            assertEquals(MediaId("future"), observed.last().now?.mediaId)
+            assertEquals(collectionEmissions, collection.observationEmissions)
+            assertTrue(media.refreshCalls.isEmpty())
+            assertTrue(collection.refreshCalls.isEmpty())
+            job.cancel()
+        }
+
+    @Test
     fun outerCollectionCancellationCancelsEveryPerMediaFlow() =
         runTest {
             val collection = TestCollectionRepository()
@@ -247,9 +315,13 @@ private class MutableTestClock(
 private class TestCollectionRepository : CollectionRepository {
     val entries = MutableStateFlow<List<CollectionEntry>>(emptyList())
     val refreshCalls = mutableListOf<AccountId>()
+    var observationEmissions = 0
 
     override fun observeCollection(accountId: AccountId): Flow<List<CollectionEntry>> =
-        entries.map { values -> values.filter { entry -> entry.accountId == accountId } }
+        entries.map { values ->
+            observationEmissions += 1
+            values.filter { entry -> entry.accountId == accountId }
+        }
 
     override fun observeEntry(entryId: CollectionEntryId): Flow<CollectionEntry?> =
         entries.map { values -> values.firstOrNull { entry -> entry.id == entryId } }

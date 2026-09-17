@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":domain:collection"))
     implementation(project(":domain:progress"))
     implementation(project(":domain:model"))
+    implementation(project(":domain:sync"))
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.metrox.viewmodel.compose)
     implementation(libs.compose.animation.core)

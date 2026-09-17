@@ -4,6 +4,8 @@ internal sealed interface TodayUiState {
     data class Loading(
         val latestUndo: TodayUndoUiModel? = null,
         val progressError: TodayProgressErrorUiModel? = null,
+        val syncIssues: List<SyncIssueUiModel> = emptyList(),
+        val accountIssue: AccountIssueUiModel? = null,
     ) : TodayUiState
 
     data class Populated(
@@ -12,6 +14,8 @@ internal sealed interface TodayUiState {
         val remainingReadyCount: Int,
         val latestUndo: TodayUndoUiModel? = null,
         val progressError: TodayProgressErrorUiModel? = null,
+        val syncIssues: List<SyncIssueUiModel> = emptyList(),
+        val accountIssue: AccountIssueUiModel? = null,
     ) : TodayUiState {
         init {
             require(remainingReadyCount >= 0)
@@ -28,7 +32,29 @@ internal sealed interface TodayUiState {
         val receipt: TodayCaughtUpUiModel,
         val latestUndo: TodayUndoUiModel? = null,
         val progressError: TodayProgressErrorUiModel? = null,
+        val syncIssues: List<SyncIssueUiModel> = emptyList(),
+        val accountIssue: AccountIssueUiModel? = null,
     ) : TodayUiState
+
+    data class SyncIssueUiModel(
+        val operationId: String,
+        val entryId: String,
+        val mediaId: String?,
+        val title: String?,
+        val kind: SyncIssueKind,
+        val localProgress: Int,
+        val localUnit: TodayProgressUnit,
+        val localStatus: TodayCollectionStatus,
+        val localTotal: Int?,
+        val remoteProgress: Int?,
+        val remoteUnit: TodayProgressUnit?,
+        val remoteStatus: TodayCollectionStatus?,
+        val canRetry: Boolean,
+    )
+
+    data class AccountIssueUiModel(
+        val kind: AccountIssueKind,
+    )
 }
 
 internal data class TodayNowUiModel(
@@ -130,4 +156,17 @@ internal enum class TodayProgressUnit {
     EPISODE,
     CHAPTER,
     VOLUME,
+}
+
+internal enum class SyncIssueKind {
+    AUTHENTICATION,
+    REJECTED,
+    CONFLICT,
+    RETRY_EXHAUSTED,
+    INVALID_REMOTE_DATA,
+}
+
+internal enum class AccountIssueKind {
+    AUTHENTICATION,
+    INVALID_REMOTE_DATA,
 }

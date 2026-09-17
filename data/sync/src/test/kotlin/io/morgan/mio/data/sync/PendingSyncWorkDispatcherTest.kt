@@ -107,7 +107,7 @@ class PendingSyncWorkDispatcherTest {
             advanceTimeBy(1)
             runCurrent()
             assertEquals(2, attempts.get())
-            assertEquals(1L, database.syncDao().getSchedule(ACCOUNT_ID)?.dispatchedGeneration)
+            awaitCondition { database.syncDao().getSchedule(ACCOUNT_ID)?.dispatchedGeneration == 1L }
         }
 
     @Test
@@ -142,7 +142,7 @@ class PendingSyncWorkDispatcherTest {
             assertEquals(2L, schedule.dispatchedGeneration)
         }
 
-    private suspend fun TestScope.awaitCondition(condition: () -> Boolean) {
+    private suspend fun TestScope.awaitCondition(condition: suspend () -> Boolean) {
         repeat(100) {
             runCurrent()
             if (condition()) return

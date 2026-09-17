@@ -11,6 +11,10 @@ import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressRules
+import io.morgan.mio.domain.sync.SyncAccountIssueKind
+import io.morgan.mio.domain.sync.SyncIssue
+import io.morgan.mio.domain.sync.SyncRecoveryState
+import io.morgan.mio.domain.sync.SyncIssueKind as DomainSyncIssueKind
 
 internal object MediaDetailUiMapper {
     internal fun mapUndo(action: ProgressAction): MediaDetailUndoUiModel = action.toUiModel()
@@ -21,6 +25,8 @@ internal object MediaDetailUiMapper {
         collection: CollectionEntry?,
         latestUndo: ProgressAction? = null,
         progressError: MediaDetailProgressErrorUiModel? = null,
+        syncIssues: List<MediaDetailUiState.SyncIssueUiModel> = emptyList(),
+        accountIssue: MediaDetailUiState.AccountIssueUiModel? = null,
     ): MediaDetailUiState.Content =
         MediaDetailUiState.Content(
             media = media.toUiModel(),
@@ -28,6 +34,24 @@ internal object MediaDetailUiMapper {
             collection = collection?.toUiModel(),
             latestUndo = latestUndo?.toUiModel(),
             progressError = progressError,
+            syncIssues = syncIssues,
+            accountIssue = accountIssue,
+        )
+
+    internal fun mapRecovery(
+        recovery: SyncRecoveryState,
+        collection: CollectionEntry?,
+        title: String,
+    ): MediaDetailRecoveryUiModel =
+        MediaDetailRecoveryUiModel(
+            syncIssues =
+                recovery.entryIssues
+                    .filter { issue -> issue.entryId == collection?.id }
+                    .map { issue -> issue.toUiModel(title) },
+            accountIssue =
+                recovery.accountIssue?.let { issue ->
+                    MediaDetailUiState.AccountIssueUiModel(issue.kind.toUiKind())
+                },
         )
 
     internal fun mapSynopsis(value: String?): String? =
@@ -94,6 +118,37 @@ internal object MediaDetailUiMapper {
             completed = afterStatus == CollectionStatus.COMPLETED,
         )
 
+    private fun SyncIssue.toUiModel(title: String): MediaDetailUiState.SyncIssueUiModel =
+        MediaDetailUiState.SyncIssueUiModel(
+            operationId = operationId.value,
+            entryId = entryId.value,
+            title = title,
+            kind = kind.toUiKind(),
+            localProgress = local.progress.value,
+            localUnit = local.unit.toUiUnit(),
+            localStatus = local.status.toUiStatus(),
+            localTotal = local.total?.value,
+            remoteProgress = remote?.progress?.value,
+            remoteUnit = remote?.unit?.toUiUnit(),
+            remoteStatus = remote?.status?.toUiStatus(),
+            canRetry = kind == DomainSyncIssueKind.REJECTED || kind == DomainSyncIssueKind.RETRY_EXHAUSTED,
+        )
+
+    private fun DomainSyncIssueKind.toUiKind(): SyncIssueKind =
+        when (this) {
+            DomainSyncIssueKind.AUTHENTICATION -> SyncIssueKind.AUTHENTICATION
+            DomainSyncIssueKind.REJECTED -> SyncIssueKind.REJECTED
+            DomainSyncIssueKind.CONFLICT -> SyncIssueKind.CONFLICT
+            DomainSyncIssueKind.RETRY_EXHAUSTED -> SyncIssueKind.RETRY_EXHAUSTED
+            DomainSyncIssueKind.INVALID_REMOTE_DATA -> SyncIssueKind.INVALID_REMOTE_DATA
+        }
+
+    private fun SyncAccountIssueKind.toUiKind(): AccountIssueKind =
+        when (this) {
+            SyncAccountIssueKind.AUTHENTICATION -> AccountIssueKind.AUTHENTICATION
+            SyncAccountIssueKind.INVALID_REMOTE_DATA -> AccountIssueKind.INVALID_REMOTE_DATA
+        }
+
     private fun MediaType.toUiType(): MediaDetailMediaType =
         when (this) {
             MediaType.ANIME -> MediaDetailMediaType.ANIME
@@ -141,3 +196,8 @@ internal object MediaDetailUiMapper {
             ProgressUnit.VOLUME -> MediaDetailProgressUnit.VOLUME
         }
 }
+
+internal data class MediaDetailRecoveryUiModel(
+    val syncIssues: List<MediaDetailUiState.SyncIssueUiModel>,
+    val accountIssue: MediaDetailUiState.AccountIssueUiModel?,
+)

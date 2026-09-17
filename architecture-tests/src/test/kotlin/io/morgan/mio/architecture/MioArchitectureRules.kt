@@ -113,6 +113,8 @@ internal fun enforcePresentationIsolation(files: List<OwnedKotlinFile>) {
             "io.morgan.mio.core.database",
             "io.morgan.mio.core.datastore",
             "io.morgan.mio.core.network",
+            "io.morgan.mio.sync.work",
+            "androidx.work",
             "androidx.room",
             "androidx.datastore",
             "retrofit2",

@@ -86,6 +86,7 @@ public object DependencyRules {
                     ":domain:progress",
                     ":domain:collection",
                     ":domain:preferences",
+                    ":domain:sync",
                     ":domain:model",
                 ),
             ":feature:library:impl" to
@@ -137,6 +138,7 @@ public object DependencyRules {
                     ":domain:media",
                     ":domain:collection",
                     ":domain:progress",
+                    ":domain:sync",
                     ":domain:model",
                 ),
             ":feature:progress:impl" to

@@ -1,5 +1,6 @@
 package io.morgan.mio
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -22,6 +23,8 @@ import io.morgan.mio.core.database.model.StoredMediaPublicationStatus
 import io.morgan.mio.core.database.model.StoredMediaType
 import io.morgan.mio.core.database.model.StoredProgressUnit
 import io.morgan.mio.core.database.model.StoredReleaseTimeKind
+import io.morgan.mio.core.ui.AccountRecoveryActions
+import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.data.collection.CollectionRefreshRequester
 import io.morgan.mio.data.collection.DefaultCollectionRepository
 import io.morgan.mio.data.collection.local.RoomCollectionLocalDataSource
@@ -81,10 +84,6 @@ class TodayRoomQueueNavigationTest {
                     providerBinding =
                         io.morgan.mio.core.testing.provider
                             .providerBindingFixture(ProviderKey.ANILIST),
-                    accountRefreshRequester =
-                        io.morgan.mio.data.account
-                            .AccountRefreshRequester {},
-                    collectionRefreshRequester = CollectionRefreshRequester {},
                 ),
             )
 
@@ -142,10 +141,6 @@ class TodayRoomQueueNavigationTest {
                     providerBinding =
                         io.morgan.mio.core.testing.provider
                             .providerBindingFixture(ProviderKey.ANILIST),
-                    accountRefreshRequester =
-                        io.morgan.mio.data.account
-                            .AccountRefreshRequester {},
-                    collectionRefreshRequester = CollectionRefreshRequester {},
                 ),
             )
 
@@ -204,10 +199,6 @@ class TodayRoomQueueNavigationTest {
                     providerBinding =
                         io.morgan.mio.core.testing.provider
                             .providerBindingFixture(ProviderKey.ANILIST),
-                    accountRefreshRequester =
-                        io.morgan.mio.data.account
-                            .AccountRefreshRequester {},
-                    collectionRefreshRequester = CollectionRefreshRequester {},
                 ),
             )
 
@@ -265,12 +256,16 @@ class TodayRoomQueueNavigationTest {
     ) {
         val accountViewModelFactory = handle.withGraph { accountGraph -> accountGraph.metroViewModelFactory }
         composeRule.setContent {
-            MioApp(
-                root = AppRoot.AUTHENTICATED,
-                navigationRegistry = graph.navigationRegistry,
-                imageLoader = graph.imageLoader,
-                viewModelFactory = accountViewModelFactory,
-            )
+            CompositionLocalProvider(
+                LocalAccountRecoveryActions provides AccountRecoveryActions("AniList", {}, {}),
+            ) {
+                MioApp(
+                    root = AppRoot.AUTHENTICATED,
+                    navigationRegistry = graph.navigationRegistry,
+                    imageLoader = graph.imageLoader,
+                    viewModelFactory = accountViewModelFactory,
+                )
+            }
         }
     }
 
@@ -314,6 +309,7 @@ class TodayRoomQueueNavigationTest {
                 ),
             preferencesRepository = fixture.preferencesRepository,
             accountSessionRepository = fixture.accountSessionRepository,
+            networkMonitor = fixture.networkMonitor,
         )
 
     private fun seedAccount(

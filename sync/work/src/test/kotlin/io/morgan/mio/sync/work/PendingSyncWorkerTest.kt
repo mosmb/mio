@@ -11,6 +11,8 @@ import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.sync.OperationValue
 import io.morgan.mio.domain.sync.ReconcilePendingOperationUseCase
+import io.morgan.mio.domain.sync.RefreshRepository
+import io.morgan.mio.domain.sync.SyncAccountIssueKind
 import io.morgan.mio.domain.sync.SyncAccountSession
 import io.morgan.mio.domain.sync.SyncAccountSessionFactory
 import io.morgan.mio.domain.sync.SyncCandidate
@@ -19,6 +21,7 @@ import io.morgan.mio.domain.sync.SyncEntryState
 import io.morgan.mio.domain.sync.SyncIssue
 import io.morgan.mio.domain.sync.SyncIssueKind
 import io.morgan.mio.domain.sync.SyncLease
+import io.morgan.mio.domain.sync.SyncRefreshResult
 import io.morgan.mio.domain.sync.SyncRemoteResult
 import io.morgan.mio.domain.sync.SyncRepository
 import io.morgan.mio.domain.sync.SyncRunResult
@@ -139,6 +142,7 @@ class PendingSyncWorkerTest {
                     repository = RepositoryForResult(result),
                     clock = Clock.System,
                     reconcile = ReconcilePendingOperationUseCase(),
+                    refreshRepository = WorkerRefreshRepository(),
                     newLeaseOwner = { "test-owner" },
                 )
 
@@ -226,5 +230,16 @@ class PendingSyncWorkerTest {
         ) = Unit
 
         override fun observeIssues(): Flow<List<SyncIssue>> = emptyFlow()
+    }
+
+    private class WorkerRefreshRepository : RefreshRepository {
+        override suspend fun isAuthenticationBlocked(): Boolean = false
+
+        override suspend fun refresh(lease: SyncLease): SyncRefreshResult = SyncRefreshResult.Success
+
+        override suspend fun recordFailure(
+            lease: SyncLease,
+            kind: SyncAccountIssueKind,
+        ): SyncCommitResult = SyncCommitResult.Applied
     }
 }

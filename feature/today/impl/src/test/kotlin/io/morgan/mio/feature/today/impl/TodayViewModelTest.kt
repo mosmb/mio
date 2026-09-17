@@ -17,6 +17,7 @@ import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.MediaTitle
 import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.OperationGroupId
+import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitNumber
@@ -31,6 +32,9 @@ import io.morgan.mio.domain.progress.ProgressWriteResult
 import io.morgan.mio.domain.progress.StepProgressUseCase
 import io.morgan.mio.domain.progress.UndoProgressUseCase
 import io.morgan.mio.domain.queue.ObserveTodayQueueUseCase
+import io.morgan.mio.domain.sync.SyncIssue
+import io.morgan.mio.domain.sync.SyncRecoveryRepository
+import io.morgan.mio.domain.sync.SyncRecoveryState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -310,6 +314,7 @@ class TodayViewModelTest {
             backgroundScope.launch { viewModel.routineHaptics.collect { haptics++ } }
             runCurrent()
             assertEquals(0, haptics)
+            viewModel.onAction(TodayAction.MotionChanged("media-1", generation = 1L, active = true))
             viewModel.onAction(TodayAction.Step("media-1", TodayProgressDirection.INCREASE, 6_000))
             runCurrent()
             viewModel.onAction(TodayAction.InteractionChanged("media-1", false))
@@ -322,7 +327,7 @@ class TodayViewModelTest {
             advanceTimeBy(219)
             runCurrent()
             assertTrue(viewModel.uiState.value is TodayUiState.Populated)
-            advanceTimeBy(1)
+            viewModel.onAction(TodayAction.MotionChanged("media-1", generation = 1L, active = false))
             runCurrent()
             assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
         }
@@ -332,9 +337,14 @@ class TodayViewModelTest {
             accountId = accountId,
             observeTodayQueue = ObserveTodayQueueUseCase(this, this, fixedClock()),
             collectionRepository = this,
+            mediaRepository = this,
             stepProgress = StepProgressUseCase(progress, fixedClock()),
             undoProgress = UndoProgressUseCase(progress, fixedClock()),
             observeUndoUseCase = ObserveProgressUndoUseCase(progress, fixedClock()),
+            syncRecoveryRepository = EmptySyncRecoveryRepository(),
+            retrySyncIssue =
+                io.morgan.mio.domain.sync
+                    .RetrySyncIssueUseCase(EmptySyncRecoveryRepository()),
         )
 
     private fun fixedClock(): Clock =
@@ -375,6 +385,19 @@ class TodayViewModelTest {
             number = UnitNumber(number),
             time = ReleaseTime.Trusted(now),
         )
+}
+
+private class EmptySyncRecoveryRepository : SyncRecoveryRepository {
+    override fun observeState() = flowOf(SyncRecoveryState(accountIssue = null, entryIssues = emptyList()))
+
+    override suspend fun readIssue(operationId: OperationId): SyncIssue? = null
+
+    override suspend fun rearm(issue: SyncIssue): Boolean = false
+
+    override suspend fun recoverAuthentication(
+        accountId: AccountId,
+        issueIds: Set<String>,
+    ): Boolean = false
 }
 
 private class TestProgressRepository : ProgressRepository {

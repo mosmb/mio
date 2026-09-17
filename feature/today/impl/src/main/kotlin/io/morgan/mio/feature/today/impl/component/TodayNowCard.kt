@@ -7,17 +7,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -45,13 +51,29 @@ internal fun TodayNowCard(
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
+    onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     val largeText = LocalDensity.current.fontScale > 1.3f
+    val motionGeneration = remember { mutableLongStateOf(0L) }
+    val motionActive = remember { mutableStateOf(false) }
+    val reportMotion: (Boolean) -> Unit = { active ->
+        if (active) {
+            if (!motionActive.value) {
+                motionGeneration.longValue += 1L
+                motionActive.value = true
+            }
+            onMotionChanged(motionGeneration.longValue, true)
+        } else if (motionActive.value) {
+            motionActive.value = false
+            onMotionChanged(motionGeneration.longValue, false)
+        }
+    }
     val actionLabel = stringResource(R.string.today_open_details, now.title)
     val cardShape = MioTheme.shapes.lg
     Box(
         modifier =
             modifier
+                .observeTodayPointer(onInteractionChanged)
                 .fillMaxWidth()
                 .requiredHeightIn(min = 332.dp)
                 .clip(cardShape),
@@ -98,26 +120,36 @@ internal fun TodayNowCard(
                     color = Color.White,
                     modifier = Modifier.padding(top = 8.dp),
                 )
-                now.nextUnit?.let { nextUnit ->
-                    Text(
-                        text = stringResource(now.progressUnit.nextUnitLabelRes, nextUnit),
-                        style = MioTheme.typography.bodyStrong,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                now.availableUnitCount?.takeIf { count -> count > 0 }?.let { availableCount ->
-                    Text(
-                        text =
-                            pluralStringResource(
-                                now.progressUnit.availableUnitsRes,
-                                availableCount,
-                                availableCount,
-                            ),
-                        style = MioTheme.typography.body,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                // Removing an expired claim must not move the bottom-aligned title or controls.
+                // Reserve its measured space until this card displays a different media identity.
+                val claimHeight = remember(now.mediaId) { mutableIntStateOf(0) }
+                Column(
+                    modifier =
+                        Modifier
+                            .heightIn(min = with(LocalDensity.current) { claimHeight.intValue.toDp() })
+                            .onSizeChanged { claimHeight.intValue = maxOf(claimHeight.intValue, it.height) },
+                ) {
+                    now.nextUnit?.let { nextUnit ->
+                        Text(
+                            text = stringResource(now.progressUnit.nextUnitLabelRes, nextUnit),
+                            style = MioTheme.typography.bodyStrong,
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    now.availableUnitCount?.takeIf { count -> count > 0 }?.let { availableCount ->
+                        Text(
+                            text =
+                                pluralStringResource(
+                                    now.progressUnit.availableUnitsRes,
+                                    availableCount,
+                                    availableCount,
+                                ),
+                            style = MioTheme.typography.body,
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
                 if (now.status != TodayCollectionStatus.CURRENT) {
                     Text(
@@ -132,6 +164,7 @@ internal fun TodayNowCard(
                         value = now.progress,
                         total = now.total,
                         description = now.progressLabel(),
+                        onMotionChanged = reportMotion,
                     )
                 }
             }
@@ -151,7 +184,6 @@ internal fun TodayNowCard(
                     increaseEnabled = controls.increaseEnabled,
                     onDecrease = onDecrease,
                     onIncrease = onIncrease,
-                    onInteractionChanged = onInteractionChanged,
                     modifier =
                         Modifier.align(Alignment.Bottom).padding(
                             start = if (largeText) 0.dp else 8.dp,
