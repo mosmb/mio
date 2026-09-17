@@ -9,6 +9,14 @@
 **Implementation architecture:** [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 **Reference viewport:** 393 × 852 dp Android phone
 
+## MVP design amendment — 2026-09-17
+
+For the reduced milestone, [MVP scope and delivery](tasks/MVP.md) and the PRD MVP amendment supersede requirements below for deferred features and exhaustive validation. Apply existing tokens, components, ordinary semantic labels/selected states, touch targets, and system reduced-motion support to shipped screens. Preserve existing accessibility behavior.
+
+MVP may use existing completion feedback without Achievement Stamp, a search prompt without Discover shelves/recent searches, and a You account/preferences screen without personal statistics/history. Additional sort modes, custom motion/haptic overrides, and animated theme crossfades are deferred. Detail remains the sole required Add/Change Status surface.
+
+Keep architecture-required previews and inspect primary light/dark portrait screens and keyboard access on a representative emulator. Sections 15.3 and 16 do not require a full configuration cross-product for MVP. Dedicated screen-reader, enlarged-text, landscape, narrow-width, high-contrast, and frame/gesture permutation audits are deferred, not recorded as passed. The complete design remains the follow-up target; this amendment grants no architecture or data-safety exception.
+
 ## 1. Purpose and authority
 
 This document defines how Mio MUST look, move, respond, and adapt. It is written so that a human or coding agent can implement any v0 screen without inventing a second design language.
