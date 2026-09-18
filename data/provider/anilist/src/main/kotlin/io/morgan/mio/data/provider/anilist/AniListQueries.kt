@@ -36,6 +36,16 @@ internal object AniListQueries {
             "coverImage { extraLarge large medium } " +
             "} } } }"
 
+    internal const val MEDIA_SEARCH: String =
+        "query MioMediaSearch(\$search: String!, \$type: MediaType!, \$page: Int!, \$perPage: Int!) { " +
+            "Page(page: \$page, perPage: \$perPage) { " +
+            "pageInfo { hasNextPage } " +
+            "media(search: \$search, type: \$type) { " +
+            "id type format status episodes chapters volumes description bannerImage genres seasonYear averageScore " +
+            "title { userPreferred romaji english native } " +
+            "coverImage { extraLarge large medium } " +
+            "} } }"
+
     internal const val SYNC_ENTRY: String =
         "query MioSyncEntry(\$id: Int!) { MediaList(id: \$id) { " +
             "id userId mediaId status progress progressVolumes updatedAt " +

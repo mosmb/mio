@@ -15,6 +15,24 @@ internal interface MyAnimeListApiService {
         @Header("Authorization") authorization: String,
     ): Response<MyAnimeListUserResponseDto>
 
+    @GET("anime")
+    suspend fun searchAnime(
+        @Header("Authorization") authorization: String,
+        @Query("q") query: String,
+        @Query("fields") fields: String,
+        @Query("limit") limit: Int,
+        @Query("offset") offset: Int,
+    ): Response<MyAnimeListMediaSearchResponseDto>
+
+    @GET("manga")
+    suspend fun searchManga(
+        @Header("Authorization") authorization: String,
+        @Query("q") query: String,
+        @Query("fields") fields: String,
+        @Query("limit") limit: Int,
+        @Query("offset") offset: Int,
+    ): Response<MyAnimeListMediaSearchResponseDto>
+
     @GET("users/@me/animelist")
     suspend fun animeList(
         @Header("Authorization") authorization: String,

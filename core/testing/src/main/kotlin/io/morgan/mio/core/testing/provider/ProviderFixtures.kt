@@ -124,6 +124,7 @@ public fun providerBindingFixture(
     val identityDataSource = FakeProviderIdentityDataSource(provider)
     val initialImportDataSource = FakeProviderInitialImportDataSource(provider)
     val mediaDetailDataSource = FakeProviderMediaDetailDataSource(provider)
+    val mediaSearchDataSource = FakeProviderMediaSearchDataSource(provider)
     val syncDataSource = FakeProviderSyncDataSource(provider)
     return io.morgan.mio.data.provider.api.ProviderBinding(
         provider = provider,
@@ -131,6 +132,7 @@ public fun providerBindingFixture(
         identityDataSource = identityDataSource,
         initialImportDataSource = initialImportDataSource,
         mediaDetailDataSource = mediaDetailDataSource,
+        mediaSearchDataSource = mediaSearchDataSource,
         syncDataSource = syncDataSource,
     )
 }

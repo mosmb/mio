@@ -29,6 +29,26 @@ import io.morgan.mio.domain.model.UnitNumber
 import io.morgan.mio.domain.model.UnitTotal
 
 internal object ProviderMediaDetailsPersistenceMapper {
+    internal fun mapSearchResult(
+        provider: ProviderKey,
+        media: ProviderMedia,
+    ): MediaPersistenceSnapshot {
+        require(media.relatedMediaIds.isEmpty())
+        require(media.releases.isEmpty())
+        val domainMedia = media.toDomain(provider)
+        return MediaPersistenceSnapshot(
+            media = domainMedia,
+            providerIds =
+                listOf(
+                    MediaProviderIdInput(
+                        mediaId = domainMedia.id,
+                        provider = provider.toStoredValue(),
+                        remoteId = media.id.value,
+                    ),
+                ),
+        )
+    }
+
     internal fun map(details: ProviderMediaDetails): MediaDetailsPersistenceSnapshot {
         val storedProvider = details.provider.toStoredValue()
         val root = details.root.toDomain(details.provider)

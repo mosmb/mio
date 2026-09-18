@@ -35,6 +35,7 @@ class MioDatabaseMigrationTest {
         context.deleteDatabase(TEST_DATABASE_V3_NAME)
         context.deleteDatabase(TEST_DATABASE_V4_NAME)
         context.deleteDatabase(TEST_DATABASE_V5_NAME)
+        context.deleteDatabase(TEST_DATABASE_V6_NAME)
     }
 
     @Test
@@ -61,7 +62,7 @@ class MioDatabaseMigrationTest {
         }
 
         helper
-            .runMigrationsAndValidate(TEST_DATABASE_NAME, 6, true, *MioMigrations.ALL)
+            .runMigrationsAndValidate(TEST_DATABASE_NAME, 7, true, *MioMigrations.ALL)
             .use { migrated ->
                 assertEquals(1, countRows(migrated, "selected_account"))
                 assertEquals(1, countRows(migrated, "media"))
@@ -87,6 +88,7 @@ class MioDatabaseMigrationTest {
         val current = MioDatabaseFactory.create(context, TEST_DATABASE_NAME)
         assertNotNull(current.selectedAccountDao())
         assertNotNull(current.mediaDao())
+        assertNotNull(current.mediaSearchDao())
         assertNotNull(current.releaseDao())
         assertNotNull(current.collectionEntryDao())
         assertNotNull(current.providerIdDao())
@@ -95,13 +97,87 @@ class MioDatabaseMigrationTest {
         assertNotNull(current.syncDao())
         current.close()
 
-        assertEquals(6, MioDatabase.VERSION)
-        assertEquals(5, MioMigrations.ALL.size)
+        assertEquals(7, MioDatabase.VERSION)
+        assertEquals(6, MioMigrations.ALL.size)
         assertTrue(MioMigrations.ALL[0] === MioMigrations.MIGRATION_1_2)
         assertTrue(MioMigrations.ALL[1] === MioMigrations.MIGRATION_2_3)
         assertTrue(MioMigrations.ALL[2] === MioMigrations.MIGRATION_3_4)
         assertTrue(MioMigrations.ALL[3] === MioMigrations.MIGRATION_4_5)
         assertTrue(MioMigrations.ALL[4] === MioMigrations.MIGRATION_5_6)
+        assertTrue(MioMigrations.ALL[5] === MioMigrations.MIGRATION_6_7)
+    }
+
+    @Test
+    fun versionSixMediaCollectionAndOutboxSurviveSearchCacheMigration() {
+        helper.createDatabase(TEST_DATABASE_V6_NAME, 6).use { database ->
+            database.execSQL(
+                "INSERT INTO selected_account " +
+                    "(selection_key, account_id, connected_provider, display_name, avatar_reference) " +
+                    "VALUES ('selected', 'account-v6', 'anilist', 'Migration account', NULL)",
+            )
+            database.execSQL(
+                "INSERT INTO media " +
+                    "(media_id, media_type, title, format, publication_status, synopsis, poster_reference, " +
+                    "banner_reference, episode_total, chapter_total, volume_total, release_year, score_percent) " +
+                    "VALUES ('media-v6', 'anime', 'Migration media', 'tv', 'releasing', 'Full detail', " +
+                    "'https://image.invalid/poster', NULL, 12, NULL, NULL, 2024, 91)",
+            )
+            database.execSQL(
+                "INSERT INTO collection_entry " +
+                    "(collection_entry_id, account_id, media_id, progress_unit, remote_status, remote_progress, " +
+                    "remote_total, remote_updated_at_utc_ms, effective_status, effective_progress, effective_total, " +
+                    "effective_updated_at_utc_ms, local_progress_revision) " +
+                    "VALUES ('entry-v6', 'account-v6', 'media-v6', 'episode', 'current', 3, 12, " +
+                    "1767225600000, 'current', 4, 12, 1767225601000, 2)",
+            )
+            database.execSQL(
+                "INSERT INTO pending_operation_group " +
+                    "(operation_group_id, account_id, created_at_utc_ms, compensates_group_id) " +
+                    "VALUES ('group-v6', 'account-v6', 1767225602000, NULL)",
+            )
+            database.execSQL(
+                "INSERT INTO pending_operation " +
+                    "(operation_id, operation_group_id, account_id, collection_entry_id, position_in_group, kind, " +
+                    "base_progress, target_progress, base_status, target_status, lifecycle_state, attempt_count, " +
+                    "last_attempt_at_utc_ms, retry_not_before_utc_ms) " +
+                    "VALUES ('operation-v6', 'group-v6', 'account-v6', 'entry-v6', 0, 'set_progress_forward', " +
+                    "3, 4, NULL, NULL, 'enqueued', 0, NULL, NULL)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DATABASE_V6_NAME, 7, true, MioMigrations.MIGRATION_6_7).use { migrated ->
+            assertEquals(1, countRows(migrated, "selected_account"))
+            assertEquals(1, countRows(migrated, "media"))
+            assertEquals(1, countRows(migrated, "collection_entry"))
+            assertEquals(1, countRows(migrated, "pending_operation_group"))
+            assertEquals(1, countRows(migrated, "pending_operation"))
+            assertEquals(0, countRows(migrated, "media_search_query"))
+            assertEquals(0, countRows(migrated, "media_search_result"))
+            migrated
+                .query(
+                    "SELECT title, synopsis, score_percent FROM media WHERE media_id = 'media-v6'",
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("Migration media", cursor.getString(0))
+                    assertEquals("Full detail", cursor.getString(1))
+                    assertEquals(91, cursor.getInt(2))
+                }
+            migrated
+                .query(
+                    "SELECT effective_progress, local_progress_revision FROM collection_entry " +
+                        "WHERE collection_entry_id = 'entry-v6'",
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(4, cursor.getInt(0))
+                    assertEquals(2L, cursor.getLong(1))
+                }
+            migrated
+                .query("SELECT operation_id FROM pending_operation WHERE operation_id = 'operation-v6'")
+                .use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("operation-v6", cursor.getString(0))
+                }
+        }
     }
 
     @Test
@@ -401,5 +477,6 @@ class MioDatabaseMigrationTest {
         const val TEST_DATABASE_V3_NAME: String = "mio-migration-v3-test.db"
         const val TEST_DATABASE_V4_NAME: String = "mio-migration-v4-test.db"
         const val TEST_DATABASE_V5_NAME: String = "mio-migration-v5-test.db"
+        const val TEST_DATABASE_V6_NAME: String = "mio-migration-v6-test.db"
     }
 }

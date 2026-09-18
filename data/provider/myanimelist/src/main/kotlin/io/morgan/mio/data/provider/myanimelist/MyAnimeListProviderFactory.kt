@@ -36,6 +36,7 @@ public class MyAnimeListProviderFactory(
         val identityDataSource = MyAnimeListIdentityDataSource(apiService)
         val initialImportDataSource = MyAnimeListInitialImportDataSource(apiService)
         val mediaDetailDataSource = MyAnimeListMediaDetailDataSource(apiService)
+        val mediaSearchDataSource = MyAnimeListMediaSearchDataSource(apiService)
 
         return ProviderBinding(
             provider = ProviderKey.MY_ANIME_LIST,
@@ -43,6 +44,7 @@ public class MyAnimeListProviderFactory(
             identityDataSource = identityDataSource,
             initialImportDataSource = initialImportDataSource,
             mediaDetailDataSource = mediaDetailDataSource,
+            mediaSearchDataSource = mediaSearchDataSource,
             syncDataSource = MyAnimeListSyncDataSource(apiService),
         )
     }

@@ -4,15 +4,18 @@ import io.morgan.mio.core.network.NetworkClientFactory
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
+import okhttp3.HttpUrl
 
 internal class MockMyAnimeListServer {
     private val server = MockWebServer()
+    val baseUrl: HttpUrl
     val apiService: MyAnimeListApiService
     val oAuthService: MyAnimeListOAuthService
 
     init {
         server.start()
-        val retrofit = NetworkClientFactory().createRetrofit(server.url("/"))
+        baseUrl = server.url("/")
+        val retrofit = NetworkClientFactory().createRetrofit(baseUrl)
         apiService = retrofit.create(MyAnimeListApiService::class.java)
         oAuthService = retrofit.create(MyAnimeListOAuthService::class.java)
     }

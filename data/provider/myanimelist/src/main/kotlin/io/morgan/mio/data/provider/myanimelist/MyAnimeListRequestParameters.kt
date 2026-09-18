@@ -7,6 +7,10 @@ internal object MyAnimeListRequestParameters {
         "id,title,main_picture,synopsis,media_type,status,num_episodes,mean,start_date,start_season{year},genres,list_status"
     const val MANGA_FIELDS: String =
         "id,title,main_picture,synopsis,media_type,status,num_chapters,num_volumes,mean,start_date,start_season{year},genres,list_status"
+    const val ANIME_SEARCH_FIELDS: String =
+        "id,title,main_picture,synopsis,media_type,status,num_episodes,mean,start_date,start_season{year},genres"
+    const val MANGA_SEARCH_FIELDS: String =
+        "id,title,main_picture,synopsis,media_type,status,num_chapters,num_volumes,mean,start_date,start_season{year},genres"
     const val ANIME_DETAIL_FIELDS: String =
         "id,title,main_picture,synopsis,media_type,status,num_episodes,mean,start_date,start_season{year},genres," +
             "related_anime{node{id,title,main_picture,synopsis,media_type,status,num_episodes,mean," +

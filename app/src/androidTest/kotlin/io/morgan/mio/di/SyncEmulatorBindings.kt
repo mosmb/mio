@@ -85,6 +85,7 @@ internal class SyncEmulatorBindings(
                     identityDataSource = binding.identityDataSource,
                     initialImportDataSource = binding.initialImportDataSource,
                     mediaDetailDataSource = binding.mediaDetailDataSource,
+                    mediaSearchDataSource = binding.mediaSearchDataSource,
                     syncDataSource = binding.syncDataSource,
                 )
             }

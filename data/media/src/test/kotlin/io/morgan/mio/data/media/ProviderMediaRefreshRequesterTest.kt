@@ -277,6 +277,9 @@ class ProviderMediaRefreshRequesterTest {
         identityDataSource = identityDataSource,
         initialImportDataSource = initialImportDataSource,
         mediaDetailDataSource = source,
+        mediaSearchDataSource =
+            io.morgan.mio.core.testing.provider
+                .FakeProviderMediaSearchDataSource(provider),
         syncDataSource = FakeProviderSyncDataSource(provider),
     )
 

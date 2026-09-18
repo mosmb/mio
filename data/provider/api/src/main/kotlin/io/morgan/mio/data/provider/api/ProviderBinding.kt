@@ -6,6 +6,7 @@ public class ProviderBinding(
     public val identityDataSource: ProviderIdentityDataSource,
     public val initialImportDataSource: ProviderInitialImportDataSource,
     public val mediaDetailDataSource: ProviderMediaDetailDataSource,
+    public val mediaSearchDataSource: ProviderMediaSearchDataSource,
     public val syncDataSource: ProviderSyncDataSource,
 ) {
     init {
@@ -13,6 +14,7 @@ public class ProviderBinding(
         require(identityDataSource.provider == provider)
         require(initialImportDataSource.provider == provider)
         require(mediaDetailDataSource.provider == provider)
+        require(mediaSearchDataSource.provider == provider)
         require(syncDataSource.provider == provider)
     }
 }

@@ -4,6 +4,7 @@ import io.morgan.mio.core.testing.provider.FakeProviderAuthenticator
 import io.morgan.mio.core.testing.provider.FakeProviderIdentityDataSource
 import io.morgan.mio.core.testing.provider.FakeProviderInitialImportDataSource
 import io.morgan.mio.core.testing.provider.FakeProviderMediaDetailDataSource
+import io.morgan.mio.core.testing.provider.FakeProviderMediaSearchDataSource
 import io.morgan.mio.core.testing.provider.FakeProviderSyncDataSource
 import io.morgan.mio.core.testing.provider.completeProviderImportFixture
 import io.morgan.mio.core.testing.provider.providerAuthorizationLaunchFixture
@@ -138,6 +139,7 @@ class FakeProviderAccountSessionRepositoryTest {
                             identityDataSource = identity,
                             initialImportDataSource = initialImport,
                             mediaDetailDataSource = mediaDetails,
+                            mediaSearchDataSource = FakeProviderMediaSearchDataSource(ProviderKey.ANILIST),
                             syncDataSource = sync,
                         ),
                 )
@@ -363,6 +365,7 @@ class FakeProviderAccountSessionRepositoryTest {
                     identityDataSource = identity,
                     initialImportDataSource = initialImport,
                     mediaDetailDataSource = mediaDetails,
+                    mediaSearchDataSource = FakeProviderMediaSearchDataSource(providerKey),
                     syncDataSource = sync,
                 ),
         )

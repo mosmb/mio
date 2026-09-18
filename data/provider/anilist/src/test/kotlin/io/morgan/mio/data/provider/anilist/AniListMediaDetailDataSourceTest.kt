@@ -104,6 +104,11 @@ class AniListMediaDetailDataSourceTest {
                             request: AniListMediaDetailsRequestDto,
                         ): Response<AniListMediaDetailsResponseDto> = throw cancellation
 
+                        override suspend fun mediaSearch(
+                            authorization: String,
+                            request: AniListMediaSearchRequestDto,
+                        ): Response<AniListMediaSearchResponseDto> = error("unused")
+
                         override suspend fun syncEntry(
                             authorization: String,
                             request: AniListSyncEntryRequestDto,

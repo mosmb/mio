@@ -78,10 +78,11 @@ class MioDatabaseTest {
         }
 
     @Test
-    fun versionSixExposesSynchronizationTablesAndDao() =
+    fun versionSevenExposesSynchronizationAndSearchTablesAndDaos() =
         runTest {
-            assertEquals(6, MioDatabase.VERSION)
+            assertEquals(7, MioDatabase.VERSION)
             assertNotNull(database.syncDao())
+            assertNotNull(database.mediaSearchDao())
             assertEquals(
                 setOf("sync_lease", "sync_schedule", "sync_issue", "sync_account_issue"),
                 database
@@ -89,6 +90,19 @@ class MioDatabaseTest {
                     .readableDatabase
                     .query(
                         "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'sync_%'",
+                    ).use { cursor ->
+                        buildSet {
+                            while (cursor.moveToNext()) add(cursor.getString(0))
+                        }
+                    },
+            )
+            assertEquals(
+                setOf("media_search_query", "media_search_result"),
+                database
+                    .openHelper
+                    .readableDatabase
+                    .query(
+                        "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'media_search_%'",
                     ).use { cursor ->
                         buildSet {
                             while (cursor.moveToNext()) add(cursor.getString(0))

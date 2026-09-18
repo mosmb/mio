@@ -251,6 +251,51 @@ public object MioMigrations {
             }
         }
 
+    public val MIGRATION_6_7: Migration =
+        object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `media_search_query` (
+                        `account_id` TEXT NOT NULL,
+                        `media_filter` TEXT NOT NULL,
+                        `provider` TEXT NOT NULL,
+                        `normalized_query` TEXT NOT NULL,
+                        `anime_cursor` TEXT,
+                        `manga_cursor` TEXT,
+                        PRIMARY KEY(`account_id`, `media_filter`),
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_search_query_account_id` " +
+                        "ON `media_search_query` (`account_id`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `media_search_result` (
+                        `account_id` TEXT NOT NULL,
+                        `media_filter` TEXT NOT NULL,
+                        `media_id` TEXT NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        PRIMARY KEY(`account_id`, `media_filter`, `media_id`),
+                        FOREIGN KEY(`account_id`, `media_filter`) REFERENCES `media_search_query`(`account_id`, `media_filter`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_media_search_result_account_id_media_filter_position` " +
+                        "ON `media_search_result` (`account_id`, `media_filter`, `position`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_search_result_media_id` " +
+                        "ON `media_search_result` (`media_id`)",
+                )
+            }
+        }
+
     public val ALL: Array<Migration> =
-        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 }

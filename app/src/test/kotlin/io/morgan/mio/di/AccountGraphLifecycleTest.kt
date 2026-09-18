@@ -55,6 +55,10 @@ class AccountGraphLifecycleTest {
                         graph.metroViewModelFactory.providerKeys("getViewModelProviders"),
                 )
                 assertTrue(
+                    "io.morgan.mio.feature.discover.impl.DiscoverViewModel" in
+                        graph.metroViewModelFactory.providerKeys("getViewModelProviders"),
+                )
+                assertTrue(
                     "io.morgan.mio.feature.media.impl.MediaDetailViewModel.Factory" in
                         graph.metroViewModelFactory.providerKeys("getManualAssistedFactoryProviders"),
                 )

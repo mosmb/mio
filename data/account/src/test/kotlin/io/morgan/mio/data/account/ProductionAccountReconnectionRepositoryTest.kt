@@ -384,6 +384,9 @@ class ProductionAccountReconnectionRepositoryTest {
             identityDataSource = identityDataSource,
             initialImportDataSource = components.initialImportDataSource,
             mediaDetailDataSource = components.mediaDetailDataSource,
+            mediaSearchDataSource =
+                io.morgan.mio.core.testing.provider
+                    .FakeProviderMediaSearchDataSource(provider),
             syncDataSource = components.syncDataSource,
         )
     }

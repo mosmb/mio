@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.withTransaction
 import io.morgan.mio.core.database.dao.CollectionEntryDao
 import io.morgan.mio.core.database.dao.MediaDao
+import io.morgan.mio.core.database.dao.MediaSearchDao
 import io.morgan.mio.core.database.dao.PendingOperationDao
 import io.morgan.mio.core.database.dao.ProgressDao
 import io.morgan.mio.core.database.dao.ProviderIdDao
@@ -19,6 +20,8 @@ import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
 import io.morgan.mio.core.database.entity.MediaEntity
 import io.morgan.mio.core.database.entity.MediaGenreEntity
 import io.morgan.mio.core.database.entity.MediaProviderIdEntity
+import io.morgan.mio.core.database.entity.MediaSearchQueryEntity
+import io.morgan.mio.core.database.entity.MediaSearchResultEntity
 import io.morgan.mio.core.database.entity.PendingOperationDependencyEntity
 import io.morgan.mio.core.database.entity.PendingOperationEntity
 import io.morgan.mio.core.database.entity.PendingOperationGroupEntity
@@ -40,6 +43,8 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         RelatedMediaEntity::class,
         ReleaseEntity::class,
         MediaProviderIdEntity::class,
+        MediaSearchQueryEntity::class,
+        MediaSearchResultEntity::class,
         CollectionEntryEntity::class,
         CollectionEntryProviderIdEntity::class,
         PendingOperationGroupEntity::class,
@@ -51,7 +56,7 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         SyncIssueEntity::class,
         SyncAccountIssueEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -59,6 +64,8 @@ public abstract class MioDatabase : RoomDatabase() {
     public abstract fun selectedAccountDao(): SelectedAccountDao
 
     public abstract fun mediaDao(): MediaDao
+
+    public abstract fun mediaSearchDao(): MediaSearchDao
 
     public abstract fun releaseDao(): ReleaseDao
 
@@ -75,6 +82,6 @@ public abstract class MioDatabase : RoomDatabase() {
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 6
+        public const val VERSION: Int = 7
     }
 }
