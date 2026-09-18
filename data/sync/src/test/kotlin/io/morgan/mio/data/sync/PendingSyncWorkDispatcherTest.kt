@@ -73,7 +73,7 @@ class PendingSyncWorkDispatcherTest {
             runCurrent()
 
             database.inTransaction { database.syncDao().requestDispatch(ACCOUNT_ID) }
-            awaitCondition { scheduled.isNotEmpty() }
+            awaitCondition { database.syncDao().getSchedule(ACCOUNT_ID)?.dispatchedGeneration == 1L }
 
             assertEquals(listOf(AccountId(ACCOUNT_ID)), scheduled)
             assertEquals(1L, database.syncDao().getSchedule(ACCOUNT_ID)?.dispatchedGeneration)
