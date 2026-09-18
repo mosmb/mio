@@ -29,20 +29,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 @ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
 @Inject
 internal class ProductionAccountReconnectionRepository(
+    private val transitions: AccountSessionTransitions,
     private val bindingResolver: ProviderBindingResolver,
     private val credentialStore: ProviderCredentialStore,
     private val accountLocalDataSource: RoomAccountLocalDataSource,
     private val database: MioDatabase,
 ) : AccountReconnectionRepository {
-    private val transitionMutex = Mutex()
     private val stateValue = MutableStateFlow<AccountReconnectionState>(AccountReconnectionState.Idle)
+    private var pendingGeneration: Long? = null
     private var pendingAccountId: AccountId? = null
     private var pendingProvider: ConnectedProvider? = null
     private var pendingBinding: ProviderBinding? = null
@@ -51,7 +51,11 @@ internal class ProductionAccountReconnectionRepository(
     override val state: StateFlow<AccountReconnectionState> = stateValue.asStateFlow()
 
     override suspend fun start(): AccountAuthorizationLaunch? =
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
+            if (pendingGeneration != null && pendingGeneration != transitions.generation) {
+                clearPending()
+                stateValue.value = AccountReconnectionState.Idle
+            }
             val account = accountLocalDataSource.observeSelectedAccount().first() ?: return@withLock null
             when (stateValue.value) {
                 is AccountReconnectionState.Authorizing -> return@withLock null
@@ -62,6 +66,7 @@ internal class ProductionAccountReconnectionRepository(
                 fail(account.id, AccountSessionFailureReason.UNAVAILABLE)
                 return@withLock null
             }
+            pendingGeneration = transitions.generation
             pendingAccountId = account.id
             pendingProvider = account.provider
             pendingBinding = binding
@@ -93,8 +98,13 @@ internal class ProductionAccountReconnectionRepository(
         }
 
     override suspend fun complete(redirect: AccountAuthorizationRedirect) {
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
             val authorizing = stateValue.value as? AccountReconnectionState.Authorizing ?: return@withLock
+            if (pendingGeneration != transitions.generation) {
+                clearPending()
+                stateValue.value = AccountReconnectionState.Idle
+                return@withLock
+            }
             val accountId = pendingAccountId
             val provider = pendingProvider
             val binding = pendingBinding
@@ -164,7 +174,7 @@ internal class ProductionAccountReconnectionRepository(
     }
 
     override suspend fun cancel() {
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
             val accountId = pendingAccountId
             clearPending()
             if (accountId != null) stateValue.value = AccountReconnectionState.Idle
@@ -180,6 +190,7 @@ internal class ProductionAccountReconnectionRepository(
     }
 
     private fun clearPending() {
+        pendingGeneration = null
         pendingAccountId = null
         pendingProvider = null
         pendingBinding = null

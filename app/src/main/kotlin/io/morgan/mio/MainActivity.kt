@@ -6,23 +6,34 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
 import io.morgan.mio.core.ui.AccountRecoveryActions
+import io.morgan.mio.core.ui.AccountSessionActions
 import io.morgan.mio.core.ui.LocalAccountRecoveryActions
+import io.morgan.mio.core.ui.LocalAccountSessionActions
 import io.morgan.mio.domain.account.AccountAuthorizationRedirect
 import io.morgan.mio.domain.account.AccountReconnectionState
 import io.morgan.mio.domain.account.AccountSessionState
 import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.preferences.AppearancePreference
+import io.morgan.mio.domain.preferences.DevicePreferences
+import io.morgan.mio.domain.preferences.MotionPreference
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
+import java.io.IOException
 import kotlin.time.Duration.Companion.seconds
 
 public class MainActivity : ComponentActivity() {
@@ -53,6 +64,31 @@ public class MainActivity : ComponentActivity() {
         }
         setContent {
             val observedSessionState = sessionState.collectAsStateWithLifecycle()
+            val preferencesFlow =
+                remember(graph.preferencesRepository) {
+                    graph.preferencesRepository.observeDevicePreferences().retryWhen { cause, _ ->
+                        if (cause is IOException) {
+                            // Keep the last rendered theme while a transient storage read recovers.
+                            delay(1.seconds)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
+            val devicePreferences by
+                preferencesFlow.collectAsStateWithLifecycle(initialValue = DevicePreferences.Default)
+            val darkTheme =
+                when (devicePreferences.appearance) {
+                    AppearancePreference.SYSTEM -> isSystemInDarkTheme()
+                    AppearancePreference.LIGHT -> false
+                    AppearancePreference.DARK -> true
+                }
+            SideEffect {
+                val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+                insetsController.isAppearanceLightStatusBars = !darkTheme
+                insetsController.isAppearanceLightNavigationBars = !darkTheme
+            }
             var previousSessionState by
                 androidx.compose.runtime.remember {
                     androidx.compose.runtime.mutableStateOf<AccountSessionState>(sessionState.value)
@@ -102,12 +138,23 @@ public class MainActivity : ComponentActivity() {
                         onReconnect = ::startReconnect,
                         onRetryRefresh = graph.accountRefreshObserver::requestRefresh,
                     ),
+                LocalAccountSessionActions provides
+                    AccountSessionActions(
+                        onDisconnect = {
+                            graph.processCoroutineScope.launch {
+                                graph.accountSessionRepository.disconnect()
+                            }
+                        },
+                    ),
             ) {
                 MioApp(
                     root = root,
                     navigationRegistry = graph.navigationRegistry,
                     imageLoader = graph.imageLoader,
                     viewModelFactory = viewModelFactory,
+                    darkTheme = darkTheme,
+                    reducedMotionOverride = devicePreferences.motion == MotionPreference.REDUCED,
+                    hapticsEnabled = devicePreferences.hapticsEnabled,
                     snackbar = snackbar,
                     onSnackbarAction = { snackbar = null },
                 )
@@ -228,6 +275,7 @@ private fun AccountSessionState.providerLabel(
         is AccountSessionState.Authorizing -> provider.label(anilist, myAnimeList)
         is AccountSessionState.Importing -> provider.label(anilist, myAnimeList)
         is AccountSessionState.Failed -> provider?.label(anilist, myAnimeList) ?: fallback
+        is AccountSessionState.Disconnecting -> provider.label(anilist, myAnimeList)
         AccountSessionState.Restoring,
         AccountSessionState.SignedOut,
         -> fallback

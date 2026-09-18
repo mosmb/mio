@@ -168,6 +168,12 @@ internal fun OnboardingScreen(
                     color = colors.textMuted,
                 )
             }
+            OnboardingPhase.DISCONNECTING ->
+                OnboardingProgressStatus(
+                    text =
+                        androidx.compose.ui.res
+                            .stringResource(R.string.onboarding_status_disconnecting),
+                )
             OnboardingPhase.WELCOME -> {
                 if (errorTitle != null && errorMessage != null) {
                     OnboardingInlineError(
@@ -191,7 +197,7 @@ internal fun OnboardingScreen(
                         .stringResource(R.string.onboarding_continue_anilist),
                 onClick = onContinueWithAniList,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.phase == OnboardingPhase.WELCOME,
+                enabled = state.phase == OnboardingPhase.WELCOME && state.connectEnabled,
                 style = MioButtonStyle.PRIMARY,
             )
             MioButton(
@@ -200,7 +206,7 @@ internal fun OnboardingScreen(
                         .stringResource(R.string.onboarding_continue_my_anime_list),
                 onClick = onContinueWithMyAnimeList,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.phase == OnboardingPhase.WELCOME,
+                enabled = state.phase == OnboardingPhase.WELCOME && state.connectEnabled,
                 style = MioButtonStyle.SECONDARY,
             )
             Text(

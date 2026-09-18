@@ -23,6 +23,8 @@ internal class FakeAccountSessionRepository(
         private set
     var completedRedirect: AccountAuthorizationRedirect? = null
         private set
+    var disconnectCalls: Int = 0
+        private set
 
     fun setState(state: AccountSessionState) {
         stateValue.value = state
@@ -43,5 +45,9 @@ internal class FakeAccountSessionRepository(
 
     override suspend fun failAuthorizationLaunch() {
         failLaunchCalls += 1
+    }
+
+    override suspend fun disconnect() {
+        disconnectCalls += 1
     }
 }

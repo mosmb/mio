@@ -20,6 +20,11 @@ public sealed interface AccountSessionState {
         public val provider: ConnectedProvider,
     ) : AccountSessionState
 
+    public data class Disconnecting(
+        public val accountId: AccountId,
+        public val provider: ConnectedProvider,
+    ) : AccountSessionState
+
     public data class Failed(
         public val provider: ConnectedProvider?,
         public val operation: AccountSessionOperation,

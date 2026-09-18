@@ -54,6 +54,9 @@ public abstract class MediaDao {
     @Query("DELETE FROM media_genre WHERE media_id = :mediaId")
     public abstract suspend fun deleteGenres(mediaId: String)
 
+    @Query("DELETE FROM media")
+    public abstract suspend fun deleteAllMedia()
+
     @Query("DELETE FROM related_media WHERE media_id = :mediaId")
     public abstract suspend fun deleteRelatedMedia(mediaId: String)
 

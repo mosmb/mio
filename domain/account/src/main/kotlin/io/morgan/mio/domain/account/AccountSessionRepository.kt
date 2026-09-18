@@ -12,4 +12,6 @@ public interface AccountSessionRepository {
     public suspend fun completeAuthorization(redirect: AccountAuthorizationRedirect)
 
     public suspend fun failAuthorizationLaunch()
+
+    public suspend fun disconnect()
 }

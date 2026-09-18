@@ -5,4 +5,5 @@ public enum class AccountSessionOperation {
     AUTHORIZATION,
     AUTHENTICATION,
     INITIAL_IMPORT,
+    DISCONNECTION,
 }

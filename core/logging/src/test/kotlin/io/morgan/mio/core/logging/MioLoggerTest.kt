@@ -24,7 +24,7 @@ class MioLoggerTest {
             listOf("DEBUG", "INFO", "WARNING", "ERROR"),
             MioLogLevel.entries.map(Enum<*>::name),
         )
-        assertEquals(3, MioLogEvent.entries.size)
+        assertEquals(4, MioLogEvent.entries.size)
         assertFalse(events.toString().contains("fixture-sensitive-value"))
         assertTrue(MioLogger.None !== recording)
     }

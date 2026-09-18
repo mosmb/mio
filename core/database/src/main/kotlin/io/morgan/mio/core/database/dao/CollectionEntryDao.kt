@@ -2,12 +2,18 @@ package io.morgan.mio.core.database.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
+import io.morgan.mio.core.database.model.CollectionStatisticsAggregate
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 public abstract class CollectionEntryDao {
+    @Transaction
+    @Query("SELECT * FROM collection_entry WHERE account_id = :accountId ORDER BY collection_entry_id")
+    public abstract fun observeStatistics(accountId: String): Flow<List<CollectionStatisticsAggregate>>
+
     @Query(
         "SELECT * FROM collection_entry " +
             "WHERE account_id = :accountId " +

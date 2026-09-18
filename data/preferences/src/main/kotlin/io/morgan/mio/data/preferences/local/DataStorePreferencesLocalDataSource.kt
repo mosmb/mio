@@ -54,7 +54,7 @@ public class DataStorePreferencesLocalDataSource(
         }
     }
 
-    internal suspend fun clearAccountPreferences(accountId: AccountId) {
+    public suspend fun clearAccountPreferences(accountId: AccountId) {
         dataStore.edit { preferences ->
             preferences.remove(PreferencesKeys.accountLibraryMediaFilter(accountId.value))
         }

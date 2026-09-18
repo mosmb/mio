@@ -61,9 +61,11 @@ import kotlin.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProductionAccountReconnectionRepositoryTest {
     private lateinit var database: MioDatabase
+    private lateinit var transitions: AccountSessionTransitions
 
     @Before
     fun setUp() {
+        transitions = AccountSessionTransitions()
         database = MioDatabaseFactory.createInMemory(ApplicationProvider.getApplicationContext())
     }
 
@@ -326,11 +328,103 @@ class ProductionAccountReconnectionRepositoryTest {
             assertEquals(1, (binding.authenticator as FakeProviderAuthenticator).beginRequests.size)
         }
 
+    @Test
+    fun disconnectWaitsForReconnectCredentialCommitThenRemovesTheNewCredential() =
+        runTest {
+            seedAccount(ProviderKey.ANILIST)
+            val enteredWrite = CompletableDeferred<Unit>()
+            val releaseWrite = CompletableDeferred<Unit>()
+            val store =
+                RecordingCredentialStore(providerCredentialsFixture()).apply {
+                    beforeCommit = {
+                        enteredWrite.complete(Unit)
+                        releaseWrite.await()
+                    }
+                }
+            val binding = configuredBinding(ProviderKey.ANILIST)
+            val session = sessionRepository(binding, store)
+            session.restore()
+            val reconnect = repository(binding, store)
+            reconnect.start()
+            val completion = async { reconnect.complete(AccountAuthorizationRedirect(VALID_REDIRECT)) }
+            enteredWrite.await()
+            val disconnect = async { session.disconnect() }
+            runCurrent()
+            assertTrue(!disconnect.isCompleted)
+            assertTrue(session.state.value is io.morgan.mio.domain.account.AccountSessionState.Authenticated)
+
+            releaseWrite.complete(Unit)
+            completion.await()
+            disconnect.await()
+
+            assertNull(store.value(ProviderKey.ANILIST))
+            assertNull(database.selectedAccountDao().observeSelectedAccount().first())
+            assertEquals(io.morgan.mio.domain.account.AccountSessionState.SignedOut, session.state.value)
+        }
+
+    @Test
+    fun disconnectInvalidatesPendingBrowserTransactionAndAllowsAFreshReconnect() =
+        runTest {
+            seedAccount(ProviderKey.ANILIST)
+            val store = RecordingCredentialStore(providerCredentialsFixture())
+            val binding = configuredBinding(ProviderKey.ANILIST)
+            val session = sessionRepository(binding, store)
+            session.restore()
+            val reconnect = repository(binding, store)
+            reconnect.start()
+            session.disconnect()
+
+            reconnect.complete(AccountAuthorizationRedirect(VALID_REDIRECT))
+
+            assertTrue((binding.authenticator as FakeProviderAuthenticator).completeCalls.isEmpty())
+            assertNull(store.value(ProviderKey.ANILIST))
+            assertEquals(AccountReconnectionState.Idle, reconnect.state.value)
+            seedAccount(ProviderKey.ANILIST)
+            (binding.authenticator as FakeProviderAuthenticator).enqueueBeginAuthorization {
+                ProviderResult.Success(providerAuthorizationLaunchFixture())
+            }
+            assertTrue(reconnect.start() != null)
+        }
+
+    private fun sessionRepository(
+        binding: ProviderBinding,
+        store: ProviderCredentialStore,
+    ): ProductionAccountSessionRepository =
+        ProductionAccountSessionRepository(
+            transitions = transitions,
+            bindingResolver = ProviderBindingResolver { binding },
+            credentialStore = store,
+            initialImportWriter =
+                InitialImportWriter(
+                    io.morgan.mio.data.account.local
+                        .RoomInitialImportLocalDataSource(database),
+                ),
+            accountLocalDataSource = RoomAccountLocalDataSource(database),
+            accountSessionActivator =
+                object : AuthenticatedAccountSessionActivator {
+                    override fun activate(
+                        accountId: AccountId,
+                        provider: io.morgan.mio.domain.account.ConnectedProvider,
+                    ) = Unit
+
+                    override fun destroy() = Unit
+                },
+            disconnectSupport =
+                object : AccountSessionDisconnectSupport {
+                    override suspend fun cancelAccountWork(accountId: AccountId) = Unit
+
+                    override suspend fun clearAccountPreferences(accountId: AccountId) = Unit
+
+                    override fun reportCleanupFailure() = Unit
+                },
+        )
+
     private fun repository(
         binding: ProviderBinding,
         credentialStore: ProviderCredentialStore,
     ): ProductionAccountReconnectionRepository =
         ProductionAccountReconnectionRepository(
+            transitions = transitions,
             bindingResolver = ProviderBindingResolver { provider -> binding.takeIf { it.provider == provider } },
             credentialStore = credentialStore,
             accountLocalDataSource = RoomAccountLocalDataSource(database),

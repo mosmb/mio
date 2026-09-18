@@ -47,12 +47,14 @@ class ProductionAccountSessionRepositoryTest {
     private lateinit var database: MioDatabase
     private lateinit var credentialStore: FakeProviderCredentialStore
     private lateinit var activator: RecordingAccountSessionActivator
+    private lateinit var disconnectSupport: RecordingAccountSessionDisconnectSupport
 
     @Before
     fun setUp() {
         database = MioDatabaseFactory.createInMemory(ApplicationProvider.getApplicationContext())
         credentialStore = FakeProviderCredentialStore()
         activator = RecordingAccountSessionActivator()
+        disconnectSupport = RecordingAccountSessionDisconnectSupport()
     }
 
     @After
@@ -67,6 +69,7 @@ class ProductionAccountSessionRepositoryTest {
                 database.clearAllTables()
                 credentialStore = FakeProviderCredentialStore()
                 activator = RecordingAccountSessionActivator()
+                disconnectSupport = RecordingAccountSessionDisconnectSupport()
                 val selected = configuredBinding(providerKey)
                 val other = providerBindingFixture(providerKey.other())
                 val resolver = RecordingBindingResolver(mapOf(providerKey to selected, providerKey.other() to other))
@@ -122,6 +125,7 @@ class ProductionAccountSessionRepositoryTest {
                 database.clearAllTables()
                 credentialStore = FakeProviderCredentialStore()
                 activator = RecordingAccountSessionActivator()
+                disconnectSupport = RecordingAccountSessionDisconnectSupport()
                 val binding = configuredBinding(providerKey, importFailure = ProviderFailure.ServiceUnavailable)
                 val repository = repository(RecordingBindingResolver(mapOf(providerKey to binding)))
 
@@ -152,6 +156,7 @@ class ProductionAccountSessionRepositoryTest {
                 database.clearAllTables()
                 credentialStore = FakeProviderCredentialStore()
                 activator = RecordingAccountSessionActivator()
+                disconnectSupport = RecordingAccountSessionDisconnectSupport()
                 val releaseImport = CompletableDeferred<Unit>()
                 val binding = configuredBinding(providerKey, releaseImport = releaseImport)
                 val repository = repository(RecordingBindingResolver(mapOf(providerKey to binding)))
@@ -246,13 +251,137 @@ class ProductionAccountSessionRepositoryTest {
             assertEquals(1, (binding.authenticator as FakeProviderAuthenticator).beginRequests.size)
         }
 
+    @Test
+    fun disconnectRemovesCredentialsAndAllAccountAndMediaCacheRowsWithoutProviderCalls() =
+        runTest {
+            val binding = configuredBinding(ProviderKey.ANILIST)
+            val repository = repository(RecordingBindingResolver(mapOf(ProviderKey.ANILIST to binding)))
+            repository.restore()
+            repository.startConnection(ConnectedProvider.ANILIST)
+            repository.completeAuthorization(AccountAuthorizationRedirect("mio://oauth/callback?code=fixture"))
+            val authenticated = repository.state.value as AccountSessionState.Authenticated
+
+            assertTrue(rowCount("media") > 0)
+            assertTrue(rowCount("media_genre") > 0)
+            assertTrue(rowCount("release") > 0)
+            assertTrue(rowCount("media_provider_id") > 0)
+            disconnectSupport.onClearPreferences = {
+                assertEquals(1, credentialStore.deleteCount)
+                assertEquals(0, rowCount("selected_account"))
+                assertEquals(0, rowCount("media"))
+            }
+
+            repository.disconnect()
+
+            assertEquals(AccountSessionState.SignedOut, repository.state.value)
+            assertEquals(listOf(ProviderKey.ANILIST), credentialStore.deleteProviders)
+            assertEquals(listOf("cancel-work", "clear-preferences"), disconnectSupport.events)
+            assertEquals(0, disconnectSupport.reportedFailures)
+            listOf(
+                "selected_account",
+                "account_provider_id",
+                "media",
+                "media_genre",
+                "related_media",
+                "release",
+                "media_provider_id",
+                "media_search_query",
+                "media_search_result",
+                "collection_entry",
+                "collection_entry_provider_id",
+                "pending_operation_group",
+                "pending_operation",
+                "pending_operation_dependency",
+                "local_progress_activity",
+                "sync_lease",
+                "sync_schedule",
+                "sync_issue",
+                "sync_account_issue",
+            ).forEach { table -> assertEquals("$table should be empty", 0, rowCount(table)) }
+            assertEquals(authenticated.accountId, disconnectSupport.cancelledAccountIds.single())
+            assertEquals(
+                0,
+                (binding.syncDataSource as io.morgan.mio.core.testing.provider.FakeProviderSyncDataSource).calls.size,
+            )
+        }
+
+    @Test
+    fun disconnectAttemptsLaterCleanupAfterFailuresAndRequiresCleanupRetryBeforeConnecting() =
+        runTest {
+            val binding = configuredBinding(ProviderKey.ANILIST)
+            val repository = repository(RecordingBindingResolver(mapOf(ProviderKey.ANILIST to binding)))
+            repository.restore()
+            repository.startConnection(ConnectedProvider.ANILIST)
+            repository.completeAuthorization(AccountAuthorizationRedirect("mio://oauth/callback?code=fixture"))
+            credentialStore.failNext(io.morgan.mio.core.testing.provider.FakeProviderCredentialOperation.DELETE)
+            disconnectSupport.failWorkCancellation = true
+            disconnectSupport.failPreferenceCleanup = true
+
+            repository.disconnect()
+
+            assertEquals(
+                AccountSessionState.Failed(
+                    provider = ConnectedProvider.ANILIST,
+                    operation = AccountSessionOperation.DISCONNECTION,
+                    reason = AccountSessionFailureReason.CLEANUP_FAILED,
+                    retryable = true,
+                ),
+                repository.state.value,
+            )
+            assertEquals(listOf("cancel-work", "clear-preferences"), disconnectSupport.events)
+            assertEquals(3, disconnectSupport.reportedFailures)
+            assertEquals(0, rowCount("selected_account"))
+            assertNull(repository.startConnection(ConnectedProvider.MY_ANIME_LIST))
+
+            disconnectSupport.failWorkCancellation = false
+            disconnectSupport.failPreferenceCleanup = false
+            repository.disconnect()
+
+            assertEquals(AccountSessionState.SignedOut, repository.state.value)
+            assertEquals(2, credentialStore.deleteCount)
+        }
+
+    @Test
+    fun disconnectCleanupSurvivesCallerCancellationAndBlocksNewConnectionUntilFinished() =
+        runTest {
+            val binding = configuredBinding(ProviderKey.ANILIST)
+            val repository = repository(RecordingBindingResolver(mapOf(ProviderKey.ANILIST to binding)))
+            repository.restore()
+            repository.startConnection(ConnectedProvider.ANILIST)
+            repository.completeAuthorization(AccountAuthorizationRedirect("mio://oauth/callback?code=fixture"))
+            val enteredCleanup = CompletableDeferred<Unit>()
+            val releaseCleanup = CompletableDeferred<Unit>()
+            disconnectSupport.onCancelWork = {
+                enteredCleanup.complete(Unit)
+                releaseCleanup.await()
+            }
+            val disconnect = async { repository.disconnect() }
+            enteredCleanup.await()
+            disconnect.cancel()
+            val nextConnection = async { repository.startConnection(ConnectedProvider.MY_ANIME_LIST) }
+            testScheduler.runCurrent()
+            assertFalse(nextConnection.isCompleted)
+            assertTrue(repository.state.value is AccountSessionState.Disconnecting)
+
+            releaseCleanup.complete(Unit)
+            disconnect.join()
+            nextConnection.await()
+
+            assertEquals(0, rowCount("selected_account"))
+            assertEquals(0, rowCount("media"))
+            assertEquals(listOf("cancel-work", "clear-preferences"), disconnectSupport.events)
+            assertEquals(1, credentialStore.deleteCount)
+        }
+
     private fun repository(resolver: ProviderBindingResolver): ProductionAccountSessionRepository =
         ProductionAccountSessionRepository(
+            transitions = AccountSessionTransitions(),
             bindingResolver = resolver,
             credentialStore = credentialStore,
             initialImportWriter = InitialImportWriter(RoomInitialImportLocalDataSource(database)),
             accountLocalDataSource = RoomAccountLocalDataSource(database),
             accountSessionActivator = activator,
+            disconnectSupport = disconnectSupport,
         )
 
     private fun configuredBinding(
@@ -318,6 +447,33 @@ private class RecordingAccountSessionActivator : AuthenticatedAccountSessionActi
 
     override fun destroy() {
         destroyCalls += 1
+    }
+}
+
+private class RecordingAccountSessionDisconnectSupport : AccountSessionDisconnectSupport {
+    val events = mutableListOf<String>()
+    val cancelledAccountIds = mutableListOf<AccountId>()
+    var reportedFailures: Int = 0
+    var failWorkCancellation: Boolean = false
+    var failPreferenceCleanup: Boolean = false
+    var onClearPreferences: () -> Unit = {}
+    var onCancelWork: suspend () -> Unit = {}
+
+    override suspend fun cancelAccountWork(accountId: AccountId) {
+        events += "cancel-work"
+        cancelledAccountIds += accountId
+        onCancelWork()
+        if (failWorkCancellation) error("fixture work cancellation failure")
+    }
+
+    override suspend fun clearAccountPreferences(accountId: AccountId) {
+        events += "clear-preferences"
+        onClearPreferences()
+        if (failPreferenceCleanup) error("fixture preference cleanup failure")
+    }
+
+    override fun reportCleanupFailure() {
+        reportedFailures += 1
     }
 }
 

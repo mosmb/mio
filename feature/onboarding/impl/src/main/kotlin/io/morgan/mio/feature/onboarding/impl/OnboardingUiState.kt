@@ -8,6 +8,7 @@ internal enum class OnboardingPhase {
     WELCOME,
     AUTHORIZING,
     IMPORTING,
+    DISCONNECTING,
 }
 
 internal enum class OnboardingProviderUi(
@@ -29,4 +30,5 @@ internal data class OnboardingUiState(
     val phase: OnboardingPhase,
     val activeProvider: OnboardingProviderUi?,
     val error: OnboardingErrorUi?,
+    val connectEnabled: Boolean = true,
 )

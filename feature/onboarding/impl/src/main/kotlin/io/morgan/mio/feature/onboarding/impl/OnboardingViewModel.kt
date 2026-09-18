@@ -45,8 +45,10 @@ internal class OnboardingViewModel(
         }
 
         when (action) {
-            OnboardingAction.ContinueWithAniList -> connect(ConnectedProvider.ANILIST)
-            OnboardingAction.ContinueWithMyAnimeList -> connect(ConnectedProvider.MY_ANIME_LIST)
+            OnboardingAction.ContinueWithAniList ->
+                if (uiState.value.connectEnabled) connect(ConnectedProvider.ANILIST)
+            OnboardingAction.ContinueWithMyAnimeList ->
+                if (uiState.value.connectEnabled) connect(ConnectedProvider.MY_ANIME_LIST)
             OnboardingAction.Retry -> retry()
         }
     }
@@ -81,6 +83,8 @@ internal class OnboardingViewModel(
         }
         if (current.operation == AccountSessionOperation.RESTORATION) {
             viewModelScope.launch { accountSessionRepository.restore() }
+        } else if (current.operation == AccountSessionOperation.DISCONNECTION) {
+            viewModelScope.launch { accountSessionRepository.disconnect() }
         } else {
             current.provider?.let(::connect)
         }

@@ -26,8 +26,11 @@ public class RoomAccountLocalDataSource(
         }
     }
 
-    internal suspend fun deleteAccount(accountId: String) {
+    internal suspend fun deleteAccountAndCache(accountId: String) {
         require(accountId.isNotBlank())
-        database.selectedAccountDao().deleteAccount(accountId)
+        database.inTransaction {
+            database.selectedAccountDao().deleteAccount(accountId)
+            database.mediaDao().deleteAllMedia()
+        }
     }
 }

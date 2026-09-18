@@ -49,6 +49,8 @@ internal class FakeProviderAccountSessionRepository(
         data object Import : Operation
 
         data object FailLaunch : Operation
+
+        data object Disconnect : Operation
     }
 
     private val transitionMutex = Mutex()
@@ -97,6 +99,7 @@ internal class FakeProviderAccountSessionRepository(
                 AccountSessionState.Restoring,
                 is AccountSessionState.Authorizing,
                 is AccountSessionState.Importing,
+                is AccountSessionState.Disconnecting,
                 -> return@withLock null
 
                 is AccountSessionState.Authenticated -> error(ACTIVE_ACCOUNT_REQUIRES_DISCONNECTION)
@@ -208,6 +211,13 @@ internal class FakeProviderAccountSessionRepository(
                     reason = AccountSessionFailureReason.AUTHORIZATION_LAUNCH_FAILED,
                     retryable = true,
                 )
+        }
+    }
+
+    override suspend fun disconnect() {
+        transitionMutex.withLock {
+            operations += Operation.Disconnect
+            stateValue.value = AccountSessionState.SignedOut
         }
     }
 

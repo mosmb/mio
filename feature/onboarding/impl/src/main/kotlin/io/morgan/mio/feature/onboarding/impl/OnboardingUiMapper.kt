@@ -37,11 +37,19 @@ internal fun mapOnboardingUiState(state: AccountSessionState): OnboardingUiState
                 activeProvider = state.provider.toUiProvider(),
                 error = null,
             )
+        is AccountSessionState.Disconnecting ->
+            OnboardingUiState(
+                phase = OnboardingPhase.DISCONNECTING,
+                activeProvider = state.provider.toUiProvider(),
+                error = null,
+                connectEnabled = false,
+            )
         is AccountSessionState.Failed ->
             OnboardingUiState(
                 phase = OnboardingPhase.WELCOME,
                 activeProvider = state.provider?.toUiProvider(),
                 error = state.toErrorUi(),
+                connectEnabled = state.operation != AccountSessionOperation.DISCONNECTION,
             )
     }
 
@@ -62,6 +70,7 @@ private val AccountSessionState.Failed.errorTitleRes: Int
                 AccountSessionOperation.AUTHORIZATION -> R.string.onboarding_error_authorization_title
                 AccountSessionOperation.AUTHENTICATION -> R.string.onboarding_error_authentication_title
                 AccountSessionOperation.INITIAL_IMPORT -> R.string.onboarding_error_initial_import_title
+                AccountSessionOperation.DISCONNECTION -> R.string.onboarding_error_disconnect_title
             }
         }
 
@@ -75,6 +84,7 @@ private val AccountSessionState.Failed.errorMessageRes: Int
                 AccountSessionOperation.AUTHORIZATION -> R.string.onboarding_error_authorization_message
                 AccountSessionOperation.AUTHENTICATION -> R.string.onboarding_error_authentication_message
                 AccountSessionOperation.INITIAL_IMPORT -> R.string.onboarding_error_initial_import_message
+                AccountSessionOperation.DISCONNECTION -> R.string.onboarding_error_disconnect_message
             }
         }
 

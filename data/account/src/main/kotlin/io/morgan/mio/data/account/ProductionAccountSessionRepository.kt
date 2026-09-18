@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
@@ -42,22 +41,24 @@ private const val ACTIVE_ACCOUNT_REQUIRES_DISCONNECTION =
 @SingleIn(AppScope::class)
 @Inject
 internal class ProductionAccountSessionRepository(
+    private val transitions: AccountSessionTransitions,
     private val bindingResolver: ProviderBindingResolver,
     private val credentialStore: ProviderCredentialStore,
     private val initialImportWriter: InitialImportWriter,
     private val accountLocalDataSource: RoomAccountLocalDataSource,
     private val accountSessionActivator: AuthenticatedAccountSessionActivator,
+    private val disconnectSupport: AccountSessionDisconnectSupport,
 ) : AccountSessionRepository {
-    private val transitionMutex = Mutex()
     private val stateValue = MutableStateFlow<AccountSessionState>(AccountSessionState.Restoring)
     private var pendingProvider: ConnectedProvider? = null
     private var pendingBinding: ProviderBinding? = null
     private var pendingTransaction: ProviderAuthorizationTransaction? = null
+    private var pendingDisconnect: DisconnectTarget? = null
 
     override val state: StateFlow<AccountSessionState> = stateValue.asStateFlow()
 
     override suspend fun restore() {
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
             val current = stateValue.value
             val canRestore =
                 current is AccountSessionState.Restoring ||
@@ -116,11 +117,13 @@ internal class ProductionAccountSessionRepository(
     }
 
     override suspend fun startConnection(provider: ConnectedProvider): AccountAuthorizationLaunch? =
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
+            if (pendingDisconnect != null) return@withLock null
             when (stateValue.value) {
                 AccountSessionState.Restoring,
                 is AccountSessionState.Authorizing,
                 is AccountSessionState.Importing,
+                is AccountSessionState.Disconnecting,
                 -> return@withLock null
 
                 is AccountSessionState.Authenticated -> error(ACTIVE_ACCOUNT_REQUIRES_DISCONNECTION)
@@ -165,7 +168,7 @@ internal class ProductionAccountSessionRepository(
         }
 
     override suspend fun completeAuthorization(redirect: AccountAuthorizationRedirect) {
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
             val authorizing =
                 stateValue.value as? AccountSessionState.Authorizing
                     ?: error(REDIRECT_OUTSIDE_AUTHORIZATION)
@@ -257,7 +260,7 @@ internal class ProductionAccountSessionRepository(
     }
 
     override suspend fun failAuthorizationLaunch() {
-        transitionMutex.withLock {
+        transitions.mutex.withLock {
             val authorizing = stateValue.value as? AccountSessionState.Authorizing ?: return@withLock
             clearPendingAuthorization()
             stateValue.value =
@@ -267,6 +270,54 @@ internal class ProductionAccountSessionRepository(
                     reason = AccountSessionFailureReason.AUTHORIZATION_LAUNCH_FAILED,
                     retryable = true,
                 )
+        }
+    }
+
+    override suspend fun disconnect() {
+        transitions.mutex.withLock {
+            withContext(NonCancellable) {
+                val target =
+                    pendingDisconnect
+                        ?: (stateValue.value as? AccountSessionState.Authenticated)?.let { authenticated ->
+                            DisconnectTarget(authenticated.accountId, authenticated.provider)
+                        }
+                        ?: return@withContext
+
+                transitions.generation += 1
+                pendingDisconnect = target
+                stateValue.value = AccountSessionState.Disconnecting(target.accountId, target.provider)
+                clearPendingAuthorization()
+
+                var failed = false
+
+                suspend fun attempt(step: suspend () -> Unit) {
+                    try {
+                        step()
+                    } catch (_: Exception) {
+                        failed = true
+                        runCatching(disconnectSupport::reportCleanupFailure)
+                    }
+                }
+
+                attempt { accountSessionActivator.destroy() }
+                attempt { disconnectSupport.cancelAccountWork(target.accountId) }
+                attempt { credentialStore.delete(target.provider.toProviderKey()) }
+                attempt { accountLocalDataSource.deleteAccountAndCache(target.accountId.value) }
+                attempt { disconnectSupport.clearAccountPreferences(target.accountId) }
+
+                if (failed) {
+                    stateValue.value =
+                        AccountSessionState.Failed(
+                            provider = target.provider,
+                            operation = AccountSessionOperation.DISCONNECTION,
+                            reason = AccountSessionFailureReason.CLEANUP_FAILED,
+                            retryable = true,
+                        )
+                } else {
+                    pendingDisconnect = null
+                    stateValue.value = AccountSessionState.SignedOut
+                }
+            }
         }
     }
 
@@ -328,3 +379,8 @@ private fun ConnectedProvider.toProviderKey(): ProviderKey =
         ConnectedProvider.ANILIST -> ProviderKey.ANILIST
         ConnectedProvider.MY_ANIME_LIST -> ProviderKey.MY_ANIME_LIST
     }
+
+private data class DisconnectTarget(
+    val accountId: io.morgan.mio.domain.model.AccountId,
+    val provider: ConnectedProvider,
+)

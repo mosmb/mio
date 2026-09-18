@@ -10,6 +10,7 @@
     <string name="onboarding_status_restoring">Checking your connection</string>
     <string name="onboarding_status_authorizing">Continue in your browser to connect %1$s.</string>
     <string name="onboarding_status_importing">Bringing in your library</string>
+    <string name="onboarding_status_disconnecting">Removing this connection and its local data</string>
     <string name="onboarding_import_source_note">Your %1$s library remains the source of truth for your library and progress.</string>
     <string name="onboarding_import_progress_semantics">Library import in progress</string>
     <string name="onboarding_retry">Retry</string>
@@ -23,4 +24,6 @@
     <string name="onboarding_error_initial_import_message">Nothing was added. Try connecting again.</string>
     <string name="onboarding_error_unavailable_title">Connection isn\'t available in this build</string>
     <string name="onboarding_error_unavailable_message">Use a build with provider connections enabled.</string>
+    <string name="onboarding_error_disconnect_title">Some local data could not be removed</string>
+    <string name="onboarding_error_disconnect_message">Mio stopped using this account, but cleanup did not finish. Retry cleanup before connecting another provider.</string>
 </resources>

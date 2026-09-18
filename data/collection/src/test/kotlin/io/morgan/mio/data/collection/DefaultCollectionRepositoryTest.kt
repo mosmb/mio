@@ -5,12 +5,14 @@ import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.core.database.MioDatabaseFactory
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
 import io.morgan.mio.core.database.entity.MediaEntity
+import io.morgan.mio.core.database.entity.MediaGenreEntity
 import io.morgan.mio.core.database.entity.SelectedAccountEntity
 import io.morgan.mio.core.database.model.StoredCollectionStatus
 import io.morgan.mio.core.database.model.StoredConnectedProvider
 import io.morgan.mio.core.database.model.StoredMediaPublicationStatus
 import io.morgan.mio.core.database.model.StoredMediaType
 import io.morgan.mio.core.database.model.StoredProgressUnit
+import io.morgan.mio.data.collection.RoomCollectionStatisticsLocalDataSource
 import io.morgan.mio.data.collection.local.RoomCollectionLocalDataSource
 import io.morgan.mio.data.collection.mapper.CollectionEntryPersistenceSnapshot
 import io.morgan.mio.data.collection.mapper.CollectionEntryProviderIdInput
@@ -22,9 +24,14 @@ import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitTotal
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -230,19 +237,178 @@ class DefaultCollectionRepositoryTest {
             assertEquals(emptyList<CollectionEntry>(), localDataSource.observeCollection(accountId).first())
         }
 
-    private fun media(id: String): MediaEntity =
+    @Test
+    fun statisticsUseEffectiveProgressDistinctGenresAndSeparateVolumesFromChapters() =
+        runTest {
+            val plannedAnimeId = MediaId("media-anime-planned")
+            val chapterMangaId = MediaId("media-manga-chapters")
+            val volumeMangaId = MediaId("media-manga-volumes")
+            database.mediaDao().upsertMedia(
+                listOf(
+                    media(mediaOneId.value, StoredMediaType.ANIME, poster = "poster:current"),
+                    media(mediaTwoId.value, StoredMediaType.ANIME),
+                    media(plannedAnimeId.value, StoredMediaType.ANIME),
+                    media(chapterMangaId.value, StoredMediaType.MANGA),
+                    media(volumeMangaId.value, StoredMediaType.MANGA),
+                ),
+            )
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    statisticsEntry(
+                        "entry-anime-current",
+                        mediaOneId.value,
+                        StoredProgressUnit.EPISODE,
+                        StoredCollectionStatus.CURRENT,
+                        1_500_000_000,
+                    ),
+                    statisticsEntry(
+                        "entry-anime-completed",
+                        mediaTwoId.value,
+                        StoredProgressUnit.EPISODE,
+                        StoredCollectionStatus.COMPLETED,
+                        1_500_000_001,
+                    ),
+                    statisticsEntry(
+                        "entry-anime-planned",
+                        plannedAnimeId.value,
+                        StoredProgressUnit.EPISODE,
+                        StoredCollectionStatus.PLANNED,
+                        99,
+                    ),
+                    statisticsEntry(
+                        "entry-manga-chapters",
+                        chapterMangaId.value,
+                        StoredProgressUnit.CHAPTER,
+                        StoredCollectionStatus.CURRENT,
+                        12,
+                    ),
+                    statisticsEntry(
+                        "entry-manga-volumes",
+                        volumeMangaId.value,
+                        StoredProgressUnit.VOLUME,
+                        StoredCollectionStatus.COMPLETED,
+                        30,
+                    ),
+                ),
+            )
+            database.mediaDao().upsertGenres(
+                listOf(
+                    MediaGenreEntity(mediaOneId.value, "Action", 0),
+                    MediaGenreEntity(mediaOneId.value, "action", 1),
+                    MediaGenreEntity(mediaOneId.value, "Comedy", 2),
+                    MediaGenreEntity(mediaTwoId.value, "action", 0),
+                    MediaGenreEntity(mediaTwoId.value, "Drama", 1),
+                    MediaGenreEntity(chapterMangaId.value, "Romance", 0),
+                    MediaGenreEntity(volumeMangaId.value, "Romance", 0),
+                ),
+            )
+            val statistics = RoomCollectionStatisticsLocalDataSource(database).observeStatistics(accountId).first()
+
+            assertEquals(2L, statistics.completedTitleCount)
+            assertEquals(3_000_000_100L, statistics.recordedEpisodes.value)
+            assertEquals(3L, statistics.recordedEpisodes.trackedTitleCount)
+            assertEquals(12L, statistics.recordedChapters.value)
+            assertEquals(3L, statistics.anime.trackedTitleCount)
+            assertEquals(1L, statistics.anime.completedTitleCount)
+            assertEquals(2L, statistics.anime.genreMetadataTitleCount)
+            assertEquals(
+                listOf("Action" to 2L, "Comedy" to 1L, "Drama" to 1L),
+                statistics.anime.topGenres
+                    .take(3)
+                    .map { it.name to it.titleCount },
+            )
+            assertEquals(2L, statistics.manga.trackedTitleCount)
+            assertEquals(listOf("Romance" to 2L), statistics.manga.topGenres.map { it.name to it.titleCount })
+            assertEquals(
+                listOf(mediaOneId.value, mediaTwoId.value, chapterMangaId.value, volumeMangaId.value).sorted(),
+                statistics.artwork.map { it.mediaId.value },
+            )
+            assertEquals(
+                0L,
+                RoomCollectionStatisticsLocalDataSource(database)
+                    .observeStatistics(AccountId("another-account"))
+                    .first()
+                    .anime
+                    .trackedTitleCount,
+            )
+        }
+
+    @Test
+    fun statisticsObservationInvalidatesAfterRoomProgressChanges() =
+        runBlocking {
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    statisticsEntry(
+                        "entry-observed",
+                        mediaOneId.value,
+                        StoredProgressUnit.EPISODE,
+                        StoredCollectionStatus.CURRENT,
+                        2,
+                    ),
+                ),
+            )
+            val source = RoomCollectionStatisticsLocalDataSource(database)
+            val emissions = Channel<io.morgan.mio.domain.collection.CollectionStatisticsSnapshot>(Channel.UNLIMITED)
+            val job = launch(Dispatchers.IO) { source.observeStatistics(accountId).take(2).collect(emissions::send) }
+
+            val initial = withTimeout(5_000) { emissions.receive() }
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    statisticsEntry(
+                        "entry-observed",
+                        mediaOneId.value,
+                        StoredProgressUnit.EPISODE,
+                        StoredCollectionStatus.CURRENT,
+                        8,
+                    ),
+                ),
+            )
+            val updated = withTimeout(5_000) { emissions.receive() }
+            job.join()
+
+            assertEquals(2L, initial.recordedEpisodes.value)
+            assertEquals(8L, updated.recordedEpisodes.value)
+        }
+
+    private fun media(
+        id: String,
+        type: StoredMediaType = StoredMediaType.ANIME,
+        poster: String? = null,
+    ): MediaEntity =
         MediaEntity(
             mediaId = id,
-            mediaType = StoredMediaType.ANIME,
+            mediaType = type,
             title = "Title $id",
             format = null,
             publicationStatus = StoredMediaPublicationStatus.UNKNOWN,
             synopsis = null,
-            posterReference = null,
+            posterReference = poster,
             bannerReference = null,
             episodeTotal = null,
             chapterTotal = null,
             volumeTotal = null,
+        )
+
+    private fun statisticsEntry(
+        entryId: String,
+        mediaId: String,
+        unit: StoredProgressUnit,
+        status: StoredCollectionStatus,
+        progress: Int,
+    ): CollectionEntryEntity =
+        CollectionEntryEntity(
+            collectionEntryId = entryId,
+            accountId = accountId.value,
+            mediaId = mediaId,
+            progressUnit = unit,
+            remoteStatus = StoredCollectionStatus.CURRENT,
+            remoteProgress = 0,
+            remoteTotal = null,
+            remoteUpdatedAtUtcMs = TIME,
+            effectiveStatus = status,
+            effectiveProgress = progress,
+            effectiveTotal = null,
+            effectiveUpdatedAtUtcMs = TIME,
         )
 
     private fun entry(

@@ -19,7 +19,7 @@ private object YouNavEntryBuilder : NavEntryBuilder {
 
     override fun EntryProviderScope<NavKey>.build(navigator: MioNavigator) {
         entry<YouKey> {
-            YouRoute()
+            YouRoute(navigator)
         }
     }
 }
