@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.metro)
 }
 
+metro {
+    generateContributionProviders.set(true)
+}
+
 dependencies {
     implementation(project(":feature:discover:api"))
     implementation(project(":core:common"))
@@ -13,4 +17,10 @@ dependencies {
     implementation(project(":domain:media"))
     implementation(project(":domain:collection"))
     implementation(project(":domain:model"))
+    implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.metrox.viewmodel.compose)
+    implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -57,6 +57,7 @@
     </plurals>
     <string name="today_caught_up">You are caught up</string>
     <string name="today_caught_up_supporting">Nothing needs your attention right now.</string>
+    <string name="today_explore_discover">Explore Discover</string>
     <string name="today_next_release">Next release</string>
     <string name="today_future_under_hour">In under one hour</string>
     <plurals name="today_future_hours">

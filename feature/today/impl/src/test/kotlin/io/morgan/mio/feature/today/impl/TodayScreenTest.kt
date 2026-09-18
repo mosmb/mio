@@ -225,12 +225,14 @@ class TodayScreenTest {
     }
 
     @Test
-    fun caughtUpReceiptIsQuietAndFutureReleaseIsTheOnlyAction() {
+    fun caughtUpReceiptOffersDiscoverAndFutureReleaseActions() {
         val clickedIds = mutableListOf<String>()
+        var discoverClicks = 0
         var density: Density? = null
         show(
             state = caughtUpState(),
             onMediaDetail = clickedIds::add,
+            onExploreDiscover = { discoverClicks += 1 },
             onDensity = { density = it },
         )
 
@@ -240,17 +242,19 @@ class TodayScreenTest {
         composeRule.onNodeWithText("The Next Chapter").assertIsDisplayed()
         composeRule.onNodeWithText("Next chapter 42").assertIsDisplayed()
         composeRule.onNodeWithText("In 2 days").assertIsDisplayed()
-        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
-        val futureTarget = composeRule.onAllNodes(hasClickAction())[0].fetchSemanticsNode()
+        val exploreTarget = composeRule.onNodeWithText("Explore Discover").assertIsDisplayed().assertHasClickAction()
+        val futureTarget = composeRule.onNodeWithText("The Next Chapter").fetchSemanticsNode()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(2)
         assertTrue(futureTarget.boundsInRoot.height >= with(requireNotNull(density)) { 48.dp.toPx() })
         assertEquals(Role.Button, futureTarget.config[SemanticsProperties.Role])
         assertEquals(
             "Open The Next Chapter details",
             futureTarget.config[SemanticsActions.OnClick].label,
         )
+        exploreTarget.performClick()
+        assertEquals(1, discoverClicks)
         composeRule.onNodeWithText("The Next Chapter").performClick()
         assertEquals(listOf("future-preview"), clickedIds)
-        composeRule.onAllNodesWithText("Discover", substring = true, ignoreCase = true).assertCountEquals(0)
         composeRule
             .onNode(
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
@@ -357,14 +361,15 @@ class TodayScreenTest {
     }
 
     @Test
-    fun emptyCaughtUpReceiptHasNoArtworkActionOrFakeRelease() {
+    fun emptyCaughtUpReceiptOffersDiscoverWithoutArtworkOrFakeRelease() {
         show(
             TodayUiState.CaughtUp(
                 TodayCaughtUpUiModel(artwork = emptyList(), nextRelease = null),
             ),
         )
         composeRule.onNodeWithText("You are caught up").assertIsDisplayed()
-        composeRule.onAllNodes(hasClickAction()).assertCountEquals(0)
+        composeRule.onNodeWithText("Explore Discover").assertIsDisplayed().assertHasClickAction()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
         composeRule.onAllNodesWithText("Next release").assertCountEquals(0)
         composeRule
             .onNode(
@@ -426,6 +431,7 @@ class TodayScreenTest {
         state: TodayUiState,
         onMediaDetail: (String) -> Unit = {},
         onRemainingReady: () -> Unit = {},
+        onExploreDiscover: () -> Unit = {},
         onAction: (TodayAction) -> Unit = {},
         providerLabel: String? = null,
         onReconnect: () -> Unit = {},
@@ -447,6 +453,7 @@ class TodayScreenTest {
                             state = stateHolder.value,
                             onMediaDetail = onMediaDetail,
                             onRemainingReady = onRemainingReady,
+                            onExploreDiscover = onExploreDiscover,
                             onAction = onAction,
                             providerLabel = providerLabel,
                             onReconnect = onReconnect,

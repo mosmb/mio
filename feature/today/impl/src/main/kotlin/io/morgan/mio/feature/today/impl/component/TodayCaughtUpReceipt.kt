@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.accessibility.mioDecorative
 import io.morgan.mio.core.designsystem.icon.MioIcons
@@ -34,6 +35,7 @@ import io.morgan.mio.feature.today.impl.TodayCaughtUpUiModel
 @Composable
 internal fun TodayCaughtUpReceipt(
     receipt: TodayCaughtUpUiModel,
+    onExploreDiscover: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -44,7 +46,6 @@ internal fun TodayCaughtUpReceipt(
                 .clip(MioTheme.shapes.lg)
                 .background(ColorReceipt)
                 .border(1.dp, MioTheme.colors.borderStrong, MioTheme.shapes.lg)
-                .semantics(mergeDescendants = true) {}
                 .padding(20.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -71,23 +72,34 @@ internal fun TodayCaughtUpReceipt(
                 color = Color.White.copy(alpha = 0.82f),
             )
         }
-        if (receipt.artwork.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(72.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                receipt.artwork.forEach { artwork ->
-                    MioArtwork(
-                        reference = artwork.reference,
-                        contentDescription = null,
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(MioTheme.shapes.xs)
-                                .mioDecorative(),
-                    )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (receipt.artwork.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(72.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    receipt.artwork.forEach { artwork ->
+                        MioArtwork(
+                            reference = artwork.reference,
+                            contentDescription = null,
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clip(MioTheme.shapes.xs)
+                                    .mioDecorative(),
+                        )
+                    }
                 }
+            }
+            TextButton(
+                onClick = onExploreDiscover,
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(horizontal = 0.dp, vertical = 8.dp),
+            ) {
+                Text(stringResource(R.string.today_explore_discover), style = MioTheme.typography.bodyStrong)
             }
         }
     }

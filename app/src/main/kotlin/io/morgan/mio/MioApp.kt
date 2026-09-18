@@ -22,6 +22,7 @@ import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavigationRegistry
 import io.morgan.mio.core.navigation.TopLevelNavigationRequest
+import io.morgan.mio.core.navigation.TopLevelRootNavigationRequest
 import io.morgan.mio.core.navigation.rememberAuthenticatedNavigationState
 import io.morgan.mio.core.navigation.rememberOnboardingNavigationState
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
@@ -111,11 +112,12 @@ private fun AuthenticatedRoot(
         remember(state, retainedStackNavigator) {
             object : MioNavigator {
                 override fun navigate(destination: androidx.navigation3.runtime.NavKey) {
-                    val topLevelRequest = destination as? TopLevelNavigationRequest
-                    if (topLevelRequest?.replacesTargetStack == true) {
-                        state.openTopLevel(topLevelRequest.targetSlot, destination)
-                    } else {
-                        retainedStackNavigator.navigate(destination)
+                    when {
+                        destination is TopLevelRootNavigationRequest -> state.openTopLevel(destination.targetSlot)
+                        destination is TopLevelNavigationRequest && destination.replacesTargetStack -> {
+                            state.openTopLevel(destination.targetSlot, destination)
+                        }
+                        else -> retainedStackNavigator.navigate(destination)
                     }
                 }
 

@@ -59,6 +59,21 @@ class AuthenticatedNavigationStateTest {
     }
 
     @Test
+    fun topLevelRootRequestSelectsTheRegisteredRootAndResetsOnlyThatStack() {
+        val state = state()
+        val navigator = state.navigator
+        navigator.navigate(AuthTodayNestedKey)
+        navigator.navigate(AuthDiscoverTestKey)
+        navigator.navigate(AuthDiscoverNestedKey)
+
+        state.openTopLevel(TopLevelSlot.DISCOVER)
+
+        assertEquals(TopLevelSlot.DISCOVER, state.selectedDestination.slot)
+        assertEquals(listOf(AuthDiscoverTestKey), state.stackSnapshot(TopLevelSlot.DISCOVER))
+        assertEquals(listOf(AuthTodayTestKey, AuthTodayNestedKey), state.stackSnapshot(TopLevelSlot.TODAY))
+    }
+
+    @Test
     fun selectingARootNeverPushesIntoEitherStack() {
         val state = state()
         val navigator = state.navigator

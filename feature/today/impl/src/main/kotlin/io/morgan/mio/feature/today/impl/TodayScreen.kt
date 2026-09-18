@@ -60,6 +60,7 @@ internal fun TodayRoute(
     modifier: Modifier = Modifier,
     onMediaDetail: (MediaId) -> Unit,
     onRemainingReady: () -> Unit,
+    onExploreDiscover: () -> Unit,
 ) {
     val viewModel = metroViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +92,7 @@ internal fun TodayRoute(
         state = state,
         onMediaDetail = { mediaId -> onMediaDetail(MediaId(mediaId)) },
         onRemainingReady = onRemainingReady,
+        onExploreDiscover = onExploreDiscover,
         onAction = viewModel::onAction,
         timeoutMillis = timeoutMillis,
         providerLabel = recoveryActions.providerLabel,
@@ -105,6 +107,7 @@ internal fun TodayScreen(
     state: TodayUiState,
     onMediaDetail: (String) -> Unit,
     onRemainingReady: () -> Unit = {},
+    onExploreDiscover: () -> Unit = {},
     onAction: (TodayAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
     providerLabel: String? = null,
@@ -218,6 +221,7 @@ internal fun TodayScreen(
                 is TodayUiState.CaughtUp -> {
                     TodayCaughtUpReceipt(
                         receipt = state.receipt,
+                        onExploreDiscover = onExploreDiscover,
                         modifier = Modifier.padding(top = 24.dp),
                     )
                     state.receipt.nextRelease?.let { recommendation ->

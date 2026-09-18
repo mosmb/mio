@@ -55,6 +55,10 @@ public class AuthenticatedNavigationState internal constructor(
         targetStack.add(rootKey)
     }
 
+    public fun openTopLevel(slot: TopLevelSlot) {
+        openTopLevel(slot, destinations[slot.ordinal].key)
+    }
+
     @Composable
     public fun decoratedEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List<NavEntry<NavKey>> {
         val todaySaveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()

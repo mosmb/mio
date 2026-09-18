@@ -1,0 +1,28 @@
+<resources>
+    <string name="discover_title">Discover</string>
+    <string name="discover_search_hint">Search anime or manga</string>
+    <string name="discover_clear_query">Clear</string>
+    <string name="discover_filter_all">All</string>
+    <string name="discover_filter_anime">Anime</string>
+    <string name="discover_filter_manga">Manga</string>
+    <string name="discover_prompt_title">Find something to watch or read</string>
+    <string name="discover_prompt_message">Search titles from your connected account.</string>
+    <string name="discover_failure_title">Search could not be loaded</string>
+    <string name="discover_failure_message">Check your connection, then try again.</string>
+    <string name="discover_cached_failure_message">Could not update results. Saved results are still shown.</string>
+    <string name="discover_no_results_title">No results found</string>
+    <string name="discover_no_results_message">Try another title or change the filter.</string>
+    <string name="discover_retry">Retry</string>
+    <string name="discover_load_more">Load more</string>
+    <string name="discover_loading_more">Loading more</string>
+    <string name="discover_load_more_failure">Could not load more results.</string>
+    <string name="discover_status_watching">Watching</string>
+    <string name="discover_status_reading">Reading</string>
+    <string name="discover_status_plan_to_watch">Plan to watch</string>
+    <string name="discover_status_plan_to_read">Plan to read</string>
+    <string name="discover_status_paused">Paused</string>
+    <string name="discover_status_completed">Completed</string>
+    <string name="discover_status_dropped">Dropped</string>
+    <string name="discover_status_rewatching">Rewatching</string>
+    <string name="discover_status_rereading">Rereading</string>
+</resources>

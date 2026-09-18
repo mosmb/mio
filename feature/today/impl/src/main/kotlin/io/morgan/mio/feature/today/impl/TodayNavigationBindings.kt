@@ -13,6 +13,7 @@ import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.feature.library.api.LibraryKey
 import io.morgan.mio.feature.media.api.MediaKey
+import io.morgan.mio.feature.today.api.OpenDiscoverRequest
 import io.morgan.mio.feature.today.api.TodayKey
 import java.util.UUID
 import kotlin.reflect.KClass
@@ -27,6 +28,7 @@ private object TodayNavEntryBuilder : NavEntryBuilder {
                 onRemainingReady = {
                     navigator.navigate(LibraryKey(readyRequestId = UUID.randomUUID().toString()))
                 },
+                onExploreDiscover = { navigator.navigate(OpenDiscoverRequest) },
             )
         }
     }

@@ -11,7 +11,9 @@ import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
+import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.feature.discover.api.DiscoverKey
+import io.morgan.mio.feature.media.api.MediaKey
 import kotlin.reflect.KClass
 
 private object DiscoverNavEntryBuilder : NavEntryBuilder {
@@ -19,7 +21,9 @@ private object DiscoverNavEntryBuilder : NavEntryBuilder {
 
     override fun EntryProviderScope<NavKey>.build(navigator: MioNavigator) {
         entry<DiscoverKey> {
-            DiscoverRoute()
+            DiscoverRoute(
+                onMediaDetail = { mediaId: MediaId -> navigator.navigate(MediaKey(mediaId)) },
+            )
         }
     }
 }
