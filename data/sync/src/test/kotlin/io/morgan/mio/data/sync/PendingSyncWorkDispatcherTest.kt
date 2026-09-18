@@ -142,6 +142,39 @@ class PendingSyncWorkDispatcherTest {
             assertEquals(2L, schedule.dispatchedGeneration)
         }
 
+    @Test
+    fun cancellingAccountStopsAnInFlightDispatchAndFencesLaterRequests() =
+        runTest {
+            val entered = CompletableDeferred<Unit>()
+            val scheduled = AtomicInteger()
+            val cancelled = mutableListOf<AccountId>()
+            val dispatcher =
+                PendingSyncWorkDispatcher(
+                    database,
+                    object : SyncWorkScheduler {
+                        override suspend fun schedule(accountId: AccountId) {
+                            scheduled.incrementAndGet()
+                            entered.complete(Unit)
+                            CompletableDeferred<Unit>().await()
+                        }
+
+                        override suspend fun cancel(accountId: AccountId) {
+                            cancelled += accountId
+                        }
+                    },
+                )
+            dispatcher.start(backgroundScope)
+            runCurrent()
+            database.inTransaction { database.syncDao().requestDispatch(ACCOUNT_ID) }
+            awaitCondition { entered.isCompleted }
+            dispatcher.cancel(AccountId(ACCOUNT_ID))
+            database.inTransaction { database.syncDao().requestDispatch(ACCOUNT_ID) }
+            runCurrent()
+            assertEquals(1, scheduled.get())
+            assertEquals(listOf(AccountId(ACCOUNT_ID)), cancelled)
+            assertEquals(0L, database.syncDao().getSchedule(ACCOUNT_ID)?.dispatchedGeneration)
+        }
+
     private suspend fun TestScope.awaitCondition(condition: suspend () -> Boolean) {
         repeat(100) {
             runCurrent()

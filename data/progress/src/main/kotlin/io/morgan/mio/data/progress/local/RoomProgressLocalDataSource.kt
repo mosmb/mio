@@ -7,8 +7,11 @@ import io.morgan.mio.core.database.model.StoredCollectionStatus
 import io.morgan.mio.data.progress.mapper.toProgressAction
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.progress.ProgressAction
+import io.morgan.mio.domain.progress.ProgressDirection
+import io.morgan.mio.domain.progress.RecordedProgressActivity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -62,6 +65,31 @@ public class RoomProgressLocalDataSource(
 
     internal fun observeLatestActivity(accountId: AccountId): Flow<ProgressAction?> =
         database.progressDao().observeLatestActivity(accountId.value).map { activity -> activity?.toProgressAction() }
+
+    internal fun observeRecordedActivity(
+        accountId: AccountId,
+        fromInclusive: kotlin.time.Instant,
+        untilExclusive: kotlin.time.Instant,
+    ): Flow<List<RecordedProgressActivity>> =
+        database.progressDao().observeRecordedActivity(accountId.value, fromInclusive, untilExclusive).map { rows ->
+            rows.map { row ->
+                RecordedProgressActivity(
+                    createdAt = row.createdAtUtcMs,
+                    mediaType =
+                        when (row.mediaType) {
+                            io.morgan.mio.core.database.model.StoredMediaType.ANIME -> MediaType.ANIME
+                            io.morgan.mio.core.database.model.StoredMediaType.MANGA -> MediaType.MANGA
+                        },
+                    direction =
+                        when (row.direction) {
+                            "increase" -> ProgressDirection.INCREASE
+                            "decrease" -> ProgressDirection.DECREASE
+                            "correction" -> ProgressDirection.CORRECTION
+                            else -> error("Unknown local progress direction: ${row.direction}")
+                        },
+                )
+            }
+        }
 
     internal suspend fun markUndone(
         accountId: AccountId,

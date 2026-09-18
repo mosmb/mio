@@ -16,6 +16,7 @@ import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.sync.ProjectSyncEntryUseCase
 import io.morgan.mio.domain.sync.ReconcilePendingOperationUseCase
 import io.morgan.mio.domain.sync.RefreshRepository
+import io.morgan.mio.domain.sync.ResolveProgressConflictUseCase
 import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
 import io.morgan.mio.domain.sync.SyncRecoveryRepository
 import io.morgan.mio.domain.sync.SyncRepository
@@ -62,6 +63,13 @@ public object AccountSyncBindings {
     @SingleIn(AccountScope::class)
     public fun provideRetrySyncIssueUseCase(repository: SyncRecoveryRepository): RetrySyncIssueUseCase =
         RetrySyncIssueUseCase(repository)
+
+    @Provides
+    @SingleIn(AccountScope::class)
+    public fun provideResolveProgressConflictUseCase(
+        repository: SyncRecoveryRepository,
+        clock: kotlin.time.Clock,
+    ): ResolveProgressConflictUseCase = ResolveProgressConflictUseCase(repository, clock)
 
     @Provides
     @SingleIn(AccountScope::class)

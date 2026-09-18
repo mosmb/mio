@@ -7,6 +7,7 @@ public data class SyncCandidate(
     public val current: SyncEntryState,
     public val groupOrder: Long,
     public val isAutomaticCompletion: Boolean = false,
+    public val correctionProgress: io.morgan.mio.domain.model.ProgressValue? = null,
     public val compensatesGroupId: OperationGroupId? = null,
     public val attemptBudgetExhausted: Boolean = false,
 ) {

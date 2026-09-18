@@ -7,6 +7,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import io.morgan.mio.domain.model.AccountId
+import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -35,7 +36,7 @@ class WorkManagerSyncWorkSchedulerTest {
     @Test
     fun scheduleUsesConnectedUniquePendingChain() {
         val accountId = AccountId("scheduler-account")
-        val scheduler = WorkManagerSyncWorkScheduler(context)
+        val scheduler = WorkManagerSyncWorkScheduler(context, Dispatchers.Unconfined)
 
         kotlinx.coroutines.runBlocking { scheduler.schedule(accountId) }
 

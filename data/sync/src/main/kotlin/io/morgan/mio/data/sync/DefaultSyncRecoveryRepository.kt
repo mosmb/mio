@@ -4,6 +4,7 @@ import dev.zacsweers.metro.Inject
 import io.morgan.mio.data.sync.local.RoomSyncRecoveryLocalDataSource
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.OperationId
+import io.morgan.mio.domain.sync.PendingOperationGroup
 import io.morgan.mio.domain.sync.SyncIssue
 import io.morgan.mio.domain.sync.SyncRecoveryRepository
 import io.morgan.mio.domain.sync.SyncRecoveryState
@@ -20,6 +21,11 @@ public class DefaultSyncRecoveryRepository(
         localDataSource.readIssue(accountId, operationId)
 
     override suspend fun rearm(issue: SyncIssue): Boolean = localDataSource.rearm(accountId, issue)
+
+    override suspend fun resolveConflict(
+        issue: SyncIssue,
+        resolution: PendingOperationGroup,
+    ): Boolean = localDataSource.resolveConflict(accountId, issue, resolution)
 
     override suspend fun recoverAuthentication(
         accountId: AccountId,

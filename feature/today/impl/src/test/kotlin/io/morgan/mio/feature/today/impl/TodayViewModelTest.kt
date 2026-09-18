@@ -32,6 +32,7 @@ import io.morgan.mio.domain.progress.ProgressWriteResult
 import io.morgan.mio.domain.progress.StepProgressUseCase
 import io.morgan.mio.domain.progress.UndoProgressUseCase
 import io.morgan.mio.domain.queue.ObserveTodayQueueUseCase
+import io.morgan.mio.domain.sync.PendingOperationGroup
 import io.morgan.mio.domain.sync.SyncIssue
 import io.morgan.mio.domain.sync.SyncRecoveryRepository
 import io.morgan.mio.domain.sync.SyncRecoveryState
@@ -393,6 +394,11 @@ private class EmptySyncRecoveryRepository : SyncRecoveryRepository {
     override suspend fun readIssue(operationId: OperationId): SyncIssue? = null
 
     override suspend fun rearm(issue: SyncIssue): Boolean = false
+
+    override suspend fun resolveConflict(
+        issue: SyncIssue,
+        resolution: PendingOperationGroup,
+    ): Boolean = false
 
     override suspend fun recoverAuthentication(
         accountId: AccountId,

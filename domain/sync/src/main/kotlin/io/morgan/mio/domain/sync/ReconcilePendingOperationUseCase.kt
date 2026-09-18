@@ -15,6 +15,20 @@ public class ReconcilePendingOperationUseCase {
             PendingOperationKind.SET_PROGRESS_FORWARD -> reconcileForward(operation, remote)
             PendingOperationKind.SET_PROGRESS_CORRECTION -> reconcileCorrection(operation, remote)
             PendingOperationKind.SET_STATUS -> reconcileStatus(input.candidate, remote)
+            PendingOperationKind.SET_STATUS_CORRECTION -> {
+                val base = (operation.base as OperationValue.Status).value
+                val target = (operation.target as OperationValue.Status).value
+                if (target == CollectionStatus.COMPLETED &&
+                    remote.total?.let { remote.progress.value < it.value } == true
+                ) {
+                    return SyncReconciliationDecision.Conflict
+                }
+                when (remote.status) {
+                    target -> SyncReconciliationDecision.Satisfied
+                    base -> SyncReconciliationDecision.Write(OperationValue.Status(target))
+                    else -> SyncReconciliationDecision.Conflict
+                }
+            }
         }
     }
 
@@ -54,10 +68,24 @@ public class ReconcilePendingOperationUseCase {
         val target =
             (candidate.operation.target as? OperationValue.Status)?.value
                 ?: return SyncReconciliationDecision.Rejected
+        if (candidate.correctionProgress != null &&
+            base == CollectionStatus.COMPLETED &&
+            target == CollectionStatus.CURRENT
+        ) {
+            if (remote.progress != candidate.correctionProgress) return SyncReconciliationDecision.Conflict
+            return when (remote.status) {
+                target -> SyncReconciliationDecision.Satisfied
+                base -> SyncReconciliationDecision.Write(OperationValue.Status(target))
+                else -> SyncReconciliationDecision.Conflict
+            }
+        }
         val isCompensation = candidate.compensatesGroupId != null
         if (isCompensation) {
-            if (base != CollectionStatus.COMPLETED || target != CollectionStatus.CURRENT) {
-                return SyncReconciliationDecision.Rejected
+            val reopens = base == CollectionStatus.COMPLETED && target == CollectionStatus.CURRENT
+            val recompletes = base == CollectionStatus.CURRENT && target == CollectionStatus.COMPLETED
+            if (!reopens && !recompletes) return SyncReconciliationDecision.Rejected
+            if (recompletes && remote.total?.let { remote.progress.value < it.value } == true) {
+                return SyncReconciliationDecision.Conflict
             }
             return when {
                 remote.status == target -> SyncReconciliationDecision.Satisfied

@@ -15,6 +15,7 @@ public object ProgressRules {
             when (direction) {
                 ProgressDirection.INCREASE -> increase(entry)
                 ProgressDirection.DECREASE -> decrease(entry)
+                ProgressDirection.CORRECTION -> Decision.Rejected(ProgressWriteResult.Rejection.INVALID_REQUEST)
             }
         }
 

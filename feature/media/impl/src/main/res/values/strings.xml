@@ -73,6 +73,7 @@
     <string name="media_detail_sync_retry_refresh">Retry refresh</string>
     <string name="media_detail_sync_reconnect">Reconnect</string>
     <string name="media_detail_sync_retry">Retry sync</string>
+    <string name="media_detail_sync_resolve">Resolve</string>
     <string name="media_detail_sync_rejected">This update was not accepted; your saved value is unchanged</string>
     <string name="media_detail_sync_conflict">This update conflicts with a provider change</string>
     <string name="media_detail_sync_retry_exhausted">This update needs another attempt</string>
@@ -82,4 +83,5 @@
     <string name="media_detail_sync_episodes">episodes</string>
     <string name="media_detail_sync_chapters">chapters</string>
     <string name="media_detail_sync_volumes">volumes</string>
+    <string name="media_detail_edit_progress">Edit exact progress</string>
 </resources>

@@ -55,7 +55,9 @@ import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
+import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.feature.media.impl.component.MediaDetailBackdrop
 import io.morgan.mio.feature.media.impl.component.MediaDetailCollectionContext
 import io.morgan.mio.feature.media.impl.component.MediaDetailHeader
@@ -69,6 +71,8 @@ internal fun MediaDetailRoute(
     mediaId: MediaId,
     onBack: () -> Unit,
     onRelatedTitle: (MediaId) -> Unit,
+    onEditProgress: (MediaId) -> Unit,
+    onResolveProgressConflict: (OperationId, CollectionEntryId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel =
@@ -105,6 +109,10 @@ internal fun MediaDetailRoute(
         onBack = onBack,
         onRetry = { viewModel.onAction(MediaDetailAction.Retry) },
         onRelatedTitleClick = { relatedId -> onRelatedTitle(MediaId(relatedId)) },
+        onEditProgress = { onEditProgress(mediaId) },
+        onResolveProgressConflict = { operationId, entryId ->
+            onResolveProgressConflict(OperationId(operationId), CollectionEntryId(entryId))
+        },
         onAction = viewModel::onAction,
         timeoutMillis = timeoutMillis,
         providerLabel = recoveryActions.providerLabel,
@@ -120,6 +128,8 @@ internal fun MediaDetailScreen(
     onRetry: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onEditProgress: () -> Unit = {},
+    onResolveProgressConflict: (String, String) -> Unit = { _, _ -> },
     onAction: (MediaDetailAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
     providerLabel: String? = null,
@@ -155,6 +165,8 @@ internal fun MediaDetailScreen(
                     state = state,
                     onBack = onBack,
                     onRelatedTitleClick = onRelatedTitleClick,
+                    onEditProgress = onEditProgress,
+                    onResolveProgressConflict = onResolveProgressConflict,
                     onAction = onAction,
                     timeoutMillis = timeoutMillis,
                     providerLabel = providerLabel,
@@ -172,6 +184,8 @@ private fun MediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
+    onEditProgress: () -> Unit,
+    onResolveProgressConflict: (String, String) -> Unit,
     modifier: Modifier = Modifier,
     onAction: (MediaDetailAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
@@ -184,6 +198,8 @@ private fun MediaDetailContent(
             state = state,
             onBack = onBack,
             onRelatedTitleClick = onRelatedTitleClick,
+            onEditProgress = onEditProgress,
+            onResolveProgressConflict = onResolveProgressConflict,
             onAction = onAction,
             timeoutMillis = timeoutMillis,
             providerLabel = providerLabel,
@@ -196,6 +212,8 @@ private fun MediaDetailContent(
             state = state,
             onBack = onBack,
             onRelatedTitleClick = onRelatedTitleClick,
+            onEditProgress = onEditProgress,
+            onResolveProgressConflict = onResolveProgressConflict,
             onAction = onAction,
             timeoutMillis = timeoutMillis,
             providerLabel = providerLabel,
@@ -211,6 +229,8 @@ private fun SheetRiseMediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
+    onEditProgress: () -> Unit,
+    onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
     providerLabel: String?,
@@ -253,6 +273,8 @@ private fun SheetRiseMediaDetailContent(
                     MediaDetailSections(
                         state = state,
                         onRelatedTitleClick = onRelatedTitleClick,
+                        onEditProgress = onEditProgress,
+                        onResolveProgressConflict = onResolveProgressConflict,
                         onAction = onAction,
                         timeoutMillis = timeoutMillis,
                         providerLabel = providerLabel,
@@ -272,6 +294,8 @@ private fun ReducedMotionMediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
+    onEditProgress: () -> Unit,
+    onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
     providerLabel: String?,
@@ -307,6 +331,8 @@ private fun ReducedMotionMediaDetailContent(
             MediaDetailSections(
                 state = state,
                 onRelatedTitleClick = onRelatedTitleClick,
+                onEditProgress = onEditProgress,
+                onResolveProgressConflict = onResolveProgressConflict,
                 onAction = onAction,
                 timeoutMillis = timeoutMillis,
                 providerLabel = providerLabel,
@@ -321,6 +347,8 @@ private fun ReducedMotionMediaDetailContent(
 private fun MediaDetailSections(
     state: MediaDetailUiState.Content,
     onRelatedTitleClick: (String) -> Unit,
+    onEditProgress: () -> Unit,
+    onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
     providerLabel: String?,
@@ -338,6 +366,7 @@ private fun MediaDetailSections(
             providerLabel = providerLabel,
             onReconnect = onReconnect,
             onRetryRefresh = onRetryRefresh,
+            onResolveProgressConflict = onResolveProgressConflict,
             onAction = onAction,
         )
         MediaDetailCollectionContext(
@@ -360,6 +389,7 @@ private fun MediaDetailSections(
                     ),
                 )
             },
+            onEditProgress = onEditProgress,
             onInteractionChanged = { pressed ->
                 onAction(MediaDetailAction.InteractionChanged(state.media.id, pressed))
             },
@@ -404,6 +434,7 @@ private fun MediaDetailRecovery(
     providerLabel: String?,
     onReconnect: () -> Unit,
     onRetryRefresh: () -> Unit,
+    onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
 ) {
     if (syncIssues.isEmpty() && accountIssue == null) return
@@ -466,6 +497,13 @@ private fun MediaDetailRecovery(
                     colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
                 ) {
                     Text(stringResource(R.string.media_detail_sync_reconnect))
+                }
+            } else if (issue.kind == SyncIssueKind.CONFLICT) {
+                TextButton(
+                    onClick = { onResolveProgressConflict(issue.operationId, issue.entryId) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                ) {
+                    Text(stringResource(R.string.media_detail_sync_resolve))
                 }
             } else if (issue.canRetry) {
                 TextButton(

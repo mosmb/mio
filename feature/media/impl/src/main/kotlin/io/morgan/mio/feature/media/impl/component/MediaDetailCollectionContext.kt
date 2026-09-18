@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,7 @@ internal fun MediaDetailCollectionContext(
     modifier: Modifier = Modifier,
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
+    onEditProgress: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
     onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
@@ -98,6 +100,13 @@ internal fun MediaDetailCollectionContext(
                         onIncrease = onIncrease,
                         onInteractionChanged = onInteractionChanged,
                     )
+                }
+            }
+            if (collection.status == MediaDetailCollectionStatus.CURRENT ||
+                collection.status == MediaDetailCollectionStatus.COMPLETED
+            ) {
+                TextButton(onClick = onEditProgress) {
+                    Text(stringResource(R.string.media_detail_edit_progress))
                 }
             }
         }

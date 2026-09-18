@@ -45,7 +45,9 @@ public class ProjectSyncEntryUseCase {
                     progress = (operation.target as OperationValue.Progress).value.value
                 }
 
-                PendingOperationKind.SET_STATUS -> {
+                PendingOperationKind.SET_STATUS,
+                PendingOperationKind.SET_STATUS_CORRECTION,
+                -> {
                     status = (operation.target as OperationValue.Status).value
                 }
             }

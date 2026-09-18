@@ -10,6 +10,8 @@ import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.feature.media.api.MediaKey
+import io.morgan.mio.feature.progress.api.ProgressConflictKey
+import io.morgan.mio.feature.progress.api.ProgressEditorKey
 import kotlin.reflect.KClass
 
 private object MediaNavEntryBuilder : NavEntryBuilder {
@@ -22,6 +24,10 @@ private object MediaNavEntryBuilder : NavEntryBuilder {
                 onBack = { navigator.goBack() },
                 onRelatedTitle = { relatedId ->
                     navigator.navigate(MediaKey(relatedId))
+                },
+                onEditProgress = { mediaId -> navigator.navigate(ProgressEditorKey(mediaId.value)) },
+                onResolveProgressConflict = { operationId, entryId ->
+                    navigator.navigate(ProgressConflictKey(operationId.value, entryId.value))
                 },
             )
         }

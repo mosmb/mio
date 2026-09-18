@@ -189,14 +189,15 @@ public class DefaultProgressRepository(
     private fun isValidRequest(change: ProgressChange): Boolean {
         val entry = change.before.entry
         if (entry.accountId != accountId) return false
-        if (entry.status != CollectionStatus.CURRENT) return false
+        if (entry.status !in setOf(CollectionStatus.CURRENT, CollectionStatus.COMPLETED)) return false
         if (change.targetProgress.value < 0) return false
         if (change.targetStatus !in setOf(CollectionStatus.CURRENT, CollectionStatus.COMPLETED)) return false
         if (!change.undoWindow.isFinite() || change.undoWindow < MIN_UNDO_WINDOW) return false
         val total = entry.total?.value
         return when (change.direction) {
             ProgressDirection.INCREASE ->
-                change.targetProgress.value.toLong() == entry.progress.value.toLong() + 1L &&
+                entry.status == CollectionStatus.CURRENT &&
+                    change.targetProgress.value.toLong() == entry.progress.value.toLong() + 1L &&
                     (total == null || entry.progress.value < total) &&
                     change.targetStatus ==
                     if (total == change.targetProgress.value) {
@@ -206,9 +207,20 @@ public class DefaultProgressRepository(
                     }
 
             ProgressDirection.DECREASE ->
-                entry.progress.value > 0 &&
+                entry.status == CollectionStatus.CURRENT &&
+                    entry.progress.value > 0 &&
                     change.targetProgress.value == entry.progress.value - 1 &&
                     change.targetStatus == CollectionStatus.CURRENT
+
+            ProgressDirection.CORRECTION ->
+                change.targetProgress != entry.progress &&
+                    (total == null || change.targetProgress.value <= total) &&
+                    change.targetStatus ==
+                    if (total == change.targetProgress.value) {
+                        CollectionStatus.COMPLETED
+                    } else {
+                        CollectionStatus.CURRENT
+                    }
         }
     }
 
@@ -260,6 +272,7 @@ public class DefaultProgressRepository(
         when (this) {
             ProgressDirection.INCREASE -> "increase"
             ProgressDirection.DECREASE -> "decrease"
+            ProgressDirection.CORRECTION -> "correction"
         }
 
     private fun CollectionStatus.toStoredStatus(): StoredCollectionStatus =

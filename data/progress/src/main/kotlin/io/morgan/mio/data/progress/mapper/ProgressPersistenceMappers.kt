@@ -51,6 +51,7 @@ internal fun LocalProgressActivityEntity.toProgressAction(): ProgressAction =
             when (direction) {
                 "increase" -> ProgressDirection.INCREASE
                 "decrease" -> ProgressDirection.DECREASE
+                "correction" -> ProgressDirection.CORRECTION
                 else -> error("Unknown local progress direction: $direction")
             },
         unit = progressUnit.toDomainUnit(),
@@ -78,7 +79,9 @@ internal fun ProgressChange.toPendingOperationGroup(createdAt: kotlin.time.Insta
             kind =
                 when (direction) {
                     ProgressDirection.INCREASE -> PendingOperationKind.SET_PROGRESS_FORWARD
-                    ProgressDirection.DECREASE -> PendingOperationKind.SET_PROGRESS_CORRECTION
+                    ProgressDirection.DECREASE,
+                    ProgressDirection.CORRECTION,
+                    -> PendingOperationKind.SET_PROGRESS_CORRECTION
                 },
             base = OperationValue.Progress(entry.progress),
             target = OperationValue.Progress(targetProgress),

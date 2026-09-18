@@ -57,6 +57,68 @@ class ReconcilePendingOperationUseCaseTest {
     }
 
     @Test
+    fun explicitStatusChoiceRequiresTheObservedProviderStatus() {
+        val operation =
+            PendingOperation(
+                id = OperationId("choice:status"),
+                groupId = OperationGroupId("choice"),
+                accountId = ACCOUNT,
+                collectionEntryId = ENTRY,
+                kind = PendingOperationKind.SET_STATUS_CORRECTION,
+                base = OperationValue.Status(CollectionStatus.PAUSED),
+                target = OperationValue.Status(CollectionStatus.COMPLETED),
+                positionInGroup = 0,
+            )
+        val candidate = candidate(operation)
+        assertEquals(
+            SyncReconciliationDecision.Write(operation.target),
+            reconcile(SyncReconciliationInput(candidate, remote(progress = 12, status = CollectionStatus.PAUSED))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Satisfied,
+            reconcile(SyncReconciliationInput(candidate, remote(progress = 12, status = CollectionStatus.COMPLETED))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Conflict,
+            reconcile(SyncReconciliationInput(candidate, remote(progress = 12, status = CollectionStatus.DROPPED))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Conflict,
+            reconcile(
+                SyncReconciliationInput(candidate, remote(progress = 11, total = 12, status = CollectionStatus.PAUSED)),
+            ),
+        )
+    }
+
+    @Test
+    fun correctionReopensCompletedOnlyWhenRemoteStillHasTheCorrectedProgress() {
+        val operation =
+            PendingOperation(
+                id = OperationId("correction:status"),
+                groupId = OperationGroupId("correction"),
+                accountId = ACCOUNT,
+                collectionEntryId = ENTRY,
+                kind = PendingOperationKind.SET_STATUS,
+                base = OperationValue.Status(CollectionStatus.COMPLETED),
+                target = OperationValue.Status(CollectionStatus.CURRENT),
+                positionInGroup = 1,
+            )
+        val candidate = candidate(operation).copy(correctionProgress = ProgressValue(9))
+        assertEquals(
+            SyncReconciliationDecision.Write(OperationValue.Status(CollectionStatus.CURRENT)),
+            reconcile(SyncReconciliationInput(candidate, remote(progress = 9, status = CollectionStatus.COMPLETED))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Conflict,
+            reconcile(SyncReconciliationInput(candidate, remote(progress = 12, status = CollectionStatus.COMPLETED))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Rejected,
+            reconcile(SyncReconciliationInput(candidate.copy(correctionProgress = null), remote(progress = 9))),
+        )
+    }
+
+    @Test
     fun automaticCompletionValidatesKnownTotalsAndItsInverseIsExplicit() {
         val completion =
             PendingOperation(
@@ -70,6 +132,15 @@ class ReconcilePendingOperationUseCaseTest {
                 positionInGroup = 1,
             )
         val candidate = candidate(completion, isAutomaticCompletion = true)
+        val correctionUndo = candidate(completion, compensatesGroupId = OperationGroupId("earlier-correction"))
+        assertEquals(
+            SyncReconciliationDecision.Write(OperationValue.Status(CollectionStatus.COMPLETED)),
+            reconcile(SyncReconciliationInput(correctionUndo, remote(progress = 12, total = 12))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Conflict,
+            reconcile(SyncReconciliationInput(correctionUndo, remote(progress = 9, total = 12))),
+        )
 
         assertEquals(
             SyncReconciliationDecision.Write(OperationValue.Status(CollectionStatus.COMPLETED)),

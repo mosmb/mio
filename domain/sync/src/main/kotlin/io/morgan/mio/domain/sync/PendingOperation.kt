@@ -51,7 +51,9 @@ public class PendingOperation(
                 require(target.value != base.value)
             }
 
-            PendingOperationKind.SET_STATUS -> {
+            PendingOperationKind.SET_STATUS,
+            PendingOperationKind.SET_STATUS_CORRECTION,
+            -> {
                 require(base is OperationValue.Status && target is OperationValue.Status)
                 require(target.value != base.value)
             }

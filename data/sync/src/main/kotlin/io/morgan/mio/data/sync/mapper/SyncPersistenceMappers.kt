@@ -98,7 +98,10 @@ internal fun ProviderCollectionEntry.toSyncEntryState(local: SyncEntryState): Sy
 
 internal fun SyncLeaseEntity.toDomain(): SyncLease = SyncLease(AccountId(accountId), ownerToken, expiresAtUtcMs)
 
-internal fun SyncIssueEntity.toDomain(): SyncIssue =
+internal fun SyncIssueEntity.toDomain(
+    current: SyncEntryState? = null,
+    latestRemote: SyncEntryState? = null,
+): SyncIssue =
     SyncIssue(
         accountId = AccountId(accountId),
         entryId = CollectionEntryId(collectionEntryId),
@@ -108,29 +111,31 @@ internal fun SyncIssueEntity.toDomain(): SyncIssue =
         base = operationValue(baseProgress, baseStatus),
         target = operationValue(targetProgress, targetStatus),
         local =
-            io.morgan.mio.domain.sync.SyncEntryState(
-                accountId = AccountId(accountId),
-                entryId = CollectionEntryId(collectionEntryId),
-                unit = progressUnit.toDomainUnit(),
-                progress = ProgressValue(localProgress),
-                status = localStatus.toDomainStatus(),
-                total = localTotal?.let(::UnitTotal),
-                updatedAt = localUpdatedAtUtcMs,
-                revision = localRevision,
-            ),
-        remote =
-            remoteProgress?.let { progress ->
-                io.morgan.mio.domain.sync.SyncEntryState(
+            current
+                ?: io.morgan.mio.domain.sync.SyncEntryState(
                     accountId = AccountId(accountId),
                     entryId = CollectionEntryId(collectionEntryId),
                     unit = progressUnit.toDomainUnit(),
-                    progress = ProgressValue(progress),
-                    status = (remoteStatus ?: error("Remote status missing")).toDomainStatus(),
-                    total = remoteTotal?.let(::UnitTotal),
-                    updatedAt = remoteUpdatedAtUtcMs ?: error("Remote timestamp missing"),
-                    revision = 0L,
-                )
-            },
+                    progress = ProgressValue(localProgress),
+                    status = localStatus.toDomainStatus(),
+                    total = localTotal?.let(::UnitTotal),
+                    updatedAt = localUpdatedAtUtcMs,
+                    revision = localRevision,
+                ),
+        remote =
+            latestRemote
+                ?: remoteProgress?.let { progress ->
+                    io.morgan.mio.domain.sync.SyncEntryState(
+                        accountId = AccountId(accountId),
+                        entryId = CollectionEntryId(collectionEntryId),
+                        unit = progressUnit.toDomainUnit(),
+                        progress = ProgressValue(progress),
+                        status = (remoteStatus ?: error("Remote status missing")).toDomainStatus(),
+                        total = remoteTotal?.let(::UnitTotal),
+                        updatedAt = remoteUpdatedAtUtcMs ?: error("Remote timestamp missing"),
+                        revision = 0L,
+                    )
+                },
         detectedAt = detectedAtUtcMs,
     )
 
@@ -149,6 +154,7 @@ private fun StoredPendingOperationKind.toDomainKind(): PendingOperationKind =
         StoredPendingOperationKind.SET_PROGRESS_FORWARD -> PendingOperationKind.SET_PROGRESS_FORWARD
         StoredPendingOperationKind.SET_PROGRESS_CORRECTION -> PendingOperationKind.SET_PROGRESS_CORRECTION
         StoredPendingOperationKind.SET_STATUS -> PendingOperationKind.SET_STATUS
+        StoredPendingOperationKind.SET_STATUS_CORRECTION -> PendingOperationKind.SET_STATUS_CORRECTION
     }
 
 private fun StoredPendingOperationState.toDomainState(): PendingOperationState =

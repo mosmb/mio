@@ -15,6 +15,7 @@ import io.morgan.mio.core.database.model.StoredMediaPublicationStatus
 import io.morgan.mio.core.database.model.StoredMediaType
 import io.morgan.mio.core.database.model.StoredPendingOperationKind
 import io.morgan.mio.core.database.model.StoredProgressUnit
+import io.morgan.mio.data.progress.DefaultProgressActivityRepository
 import io.morgan.mio.data.progress.local.RoomProgressLocalDataSource
 import io.morgan.mio.data.sync.DefaultPendingOperationWriter
 import io.morgan.mio.data.sync.PendingOperationWriter
@@ -22,14 +23,18 @@ import io.morgan.mio.data.sync.local.RoomPendingOperationLocalDataSource
 import io.morgan.mio.domain.collection.CollectionStatus
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.OperationGroupId
+import io.morgan.mio.domain.progress.CorrectProgressUseCase
 import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressWriteResult
+import io.morgan.mio.domain.progress.RecordedProgressActivity
 import io.morgan.mio.domain.progress.StepProgressUseCase
 import io.morgan.mio.domain.progress.UndoProgressUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -43,6 +48,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -136,6 +142,43 @@ class DefaultProgressRepositoryTest {
         }
 
     @Test
+    fun exactFinalCorrectionUsesDurableCorrectionAndCompletionGroupAndCanBeUndone() =
+        runTest {
+            val groupId = OperationGroupId("group-exact-final")
+            val result =
+                CorrectProgressUseCase(repository, clock)(
+                    mediaId = mediaId,
+                    targetProgress = 12,
+                    actionId = groupId,
+                    undoWindow = 6.seconds,
+                )
+            val committed = result as ProgressWriteResult.Committed
+            val operations = database.pendingOperationDao().getOperationsForGroup(groupId.value)
+            val activity = requireNotNull(database.progressDao().getActivity(accountId.value, groupId.value))
+
+            assertEquals(12, committed.action.afterProgress.value)
+            assertEquals(CollectionStatus.COMPLETED, committed.action.afterStatus)
+            assertEquals("correction", activity.direction)
+            assertEquals(
+                listOf(
+                    StoredPendingOperationKind.SET_PROGRESS_CORRECTION,
+                    StoredPendingOperationKind.SET_STATUS,
+                ),
+                operations.map { operation -> operation.kind },
+            )
+            assertEquals(11, operations.first().baseProgress)
+            assertEquals(12, operations.first().targetProgress)
+
+            clock.set(baseline.plus(1.seconds))
+            val undone = UndoProgressUseCase(repository, clock)(groupId)
+            val restored = requireNotNull(database.progressDao().getEntryForMedia(accountId.value, mediaId.value))
+            assertTrue(undone is ProgressWriteResult.Committed)
+            assertEquals(11, restored.effectiveProgress)
+            assertEquals(StoredCollectionStatus.CURRENT, restored.effectiveStatus)
+            assertNotNull(database.progressDao().getActivity(accountId.value, groupId.value)?.undoneAtUtcMs)
+        }
+
+    @Test
     fun undoRestoresEffectiveStateTimestampAndRevisionAndCancelsTheWholeGroup() =
         runTest {
             val groupId = OperationGroupId("group-undo")
@@ -161,6 +204,63 @@ class DefaultProgressRepositoryTest {
             assertEquals(committed.action.afterRevision, activity.afterRevision)
             assertNotNull(activity.undoneAtUtcMs)
             assertEquals(groupId.value, database.progressDao().getLatestActivity(accountId.value)?.operationGroupId)
+        }
+
+    @Test
+    fun recordedActivityIsBoundedLocalAndExcludesUndoAndRemovedEntries() =
+        runTest {
+            val activityRepository = DefaultProgressActivityRepository(RoomProgressLocalDataSource(database))
+            val from = baseline.minus(1.seconds)
+            val until = baseline.plus(20.seconds)
+
+            // Collection snapshots update durable progress without creating a local observation.
+            database.collectionEntryDao().upsertEntries(listOf(entry(progress = 5)))
+            assertEquals(
+                emptyList<RecordedProgressActivity>(),
+                activityRepository.observeRecordedActivity(accountId, from, until).first(),
+            )
+
+            val increaseId = OperationGroupId("activity-increase")
+            StepProgressUseCase(repository, clock)(mediaId, ProgressDirection.INCREASE, increaseId, 6.seconds)
+            assertEquals(
+                listOf(RecordedProgressActivity(baseline, MediaType.ANIME, ProgressDirection.INCREASE)),
+                activityRepository.observeRecordedActivity(accountId, from, until).first(),
+            )
+            assertEquals(
+                emptyList<RecordedProgressActivity>(),
+                activityRepository
+                    .observeRecordedActivity(AccountId("other-account"), from, until)
+                    .first(),
+            )
+            assertEquals(
+                emptyList<RecordedProgressActivity>(),
+                activityRepository
+                    .observeRecordedActivity(accountId, baseline.plus(1.milliseconds), until)
+                    .first(),
+            )
+
+            clock.set(baseline.plus(1.seconds))
+            UndoProgressUseCase(repository, clock)(increaseId)
+            assertEquals(
+                emptyList<RecordedProgressActivity>(),
+                activityRepository.observeRecordedActivity(accountId, from, until).first(),
+            )
+
+            clock.set(baseline.plus(2.seconds))
+            val correctionId = OperationGroupId("activity-correction")
+            CorrectProgressUseCase(repository, clock)(mediaId, 7, correctionId, 6.seconds)
+            assertEquals(
+                listOf(
+                    RecordedProgressActivity(baseline.plus(2.seconds), MediaType.ANIME, ProgressDirection.CORRECTION),
+                ),
+                activityRepository.observeRecordedActivity(accountId, from, until).first(),
+            )
+
+            database.collectionEntryDao().deleteAllForAccount(accountId.value)
+            assertEquals(
+                emptyList<RecordedProgressActivity>(),
+                activityRepository.observeRecordedActivity(accountId, from, until).first(),
+            )
         }
 
     @Test

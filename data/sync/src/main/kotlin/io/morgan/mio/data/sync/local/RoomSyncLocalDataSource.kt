@@ -159,6 +159,7 @@ public class RoomSyncLocalDataSource(
                             current = entry.toSyncEntryState(),
                             groupOrder = group.groupOrder,
                             isAutomaticCompletion = isAutomaticCompletion(operation, group.operationGroupId),
+                            correctionProgress = correctionProgress(operation, group.operationGroupId),
                             compensatesGroupId = group.compensatesGroupId?.let(::OperationGroupId),
                         )
                 }
@@ -472,6 +473,32 @@ public class RoomSyncLocalDataSource(
                 )
             }
 
+    private suspend fun correctionProgress(
+        operation: PendingOperation,
+        groupId: String,
+    ): io.morgan.mio.domain.model.ProgressValue? {
+        if (operation.kind != PendingOperationKind.SET_STATUS) return null
+        val activity = database.syncDao().getActivity(operation.accountId.value, groupId) ?: return null
+        if (activity.direction != "correction" ||
+            activity.beforeStatus != StoredCollectionStatus.COMPLETED ||
+            activity.afterStatus != StoredCollectionStatus.CURRENT
+        ) {
+            return null
+        }
+        val predecessor =
+            database.syncDao().getOperationsForGroup(groupId).firstOrNull { pending ->
+                pending.collectionEntryId == operation.collectionEntryId.value &&
+                    pending.positionInGroup < operation.positionInGroup &&
+                    pending.kind == StoredPendingOperationKind.SET_PROGRESS_CORRECTION &&
+                    pending.targetProgress == activity.afterProgress &&
+                    OperationId(pending.operationId) in operation.dependsOn
+            } ?: return null
+        return predecessor.targetProgress?.let {
+            io.morgan.mio.domain.model
+                .ProgressValue(it)
+        }
+    }
+
     private suspend fun isAutomaticCompletion(
         operation: PendingOperation,
         groupId: String,
@@ -486,7 +513,11 @@ public class RoomSyncLocalDataSource(
             database.syncDao().getOperationsForGroup(groupId).any { predecessor ->
                 predecessor.collectionEntryId == operation.collectionEntryId.value &&
                     predecessor.positionInGroup < operation.positionInGroup &&
-                    predecessor.kind == StoredPendingOperationKind.SET_PROGRESS_FORWARD &&
+                    predecessor.kind in
+                    setOf(
+                        StoredPendingOperationKind.SET_PROGRESS_FORWARD,
+                        StoredPendingOperationKind.SET_PROGRESS_CORRECTION,
+                    ) &&
                     predecessor.targetProgress == activity.afterProgress
             }
     }

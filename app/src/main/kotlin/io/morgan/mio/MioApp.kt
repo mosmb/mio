@@ -26,6 +26,9 @@ import io.morgan.mio.core.navigation.TopLevelRootNavigationRequest
 import io.morgan.mio.core.navigation.rememberAuthenticatedNavigationState
 import io.morgan.mio.core.navigation.rememberOnboardingNavigationState
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
+import io.morgan.mio.feature.media.api.OpenProgressConflictRequest
+import io.morgan.mio.feature.progress.api.ProgressConflictKey
+import io.morgan.mio.feature.you.api.YouResolveProgressRequest
 
 internal enum class AppRoot {
     ONBOARDING,
@@ -113,6 +116,14 @@ private fun AuthenticatedRoot(
             object : MioNavigator {
                 override fun navigate(destination: androidx.navigation3.runtime.NavKey) {
                     when {
+                        destination is YouResolveProgressRequest ->
+                            retainedStackNavigator.navigate(
+                                ProgressConflictKey(destination.operationId.value, destination.entryId.value),
+                            )
+                        destination is OpenProgressConflictRequest ->
+                            retainedStackNavigator.navigate(
+                                ProgressConflictKey(destination.operationId.value, destination.entryId.value),
+                            )
                         destination is TopLevelRootNavigationRequest -> state.openTopLevel(destination.targetSlot)
                         destination is TopLevelNavigationRequest && destination.replacesTargetStack -> {
                             state.openTopLevel(destination.targetSlot, destination)

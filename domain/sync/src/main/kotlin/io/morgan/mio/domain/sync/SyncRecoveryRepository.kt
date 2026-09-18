@@ -11,6 +11,11 @@ public interface SyncRecoveryRepository {
 
     public suspend fun rearm(issue: SyncIssue): Boolean
 
+    public suspend fun resolveConflict(
+        issue: SyncIssue,
+        resolution: PendingOperationGroup,
+    ): Boolean
+
     public suspend fun recoverAuthentication(
         accountId: AccountId,
         issueIds: Set<String>,

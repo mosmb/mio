@@ -4,5 +4,4 @@ plugins {
 
 dependencies {
     implementation(project(":core:navigation"))
-    implementation(project(":domain:model"))
 }

@@ -88,7 +88,7 @@ public data class LocalProgressActivityEntity(
         require(accountId.isNotBlank())
         require(collectionEntryId.isNotBlank())
         require(mediaId.isNotBlank())
-        require(direction == "increase" || direction == "decrease")
+        require(direction == "increase" || direction == "decrease" || direction == "correction")
         require(beforeProgress >= 0)
         require(afterProgress >= 0)
         require(afterRevision >= 0L)

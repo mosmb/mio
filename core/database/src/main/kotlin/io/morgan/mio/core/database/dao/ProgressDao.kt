@@ -6,12 +6,30 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
 import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
+import io.morgan.mio.core.database.model.ProgressActivityRow
 import io.morgan.mio.core.database.model.StoredCollectionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
 @Dao
 public abstract class ProgressDao {
+    @Query(
+        "SELECT activity.created_at_utc_ms AS created_at_utc_ms, " +
+            "media.media_type AS media_type, activity.direction AS direction " +
+            "FROM local_progress_activity AS activity " +
+            "JOIN media ON media.media_id = activity.media_id " +
+            "WHERE activity.account_id = :accountId " +
+            "AND activity.created_at_utc_ms >= :fromInclusive " +
+            "AND activity.created_at_utc_ms < :untilExclusive " +
+            "AND activity.undone_at_utc_ms IS NULL " +
+            "ORDER BY activity.activity_order",
+    )
+    public abstract fun observeRecordedActivity(
+        accountId: String,
+        fromInclusive: Instant,
+        untilExclusive: Instant,
+    ): Flow<List<ProgressActivityRow>>
+
     @Query(
         "SELECT * FROM collection_entry " +
             "WHERE account_id = :accountId AND media_id = :mediaId",

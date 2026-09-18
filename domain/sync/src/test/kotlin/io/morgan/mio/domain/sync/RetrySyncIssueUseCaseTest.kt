@@ -108,6 +108,11 @@ class RetrySyncIssueUseCaseTest {
             return rearmResult
         }
 
+        override suspend fun resolveConflict(
+            issue: SyncIssue,
+            resolution: PendingOperationGroup,
+        ): Boolean = false
+
         override suspend fun recoverAuthentication(
             accountId: AccountId,
             issueIds: Set<String>,

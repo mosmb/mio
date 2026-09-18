@@ -10,6 +10,7 @@ import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.sync.ResolveProgressConflictUseCase
 import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
 import io.morgan.mio.domain.sync.SyncRecoveryRepository
 import io.morgan.mio.domain.sync.SynchronizeAccountUseCase
@@ -25,6 +26,7 @@ internal interface AccountGraph : ViewModelGraph {
     val synchronizeAccountUseCase: SynchronizeAccountUseCase
     val syncRecoveryRepository: SyncRecoveryRepository
     val retrySyncIssueUseCase: RetrySyncIssueUseCase
+    val resolveProgressConflictUseCase: ResolveProgressConflictUseCase
 
     @GraphExtension.Factory
     fun interface Factory {

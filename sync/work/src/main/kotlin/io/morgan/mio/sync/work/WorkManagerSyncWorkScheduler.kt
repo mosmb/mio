@@ -12,8 +12,11 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.morgan.mio.core.common.di.AppScope
 import io.morgan.mio.core.common.di.ApplicationContext
+import io.morgan.mio.core.common.di.IoDispatcher
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.sync.SyncWorkScheduler
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 @ContributesBinding(AppScope::class)
@@ -21,6 +24,7 @@ import java.util.concurrent.TimeUnit
 @Inject
 public class WorkManagerSyncWorkScheduler(
     @param:ApplicationContext private val context: Context,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : SyncWorkScheduler {
     override suspend fun schedule(accountId: AccountId) {
         val request =
@@ -42,6 +46,16 @@ public class WorkManagerSyncWorkScheduler(
             ExistingWorkPolicy.APPEND_OR_REPLACE,
             request,
         )
+    }
+
+    override suspend fun cancel(accountId: AccountId) {
+        withContext(ioDispatcher) {
+            WorkManager
+                .getInstance(context)
+                .cancelUniqueWork(uniqueWorkName(accountId))
+                .result
+                .get()
+        }
     }
 
     public companion object {

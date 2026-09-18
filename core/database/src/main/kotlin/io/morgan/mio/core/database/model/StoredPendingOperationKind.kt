@@ -6,6 +6,7 @@ public enum class StoredPendingOperationKind(
     SET_PROGRESS_FORWARD("set_progress_forward"),
     SET_PROGRESS_CORRECTION("set_progress_correction"),
     SET_STATUS("set_status"),
+    SET_STATUS_CORRECTION("set_status_correction"),
     ;
 
     public companion object {

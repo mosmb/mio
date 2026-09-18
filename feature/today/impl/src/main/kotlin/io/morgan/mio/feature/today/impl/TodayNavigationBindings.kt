@@ -13,6 +13,7 @@ import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.feature.library.api.LibraryKey
 import io.morgan.mio.feature.media.api.MediaKey
+import io.morgan.mio.feature.media.api.OpenProgressConflictRequest
 import io.morgan.mio.feature.today.api.OpenDiscoverRequest
 import io.morgan.mio.feature.today.api.TodayKey
 import java.util.UUID
@@ -29,6 +30,14 @@ private object TodayNavEntryBuilder : NavEntryBuilder {
                     navigator.navigate(LibraryKey(readyRequestId = UUID.randomUUID().toString()))
                 },
                 onExploreDiscover = { navigator.navigate(OpenDiscoverRequest) },
+                onResolveProgressConflict = { operationId, entryId ->
+                    navigator.navigate(
+                        OpenProgressConflictRequest(
+                            operationIdValue = operationId.value,
+                            entryIdValue = entryId.value,
+                        ),
+                    )
+                },
             )
         }
     }

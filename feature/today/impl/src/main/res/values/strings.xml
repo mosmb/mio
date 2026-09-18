@@ -77,6 +77,7 @@
     <string name="today_sync_retry_refresh">Retry refresh</string>
     <string name="today_sync_reconnect">Reconnect</string>
     <string name="today_sync_retry">Retry sync</string>
+    <string name="today_sync_resolve">Resolve</string>
     <string name="today_sync_rejected">This update was not accepted; your saved value is unchanged</string>
     <string name="today_sync_conflict">This update conflicts with a provider change</string>
     <string name="today_sync_retry_exhausted">This update needs another attempt</string>

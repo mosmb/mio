@@ -140,7 +140,9 @@ public data class PendingOperationEntity(
                 require(targetProgress != baseProgress)
             }
 
-            StoredPendingOperationKind.SET_STATUS -> {
+            StoredPendingOperationKind.SET_STATUS,
+            StoredPendingOperationKind.SET_STATUS_CORRECTION,
+            -> {
                 require(baseProgress == null && targetProgress == null)
                 require(baseStatus != null && targetStatus != null)
                 require(targetStatus != baseStatus)

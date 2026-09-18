@@ -71,6 +71,7 @@ private fun PendingOperationKind.toStoredPendingOperationKind(): StoredPendingOp
         PendingOperationKind.SET_PROGRESS_FORWARD -> StoredPendingOperationKind.SET_PROGRESS_FORWARD
         PendingOperationKind.SET_PROGRESS_CORRECTION -> StoredPendingOperationKind.SET_PROGRESS_CORRECTION
         PendingOperationKind.SET_STATUS -> StoredPendingOperationKind.SET_STATUS
+        PendingOperationKind.SET_STATUS_CORRECTION -> StoredPendingOperationKind.SET_STATUS_CORRECTION
     }
 
 private fun PendingOperationState.toStoredPendingOperationState(): StoredPendingOperationState =

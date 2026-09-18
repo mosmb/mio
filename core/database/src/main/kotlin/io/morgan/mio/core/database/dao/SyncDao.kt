@@ -200,6 +200,9 @@ public abstract class SyncDao {
     @Query("SELECT * FROM collection_entry WHERE collection_entry_id = :entryId")
     public abstract suspend fun getEntry(entryId: String): CollectionEntryEntity?
 
+    @Query("SELECT * FROM collection_entry WHERE account_id = :accountId ORDER BY collection_entry_id")
+    public abstract fun observeEntriesForAccount(accountId: String): Flow<List<CollectionEntryEntity>>
+
     @Query("SELECT * FROM selected_account WHERE selection_key = 'selected'")
     public abstract suspend fun getSelectedAccount(): SelectedAccountEntity?
 
@@ -327,6 +330,14 @@ public abstract class SyncDao {
     public abstract suspend fun getIssuesForGroup(
         accountId: String,
         groupId: String,
+    ): List<SyncIssueEntity>
+
+    @Query(
+        "SELECT * FROM sync_issue WHERE account_id = :accountId AND collection_entry_id = :entryId",
+    )
+    public abstract suspend fun getIssuesForEntry(
+        accountId: String,
+        entryId: String,
     ): List<SyncIssueEntity>
 
     @Query("SELECT * FROM sync_issue WHERE account_id = :accountId AND issue_id = :issueId")

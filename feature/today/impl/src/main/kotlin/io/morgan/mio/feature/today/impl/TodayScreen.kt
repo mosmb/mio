@@ -48,7 +48,9 @@ import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
+import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.feature.today.impl.component.TodayCaughtUpReceipt
 import io.morgan.mio.feature.today.impl.component.TodayNewRow
 import io.morgan.mio.feature.today.impl.component.TodayNextReleaseRow
@@ -61,6 +63,7 @@ internal fun TodayRoute(
     onMediaDetail: (MediaId) -> Unit,
     onRemainingReady: () -> Unit,
     onExploreDiscover: () -> Unit,
+    onResolveProgressConflict: (OperationId, CollectionEntryId) -> Unit,
 ) {
     val viewModel = metroViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -93,6 +96,9 @@ internal fun TodayRoute(
         onMediaDetail = { mediaId -> onMediaDetail(MediaId(mediaId)) },
         onRemainingReady = onRemainingReady,
         onExploreDiscover = onExploreDiscover,
+        onResolveProgressConflict = { operationId, entryId ->
+            onResolveProgressConflict(OperationId(operationId), CollectionEntryId(entryId))
+        },
         onAction = viewModel::onAction,
         timeoutMillis = timeoutMillis,
         providerLabel = recoveryActions.providerLabel,
@@ -108,6 +114,7 @@ internal fun TodayScreen(
     onMediaDetail: (String) -> Unit,
     onRemainingReady: () -> Unit = {},
     onExploreDiscover: () -> Unit = {},
+    onResolveProgressConflict: (String, String) -> Unit = { _, _ -> },
     onAction: (TodayAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
     providerLabel: String? = null,
@@ -240,6 +247,7 @@ internal fun TodayScreen(
                 onReconnect = onReconnect,
                 onRetryRefresh = onRetryRefresh,
                 onMediaDetail = onMediaDetail,
+                onResolveProgressConflict = onResolveProgressConflict,
                 onAction = onAction,
                 modifier = Modifier.padding(top = 24.dp),
             )
@@ -259,6 +267,7 @@ private fun TodayRecovery(
     onReconnect: () -> Unit,
     onRetryRefresh: () -> Unit,
     onMediaDetail: (String) -> Unit,
+    onResolveProgressConflict: (String, String) -> Unit,
     onAction: (TodayAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -344,6 +353,13 @@ private fun TodayRecovery(
                         colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
                     ) {
                         Text(stringResource(R.string.today_sync_reconnect))
+                    }
+                } else if (issue.kind == SyncIssueKind.CONFLICT) {
+                    TextButton(
+                        onClick = { onResolveProgressConflict(issue.operationId, issue.entryId) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
+                    ) {
+                        Text(stringResource(R.string.today_sync_resolve))
                     }
                 } else if (issue.canRetry) {
                     TextButton(
