@@ -346,13 +346,17 @@ Feature modules SHOULD depend on fewer modules when possible. The following matr
 | `today` | `today:api` | `media:api`, `library:api` | `queue`, `media`, `progress`, `collection`, `preferences`, `sync`, `model` |
 | `library` | `library:api` | `media:api`, `progress:api` | `collection`, `media`, `queue`, `progress`, `preferences`, `model` |
 | `discover` | `discover:api` | `media:api` | `media`, `collection`, `model` |
-| `you` | `you:api` | none | `account`, `sync`, `preferences`, `model` |
+| `you` | `you:api` | none | `account`, `sync`, `preferences`, `collection`, `progress`, `model` |
 | `media` | `media:api` | `progress:api` | `media`, `collection`, `progress`, `sync`, `model` |
-| `progress` | `progress:api` | none | `progress`, `collection`, `sync`, `model` |
+| `progress` | `progress:api` | none | `progress`, `collection`, `media`, `sync`, `model` |
 
 Task 21's prerequisite decision, reviewed separately from feature implementation on 2026-09-16 under the user's delegated decision authority, allows Today and media implementations to consume `:domain:sync` for persisted issue presentation and recovery use cases. Synchronization policy remains in domain; delivery/persistence remains in data and WorkManager execution in `:sync:work`. These features gain no data, provider, database, Worker, or additional cross-feature access. Their API modules remain unchanged.
 
 Task 25's prerequisite decision, reviewed separately from feature implementation on 2026-09-18 under the user's delegated approval, allows Library implementation to consume `:domain:media` for cached metadata and `:domain:queue` for shared Ready membership. Ready rules remain in queue; Library observes the complete effective collection through existing domain repositories. This adds no data/provider/database/sync access, cross-feature implementation access, domain dependency edge, or API-module permission.
+
+Task 31's prerequisite decision, reviewed separately from feature implementation on 2026-09-18 under the user's delegated approval, allows You implementation to consume `:domain:collection` for read-only collection statistics and `:domain:progress` for read-only recorded activity. Collection statistics may include cached metadata joined in `:data:collection`; activity observation remains in `:data:progress`. Both use their existing Room access and account-scoped bindings. This adds no domain/data dependency edges, modules, feature API permissions, or direct feature access to data/providers/database. It does not authorize progress mutations from You or broaden Task 31 into account controls, milestones, favorites, or history.
+
+The Tasks 31/33 review on 2026-09-18 independently reviewed the correction/conflict ownership prerequisite under the user's delegated review-and-fix authority. `:feature:progress:impl` may consume `:core:common` for the existing account-scoped Metro bindings and `:domain:media` for cached title metadata. Correction/conflict presentation stays in Progress as required by section 4.4; Media only navigates to its API. This adds no feature API permissions, direct data/database/provider access, or domain/data dependency edges.
 
 Every feature API may depend only on `:core:navigation`, `:domain:model` for typed IDs, Kotlin serialization, and Navigation 3 runtime APIs required to define keys. It MUST NOT depend on its implementation or on broader domain capabilities.
 

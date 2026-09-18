@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -56,6 +57,10 @@ public fun MioArtwork(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val colors = MioTheme.colors
+    if (LocalInspectionMode.current) {
+        Box(modifier = modifier.background(colors.surfaceSoft)) { ArtworkFallbackMark() }
+        return
+    }
     val imageLoader = LocalMioImageLoader.current
     val sizeResolver = rememberConstraintsSizeResolver()
     val platformContext = LocalPlatformContext.current

@@ -4,9 +4,11 @@ import com.lemonappdev.konsist.api.Konsist
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ProductionArchitectureKonsistTest {
     private val repositoryRoot: Path
         get() =
@@ -351,7 +353,7 @@ class ProductionArchitectureKonsistTest {
             assertTrue(
                 files.any { ownedFile ->
                     ownedFile.modulePath == modulePath &&
-                        ownedFile.file.text.contains("data object $keyName")
+                        ownedFile.file.classesAndInterfacesAndObjects().any { it.name == keyName }
                 },
                 "production scan omitted $keyName from $modulePath",
             )
@@ -765,7 +767,7 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.path
                         .replace('\\', '/')
                         .endsWith("/MainActivity.kt") &&
-                    ownedFile.file.text.contains("activeHandle()") &&
+                    ownedFile.file.text.contains("withActiveGraph") &&
                     ownedFile.file.text.contains("?: graph.metroViewModelFactory")
             },
             "production scan omitted MainActivity's active-account factory fallback",
@@ -804,7 +806,7 @@ class ProductionArchitectureKonsistTest {
         assertTrue(
             files.any { ownedFile ->
                 ownedFile.modulePath == ":core:database" &&
-                    ownedFile.file.text.contains("version = 5")
+                    ownedFile.file.text.contains("version = 7")
             },
             "production scan omitted the current database version",
         )
@@ -830,9 +832,7 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.imports.any { import ->
                         import.name == "io.morgan.mio.domain.collection.CollectionRepository"
                     } &&
-                    ownedFile.file.imports.any { import ->
-                        import.name == "io.morgan.mio.domain.media.MediaRepository"
-                    }
+                    ownedFile.file.text.contains("io.morgan.mio.domain.media.MediaRepository")
             },
             "production scan omitted the Room-flow-backed Today queue use case",
         )
@@ -934,7 +934,7 @@ class ProductionArchitectureKonsistTest {
         )
         assertTrue(
             files.any { ownedFile ->
-                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 5")
+                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 7")
             },
             "production scan omitted the Task 20 database version",
         )
@@ -995,7 +995,9 @@ class ProductionArchitectureKonsistTest {
         )
     }
 
-    private fun productionFiles(): List<OwnedKotlinFile> =
+    private fun productionFiles(): List<OwnedKotlinFile> = scannedProductionFiles
+
+    private val scannedProductionFiles: List<OwnedKotlinFile> by lazy {
         MioProductionModules.paths.flatMap { modulePath ->
             listOf("main", "debug", "release").flatMap { sourceSet ->
                 val sourceDirectory =
@@ -1019,4 +1021,5 @@ class ProductionArchitectureKonsistTest {
                 }
             }
         }
+    }
 }

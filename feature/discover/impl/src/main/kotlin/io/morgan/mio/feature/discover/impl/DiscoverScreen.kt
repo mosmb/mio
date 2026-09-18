@@ -1,6 +1,5 @@
 package io.morgan.mio.feature.discover.impl
 
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -35,13 +34,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -50,7 +47,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.ImageLoader
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.morgan.mio.core.designsystem.component.MioButton
 import io.morgan.mio.core.designsystem.component.MioFilterPill
@@ -58,7 +54,6 @@ import io.morgan.mio.core.designsystem.component.MioSkeleton
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
-import io.morgan.mio.core.ui.image.MioImageLoaderProvider
 import io.morgan.mio.core.ui.image.MioPoster
 import io.morgan.mio.domain.model.MediaId
 
@@ -551,16 +546,8 @@ private fun DiscoverPreview(
     state: DiscoverUiState,
 ) {
     MioPreviewSurface(configuration) {
-        MioImageLoaderProvider(previewImageLoader()) {
-            DiscoverScreen(state = state, onAction = {}, onMediaDetail = {})
-        }
+        DiscoverScreen(state = state, onAction = {}, onMediaDetail = {})
     }
-}
-
-@Composable
-private fun previewImageLoader(): ImageLoader {
-    val context: Context = LocalContext.current
-    return remember(context) { ImageLoader.Builder(context).build() }
 }
 
 private fun previewPopulatedState(): DiscoverUiState =

@@ -128,6 +128,8 @@ public object DependencyRules {
                     ":domain:sync",
                     ":domain:preferences",
                     ":domain:model",
+                    ":domain:collection",
+                    ":domain:progress",
                 ),
             ":feature:media:impl" to
                 setOf(
@@ -146,9 +148,11 @@ public object DependencyRules {
             ":feature:progress:impl" to
                 setOf(
                     ":feature:progress:api",
+                    ":core:common",
                     ":core:designsystem",
                     ":core:ui",
                     ":core:navigation",
+                    ":domain:media",
                     ":domain:progress",
                     ":domain:collection",
                     ":domain:sync",

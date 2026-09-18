@@ -6,6 +6,7 @@ import com.lemonappdev.konsist.api.declaration.KoFunctionDeclaration
 import com.lemonappdev.konsist.api.declaration.KoInterfaceDeclaration
 import com.lemonappdev.konsist.api.declaration.KoObjectDeclaration
 import com.lemonappdev.konsist.api.declaration.combined.KoClassAndInterfaceAndObjectDeclaration
+import com.lemonappdev.konsist.api.provider.KoContainingDeclarationProvider
 import com.lemonappdev.konsist.api.provider.KoNameProvider
 import com.lemonappdev.konsist.api.provider.modifier.KoVisibilityModifierProvider
 
@@ -339,17 +340,6 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
             "String",
         )
     val stateOwnerModules = setOf(":app", ":core:navigation")
-    val focusedFeatureApiImports =
-        files
-            .filter { ownedFile -> isFeatureApi(ownedFile.modulePath) }
-            .flatMap { ownedFile ->
-                val packageName = ownedFile.file.packagee?.name ?: return@flatMap emptyList()
-                ownedFile.file
-                    .classesAndInterfacesAndObjects(includeNested = false, includeLocal = false)
-                    .filter { declaration ->
-                        declaration.text.substringBefore('{').contains(": FocusedDestination")
-                    }.map { declaration -> "$packageName.${declaration.name}" }
-            }.toSet()
     val navigationStateImports =
         listOf(
             "androidx.navigation3.runtime.NavBackStack",
@@ -364,9 +354,10 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
             declarations.associate { declaration ->
                 declaration to navigationParentNames(declaration)
             }
-        val markerDeclaration =
-            declarations.firstOrNull { declaration ->
-                declaration.name == "FocusedDestination" &&
+        val markerDeclarations =
+            declarations.filter { declaration ->
+                declaration.name in
+                    setOf("FocusedDestination", "TopLevelNavigationRequest", "TopLevelRootNavigationRequest") &&
                     declaration is KoInterfaceDeclaration &&
                     ownedFile.modulePath == ":core:navigation"
             }
@@ -375,9 +366,11 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
                 .filter { (declaration, parentNames) ->
                     "NavKey" in parentNames ||
                         "FocusedDestination" in parentNames ||
+                        "TopLevelNavigationRequest" in parentNames ||
+                        "TopLevelRootNavigationRequest" in parentNames ||
                         (ownedFile.modulePath == ":feature:media:api" && declaration.name == "MediaKey")
                 }.keys
-                .filterNot { declaration -> declaration == markerDeclaration }
+                .filterNot { declaration -> declaration in markerDeclarations }
         val entryBuilderDeclarations =
             parentNamesByDeclaration
                 .filter { (_, parentNames) -> "NavEntryBuilder" in parentNames }
@@ -475,7 +468,9 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
                                     importedPackage.startsWith("io.morgan.mio.feature.") &&
                                     importedPackage.endsWith(".api")
                             )
-                    if (isPrimitive || isTypedDomainValue || isAllowedEnum) {
+                    val isTopLevelSlot =
+                        propertyName == "targetSlot" && importedType == "io.morgan.mio.core.navigation.TopLevelSlot"
+                    if (isPrimitive || isTypedDomainValue || isAllowedEnum || isTopLevelSlot) {
                         null
                     } else {
                         "key property '$propertyName' uses forbidden payload type '$typeText'"
@@ -517,7 +512,11 @@ internal fun enforceNavigationBoundaries(files: List<OwnedKotlinFile>) {
                         segments.take(4) == listOf("io", "morgan", "mio", "feature") &&
                         segments[5] == "api" &&
                         segments[4] != implementationFeature &&
-                        importName !in focusedFeatureApiImports
+                        entryBuilderDeclarations.any { builder ->
+                            val keyName = Regex.escape(importName.substringAfterLast('.'))
+                            Regex("\\bentry\\s*<\\s*(?:[\\w.]+\\.)?$keyName\\s*>|\\b$keyName\\s*::\\s*class")
+                                .containsMatchIn(builder.text)
+                        }
                 }
             } else {
                 null
@@ -581,7 +580,13 @@ private fun navigationDeclarations(file: KoFileDeclaration): List<KoClassAndInte
 
 private fun navigationParentNames(declaration: KoClassAndInterfaceAndObjectDeclaration): Set<String> {
     val header = declaration.text.substringBefore('{').substringBefore('=')
-    return setOf("NavKey", "FocusedDestination", "NavEntryBuilder").filterTo(mutableSetOf()) { parentName ->
+    return setOf(
+        "NavKey",
+        "FocusedDestination",
+        "TopLevelNavigationRequest",
+        "TopLevelRootNavigationRequest",
+        "NavEntryBuilder",
+    ).filterTo(mutableSetOf()) { parentName ->
         Regex("\\)\\s*:\\s*[^\\{=]*\\b$parentName\\b").containsMatchIn(header) ||
             Regex("\\b(?:class|object|interface)\\s+\\w+\\s*:\\s*[^\\{=]*\\b$parentName\\b")
                 .containsMatchIn(header)
@@ -1871,7 +1876,6 @@ internal fun enforcePersistenceDoesNotEscape(files: List<OwnedKotlinFile>) {
 
     assertNoViolations("Persistence escape", files) { ownedFile ->
         val imports = ownedFile.file.imports.map { import -> import.name }
-        val source = ownedFile.file.text
         val outsideRoomBoundary =
             ownedFile.modulePath != ":core:database" && !ownedFile.modulePath.startsWith(":data:")
         val outsideDataStoreBoundary =
@@ -1898,7 +1902,7 @@ internal fun enforcePersistenceDoesNotEscape(files: List<OwnedKotlinFile>) {
             if (isRepository &&
                 !isTaskNineteenProgressRepository
             ) {
-                publicStorageTypePattern.find(source)?.value
+                publicApiSignatures(ownedFile.file).firstNotNullOfOrNull { publicStorageTypePattern.find(it)?.value }
             } else {
                 null
             }
@@ -1932,7 +1936,15 @@ internal fun enforceOneMechanismPerDataSource(files: List<OwnedKotlinFile>) {
                 buildSet {
                     if (matchesAnyPrefixFromList(imports, roomPrefixes)) add("Room")
                     if (matchesAnyPrefixFromList(imports, dataStorePrefixes)) add("DataStore")
-                    if (matchesAnyPrefixFromList(imports, providerPrefixes)) add("provider/network")
+                    if (matchesAnyPrefixFromList(
+                            imports.filterNot {
+                                it == "io.morgan.mio.data.provider.api.ProviderKey"
+                            },
+                            providerPrefixes,
+                        )
+                    ) {
+                        add("provider/network")
+                    }
                 }
             val persistedAccountBoundary =
                 ownedFile.modulePath == ":data:sync" &&
@@ -2211,19 +2223,32 @@ private fun firstPublicProviderType(
     ownedFile: OwnedKotlinFile,
     typeNames: Set<String>,
 ): String? {
-    val declarations =
-        buildList {
-            addAll(ownedFile.file.functions(true).map { declaration -> declaration.text })
-            addAll(ownedFile.file.properties(true).map { declaration -> declaration.text })
-        }
-
+    val signatures =
+        publicApiSignatures(ownedFile.file, allowDataSourceBoundary = ownedFile.modulePath.startsWith(":data:"))
     return typeNames.firstOrNull { typeName ->
-        declarations.any { declaration ->
-            val trimmed = declaration.trimStart()
-            !trimmed.startsWith("private ") &&
-                !trimmed.startsWith("internal ") &&
-                Regex("\\b$typeName\\b").containsMatchIn(declaration.substringBefore('=').substringBefore('{'))
+        signatures.any { signature -> Regex("\\b$typeName\\b").containsMatchIn(signature) }
+    }
+}
+
+private fun publicApiSignatures(
+    file: KoFileDeclaration,
+    allowDataSourceBoundary: Boolean = false,
+): List<String> {
+    fun visible(declaration: Any): Boolean {
+        if (declaration is KoFileDeclaration) return true
+        if (declaration is KoVisibilityModifierProvider && !declaration.hasPublicOrDefaultModifier) return false
+        val parent = (declaration as? KoContainingDeclarationProvider)?.containingDeclaration ?: return true
+        if (allowDataSourceBoundary &&
+            parent is KoClassAndInterfaceAndObjectDeclaration &&
+            parent.name.endsWith("DataSource")
+        ) {
+            return false
         }
+        return visible(parent)
+    }
+    return buildList {
+        file.functions(true).filter(::visible).forEach { add(it.text.substringBefore('=').substringBefore('{')) }
+        file.properties(true).filter(::visible).forEach { add(it.text.substringBefore('=').substringBefore('{')) }
     }
 }
 

@@ -1267,6 +1267,63 @@ class ArchitectureRuleFixturesTest {
         )
     }
 
+    @Test
+    fun navigationCallbacksAndCoreMarkerInterfacesAreAllowedButForeignEntriesAndConcreteCoreKeysAreNot() {
+        enforceNavigationBoundaries(
+            loadFixtureDirectory("navigation-boundary", ":feature:today:impl", "CallbackEntryBuilder.kt"),
+        )
+        enforceNavigationBoundaries(
+            loadFixtureDirectory("navigation-boundary", ":core:navigation", "CoreMarkerInterfaces.kt"),
+        )
+        assertFixtureRejected(
+            "navigation-boundary",
+            "ForeignEntryBuilder.kt",
+            ":feature:today:impl",
+            ::enforceNavigationBoundaries,
+        )
+        assertFixtureRejected(
+            "navigation-boundary",
+            "CoreMarkerConcreteKey.kt",
+            ":core:navigation",
+            ::enforceNavigationBoundaries,
+        )
+    }
+
+    @Test
+    fun privateImplementationStorageAndProviderDataSourcesDoNotEscapeRepositoryContracts() {
+        enforceProviderContractsDoNotEscape(
+            loadFixtureDirectory("provider-contract-escape", ":data:media", "PrivateProviderHelpers.kt"),
+        )
+        enforcePersistenceDoesNotEscape(
+            loadFixtureDirectory("persistence-escape", ":data:account", "PrivateRepositoryStorage.kt"),
+        )
+        assertFixtureRejected(
+            "provider-contract-escape",
+            "RepositoryReturnsProviderCredentials.kt",
+            ":data:account",
+            ::enforceProviderContractsDoNotEscape,
+        )
+        assertFixtureRejected(
+            "persistence-escape",
+            "RepositoryReturnsDao.kt",
+            ":data:account",
+            ::enforcePersistenceDoesNotEscape,
+        )
+    }
+
+    @Test
+    fun roomProviderIdentityValueIsNotANetworkMechanismButProviderDataSourceIs() {
+        enforceOneMechanismPerDataSource(
+            loadFixtureDirectory("data-source-boundary", ":data:media", "RoomProviderValue.kt"),
+        )
+        assertFixtureRejected(
+            "data-source-boundary",
+            "RoomProviderNetwork.kt",
+            ":data:media",
+            ::enforceOneMechanismPerDataSource,
+        )
+    }
+
     private fun assertFixtureRejected(
         directoryName: String,
         filename: String,

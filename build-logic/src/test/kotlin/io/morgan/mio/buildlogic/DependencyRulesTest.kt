@@ -115,6 +115,67 @@ class DependencyRulesTest {
     }
 
     @Test
+    fun taskThirtyOneAllowsOnlyYouCollectionAndActivityAccess() {
+        val owner = ":feature:you:impl"
+        val approved = setOf(":domain:collection", ":domain:progress")
+        val existing =
+            setOf(
+                ":feature:you:api",
+                ":core:common",
+                ":core:designsystem",
+                ":core:ui",
+                ":core:navigation",
+                ":domain:account",
+                ":domain:sync",
+                ":domain:preferences",
+                ":domain:model",
+            )
+        assertEquals(existing + approved, DependencyRules.productionProjectDependencies.getValue(owner))
+        listOf("api", "implementation").forEach { configuration ->
+            approved.forEach { dependency ->
+                assertTrue(violations(owner, configuration, dependency).isEmpty())
+                assertTrue(violations(":feature:you:api", configuration, dependency).isNotEmpty())
+                assertTrue(violations(dependency, configuration, owner).isNotEmpty())
+            }
+            (DependencyRules.productionProjectDependencies.keys - existing - approved).forEach { dependency ->
+                assertTrue(
+                    violations(owner, configuration, dependency).isNotEmpty(),
+                    "Expected $owner -> $dependency to remain forbidden",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun progressPresentationKeepsItsReviewedDependencyBoundary() {
+        val owner = ":feature:progress:impl"
+        val allowed =
+            setOf(
+                ":feature:progress:api",
+                ":core:common",
+                ":core:designsystem",
+                ":core:ui",
+                ":core:navigation",
+                ":domain:progress",
+                ":domain:collection",
+                ":domain:sync",
+                ":domain:model",
+                ":domain:media",
+            )
+        assertEquals(allowed, DependencyRules.productionProjectDependencies.getValue(owner))
+        listOf("api", "implementation").forEach { configuration ->
+            listOf(":core:common", ":domain:media").forEach { dependency ->
+                assertTrue(violations(owner, configuration, dependency).isEmpty())
+                assertTrue(violations(":feature:progress:api", configuration, dependency).isNotEmpty())
+                assertTrue(violations(dependency, configuration, owner).isNotEmpty())
+            }
+            (DependencyRules.productionProjectDependencies.keys - allowed).forEach { dependency ->
+                assertTrue(violations(owner, configuration, dependency).isNotEmpty())
+            }
+        }
+    }
+
+    @Test
     fun opensOnlyTheTaskSeventeenTodayQueueEdges() {
         listOf(":domain:media", ":domain:collection", ":domain:model").forEach { dependency ->
             assertTrue(
@@ -313,8 +374,8 @@ class DependencyRulesTest {
             ":feature:today:api",
         ).forEach { owner ->
             val violations = violations(owner, "implementation", ":core:common")
-            if (owner == ":feature:media:impl") {
-                assertTrue(violations.isEmpty(), "Expected task sixteen media common edge to be allowed")
+            if (owner in setOf(":feature:media:impl", ":feature:progress:impl")) {
+                assertTrue(violations.isEmpty(), "Expected the reviewed account-scoped common edge to be allowed")
             } else {
                 assertTrue(violations.isNotEmpty(), "Expected $owner -> :core:common to remain forbidden")
             }
