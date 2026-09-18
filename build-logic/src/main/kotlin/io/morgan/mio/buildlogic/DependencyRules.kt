@@ -99,6 +99,8 @@ public object DependencyRules {
                     ":core:ui",
                     ":core:navigation",
                     ":domain:collection",
+                    ":domain:media",
+                    ":domain:queue",
                     ":domain:progress",
                     ":domain:preferences",
                     ":domain:model",

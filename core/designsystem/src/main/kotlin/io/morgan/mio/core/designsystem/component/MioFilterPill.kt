@@ -4,13 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -65,19 +65,20 @@ public fun MioFilterPill(
                     onClick = onClick,
                 ).semantics(mergeDescendants = true) {
                     this.selected = selected
-                },
+                }.padding(vertical = 4.dp),
         visualModifier =
             Modifier
                 .clip(shape)
                 .then(borderModifier)
                 .background(containerColor, shape),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)) {
-            Text(
-                text = label,
-                color = contentColor,
-                style = MioTheme.typography.label,
-            )
-        }
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 12.dp),
+            color = contentColor,
+            style = MioTheme.typography.label,
+            maxLines = 1,
+        )
     }
 }

@@ -8,4 +8,7 @@ dependencies {
     implementation(project(":domain:model"))
     implementation(libs.navigation3.runtime)
     implementation(libs.kotlinx.serialization.core)
+
+    testImplementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit4)
 }

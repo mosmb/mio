@@ -45,6 +45,16 @@ public class AuthenticatedNavigationState internal constructor(
     public fun stackSnapshot(slot: TopLevelSlot): List<NavKey> =
         Collections.unmodifiableList(backStacks.getValue(slot).toList())
 
+    public fun openTopLevel(
+        slot: TopLevelSlot,
+        rootKey: NavKey,
+    ) {
+        selectedSlot.value = slot.ordinal
+        val targetStack = backStacks.getValue(slot)
+        targetStack.clear()
+        targetStack.add(rootKey)
+    }
+
     @Composable
     public fun decoratedEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): List<NavEntry<NavKey>> {
         val todaySaveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<NavKey>()

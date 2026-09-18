@@ -5,12 +5,14 @@ import androidx.navigation3.runtime.NavKey
 import androidx.test.core.app.ApplicationProvider
 import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.core.navigation.MioNavigator
+import io.morgan.mio.core.navigation.TopLevelNavigationRequest
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.di.AppGraph
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.feature.media.api.MediaKey
 import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
@@ -57,6 +59,11 @@ class NavigationRegistrationTest {
             assertEquals(6, rootKeys.size)
             assertEquals(6, rootKeys.map { key -> key::class }.toSet().size)
             rootKeys.forEach { key -> assertNotNull(provider(key)) }
+            val libraryRoot =
+                registry.topLevelDestinations.single { it.slot == TopLevelSlot.LIBRARY }.key as
+                    TopLevelNavigationRequest
+            assertEquals(TopLevelSlot.LIBRARY, libraryRoot.targetSlot)
+            assertFalse(libraryRoot.replacesTargetStack)
             assertThrows(Throwable::class.java) { provider(UnknownNavigationTestKey) }
         } finally {
             graph.database.close()

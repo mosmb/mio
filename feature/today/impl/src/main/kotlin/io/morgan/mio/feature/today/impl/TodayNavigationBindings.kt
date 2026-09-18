@@ -11,8 +11,10 @@ import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
+import io.morgan.mio.feature.library.api.LibraryKey
 import io.morgan.mio.feature.media.api.MediaKey
 import io.morgan.mio.feature.today.api.TodayKey
+import java.util.UUID
 import kotlin.reflect.KClass
 
 private object TodayNavEntryBuilder : NavEntryBuilder {
@@ -22,6 +24,9 @@ private object TodayNavEntryBuilder : NavEntryBuilder {
         entry<TodayKey> {
             TodayRoute(
                 onMediaDetail = { mediaId -> navigator.navigate(MediaKey(mediaId)) },
+                onRemainingReady = {
+                    navigator.navigate(LibraryKey(readyRequestId = UUID.randomUUID().toString()))
+                },
             )
         }
     }

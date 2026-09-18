@@ -1,13 +1,18 @@
 package io.morgan.mio
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import dev.zacsweers.metro.createDynamicGraphFactory
 import io.morgan.mio.core.database.MioDatabase
 import io.morgan.mio.core.database.entity.AccountProviderIdEntity
@@ -177,6 +182,83 @@ class TodayRoomQueueNavigationTest {
             composeRule.onAllNodesWithText("Library").assertCountEquals(0)
             composeRule.onAllNodesWithText("Discover").assertCountEquals(0)
             composeRule.onAllNodesWithText("You").assertCountEquals(0)
+        } finally {
+            graph.accountGraphLifecycle.destroy()
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun remainingReadyActionOpensTheCompleteLibraryReadyInventory() {
+        val scheduler = TestCoroutineScheduler()
+        Dispatchers.setMain(StandardTestDispatcher(scheduler))
+        val accountId = AccountId("account-1")
+        val fixture = TestGraphFixture(activityRule.activity, scheduler)
+        val graph =
+            createDynamicGraphFactory<AppGraph.Factory>(productionBindings(fixture))
+                .create(activityRule.activity)
+        val handle =
+            graph.accountGraphLifecycle.create(
+                AccountGraphRequest(
+                    accountId = accountId,
+                    providerBinding =
+                        io.morgan.mio.core.testing.provider
+                            .providerBindingFixture(ProviderKey.ANILIST),
+                ),
+            )
+
+        try {
+            seedAccount(fixture.database, accountId)
+            listOf(
+                Triple("ready-one", "Ready first title", UPDATED_11),
+                Triple("ready-two", "Ready second title", UPDATED_10),
+                Triple("ready-three", "Ready third title", UPDATED_09),
+                Triple("ready-four", "Ready fourth title", UPDATED_08),
+                Triple("ready-overflow", "Overflow ready title", UPDATED_07),
+            ).forEach { (mediaId, title, updatedAt) ->
+                seedQueueTitle(
+                    database = fixture.database,
+                    mediaId = mediaId,
+                    title = title,
+                    updatedAt = updatedAt,
+                    releaseInstant = UPDATED_11,
+                )
+            }
+            showAuthenticated(graph, handle)
+
+            waitForText(scheduler, "1 other title is ready when you are")
+            composeRule
+                .onNodeWithText("1 other title is ready when you are")
+                .performScrollTo()
+                .performClick()
+            waitForText(scheduler, "Ready first title")
+
+            composeRule.onNodeWithText("Ready").assertIsDisplayed()
+            composeRule
+                .onNode(
+                    hasScrollAction() and
+                        SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
+                ).performTouchInput { repeat(8) { swipeUp() } }
+            composeRule.onNodeWithText("Overflow ready title").assertIsDisplayed()
+
+            composeRule.onNodeWithText("Ready").performClick()
+            composeRule.onNodeWithText("All statuses").performClick()
+            composeRule.onNodeWithText("All statuses").assertIsDisplayed()
+            composeRule.onNodeWithText("Today").performClick()
+            waitForText(scheduler, "1 other title is ready when you are")
+            composeRule.onNodeWithText("1 other title is ready when you are").performScrollTo().performClick()
+            waitForText(scheduler, "Ready first title")
+
+            composeRule.onNodeWithText("Ready").assertIsDisplayed()
+            composeRule
+                .onNode(
+                    hasScrollAction() and
+                        SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
+                ).performTouchInput { repeat(8) { swipeUp() } }
+            composeRule.onNodeWithText("Overflow ready title").performClick()
+            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Synopsis")
+            composeRule.onNodeWithText("Overflow ready title").assertIsDisplayed()
         } finally {
             graph.accountGraphLifecycle.destroy()
             fixture.close()

@@ -1,0 +1,31 @@
+<resources>
+    <string name="library_title">Library</string>
+    <string name="library_filter_all">All</string>
+    <string name="library_filter_anime">Anime</string>
+    <string name="library_filter_manga">Manga</string>
+    <string name="library_filter_all_statuses">All statuses</string>
+    <string name="library_filter_ready">Ready</string>
+    <string name="library_status_current">Current</string>
+    <string name="library_status_planning">Planning</string>
+    <string name="library_status_paused">Paused</string>
+    <string name="library_status_completed">Completed</string>
+    <string name="library_status_dropped">Dropped</string>
+    <string name="library_status_repeating">Repeating</string>
+    <string name="library_status_sheet_title">Filter by status</string>
+    <string name="library_unit_episode">Episode</string>
+    <string name="library_unit_chapter">Chapter</string>
+    <string name="library_unit_volume">Volume</string>
+    <string name="library_progress_with_total">%1$s %2$d of %3$d</string>
+    <string name="library_progress_without_total">%1$s %2$d</string>
+    <string name="library_row_type_and_status">%1$s · %2$s</string>
+    <string name="library_unavailable_title">Title unavailable</string>
+    <string name="library_media_type_unavailable">Media type unavailable</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_message">Imported titles will appear here.</string>
+    <string name="library_filtered_empty_title">No titles match these filters</string>
+    <string name="library_filtered_empty_message">Clear filters to see the rest of your collection.</string>
+    <string name="library_clear_filters">Clear filters</string>
+    <string name="library_observation_error_title">Library could not be updated</string>
+    <string name="library_observation_error_message">Your saved collection is still here. Try loading it again.</string>
+    <string name="library_retry">Retry</string>
+</resources>

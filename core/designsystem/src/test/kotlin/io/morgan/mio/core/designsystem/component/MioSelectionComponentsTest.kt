@@ -98,7 +98,10 @@ class MioSelectionComponentsTest {
 
         val filterBounds = composeRule.onNodeWithText("I").fetchSemanticsNode().boundsInRoot
         assertTrue(filterBounds.width >= composeRule.density.run { 48.dp.toPx() })
-        assertTrue(filterBounds.height >= composeRule.density.run { 48.dp.toPx() })
+        assertEquals(composeRule.density.run { 48.dp.toPx() }, filterBounds.height, 1f)
+        val labelBounds = composeRule.onNodeWithText("I", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(filterBounds.center.x, labelBounds.center.x, 1f)
+        assertEquals(filterBounds.center.y, labelBounds.center.y, 1f)
         composeRule.onNodeWithText("Disabled").performClick()
         composeRule.runOnIdle { assertEquals("", selectedId) }
     }

@@ -12,14 +12,18 @@ import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.feature.library.api.LibraryKey
+import io.morgan.mio.feature.media.api.MediaKey
 import kotlin.reflect.KClass
 
 private object LibraryNavEntryBuilder : NavEntryBuilder {
     override val destinationKeyTypes: Set<KClass<out NavKey>> = setOf(LibraryKey::class)
 
     override fun EntryProviderScope<NavKey>.build(navigator: MioNavigator) {
-        entry<LibraryKey> {
-            LibraryRoute()
+        entry<LibraryKey> { key ->
+            LibraryRoute(
+                readyRequestId = key.readyRequestId,
+                onMediaDetail = { mediaId -> navigator.navigate(MediaKey(mediaId)) },
+            )
         }
     }
 }
@@ -36,6 +40,6 @@ public object LibraryNavigationBindings {
     public fun provideLibraryTopLevelDestination(): TopLevelDestination =
         TopLevelDestination(
             slot = TopLevelSlot.LIBRARY,
-            key = LibraryKey,
+            key = LibraryKey(),
         )
 }

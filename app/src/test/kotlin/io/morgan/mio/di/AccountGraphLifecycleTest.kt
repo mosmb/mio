@@ -58,6 +58,10 @@ class AccountGraphLifecycleTest {
                     "io.morgan.mio.feature.media.impl.MediaDetailViewModel.Factory" in
                         graph.metroViewModelFactory.providerKeys("getManualAssistedFactoryProviders"),
                 )
+                assertTrue(
+                    "io.morgan.mio.feature.library.impl.LibraryViewModel.Factory" in
+                        graph.metroViewModelFactory.providerKeys("getManualAssistedFactoryProviders"),
+                )
             }
 
             assertThrows(IllegalStateException::class.java) {

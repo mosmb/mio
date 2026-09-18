@@ -135,7 +135,7 @@ class TodayScreenTest {
         )
 
         val targets = composeRule.onAllNodes(hasClickAction())
-        targets.assertCountEquals(4)
+        targets.assertCountEquals(5)
         val currentDensity = requireNotNull(density)
         composeRule.onNodeWithText("Readable title").assertIsDisplayed()
 
@@ -199,7 +199,8 @@ class TodayScreenTest {
     }
 
     @Test
-    fun remainingSummaryIsInformationalAndHasNoButtonSemantics() {
+    fun remainingSummaryOpensTheReadyLibraryAction() {
+        var remainingReadyClicks = 0
         show(
             state =
                 TodayUiState.Populated(
@@ -207,13 +208,20 @@ class TodayScreenTest {
                     newRecommendations = emptyList(),
                     remainingReadyCount = 1,
                 ),
+            onRemainingReady = { remainingReadyClicks += 1 },
         )
 
-        composeRule.onNodeWithText("1 other title is ready when you are").performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
-        val summary = composeRule.onNodeWithText("1 other title is ready when you are").fetchSemanticsNode().config
-        assertFalse(summary.contains(SemanticsActions.OnClick))
-        assertFalse(summary.contains(SemanticsProperties.Role))
+        val summary =
+            composeRule
+                .onNodeWithText("1 other title is ready when you are")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assertHasClickAction()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(2)
+        val summarySemantics = summary.fetchSemanticsNode().config
+        assertEquals(Role.Button, summarySemantics[SemanticsProperties.Role])
+        summary.performClick()
+        assertEquals(1, remainingReadyClicks)
     }
 
     @Test
@@ -417,6 +425,7 @@ class TodayScreenTest {
     private fun show(
         state: TodayUiState,
         onMediaDetail: (String) -> Unit = {},
+        onRemainingReady: () -> Unit = {},
         onAction: (TodayAction) -> Unit = {},
         providerLabel: String? = null,
         onReconnect: () -> Unit = {},
@@ -437,6 +446,7 @@ class TodayScreenTest {
                             modifier = modifier,
                             state = stateHolder.value,
                             onMediaDetail = onMediaDetail,
+                            onRemainingReady = onRemainingReady,
                             onAction = onAction,
                             providerLabel = providerLabel,
                             onReconnect = onReconnect,

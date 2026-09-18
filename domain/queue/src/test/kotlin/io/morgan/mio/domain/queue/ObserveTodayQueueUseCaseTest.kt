@@ -62,6 +62,104 @@ class ObserveTodayQueueUseCaseTest {
         }
 
     @Test
+    fun readyMembershipIncludesTitlesBeyondTodaysNowAndThreeNewCards() =
+        runTest {
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val entries = (1..7).map { index -> entry(mediaId = "ready-$index") }
+            collection.entries.value = entries
+            entries.forEach { item ->
+                media.media(item.mediaId.value).value = media(item.mediaId.value)
+                media.releases(item.mediaId.value).value =
+                    listOf(release(item.mediaId.value, 2, ReleaseTime.Trusted(now - 1.days)))
+            }
+
+            val ready = ObserveReadyMediaIdsUseCase(collection, media, fixedClock())(accountId).firstValue()
+            val today = ObserveTodayQueueUseCase(collection, media, fixedClock())(accountId).firstValue()
+
+            assertEquals(entries.map { it.mediaId }.toSet(), ready)
+            assertEquals(3, today.newRecommendations.size)
+            assertEquals(3, today.remainingReadyCount)
+        }
+
+    @Test
+    fun readyMembershipUsesCurrentTrustedMatchingUnitAndFinishedKnownTotalRules() =
+        runTest {
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val entries =
+                listOf(
+                    entry("released"),
+                    entry("planned", status = CollectionStatus.PLANNED),
+                    entry("repeating", status = CollectionStatus.REPEATING),
+                    entry("future"),
+                    entry("unknown-time"),
+                    entry("untrusted-time"),
+                    entry("wrong-unit", progressUnit = ProgressUnit.CHAPTER),
+                    entry("finished-known"),
+                    entry("finished-unknown", total = null),
+                    entry("at-total", progress = 12, total = UnitTotal(12)),
+                    entry("overflow", progress = Int.MAX_VALUE, total = null),
+                )
+            collection.entries.value = entries
+            entries.forEach { item -> media.media(item.mediaId.value).value = media(item.mediaId.value) }
+            media.media("finished-known").value = media("finished-known", MediaPublicationStatus.FINISHED)
+            media.media("finished-unknown").value = media("finished-unknown", MediaPublicationStatus.FINISHED)
+            media.releases("released").value = listOf(release("released", 2))
+            media.releases("planned").value = listOf(release("planned", 2))
+            media.releases("repeating").value = listOf(release("repeating", 2))
+            media.releases("future").value = listOf(release("future", 2, ReleaseTime.Trusted(now + 1.hours)))
+            media.releases("unknown-time").value = listOf(release("unknown-time", 2, ReleaseTime.Unknown))
+            media.releases("untrusted-time").value =
+                listOf(release("untrusted-time", 2, ReleaseTime.Untrusted(now)))
+            media.releases("wrong-unit").value = listOf(release("wrong-unit", 2))
+            media.releases("at-total").value = listOf(release("at-total", 13))
+
+            val ready = ObserveReadyMediaIdsUseCase(collection, media, fixedClock())(accountId).firstValue()
+
+            assertEquals(setOf(MediaId("released"), MediaId("finished-known")), ready)
+        }
+
+    @Test
+    fun readyMembershipTracksProgressCollectionRemovalAndClockBoundary() =
+        runTest {
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val mutableClock = MutableTestClock(now)
+            val current = entry("current")
+            val future = entry("future")
+            collection.entries.value = listOf(current)
+            media.media("current").value = media("current")
+            media.releases("current").value = listOf(release("current", 2))
+            media.media("future").value = media("future")
+            media.releases("future").value = listOf(release("future", 2, ReleaseTime.Trusted(now + 1.hours)))
+            val observed = mutableListOf<Set<MediaId>>()
+            val job =
+                launch {
+                    ObserveReadyMediaIdsUseCase(collection, media, mutableClock)(accountId).collect(observed::add)
+                }
+
+            runCurrent()
+            assertEquals(setOf(MediaId("current")), observed.last())
+            collection.entries.value = listOf(current.copy(progress = ProgressValue(2)))
+            runCurrent()
+            assertTrue(observed.last().isEmpty())
+            collection.entries.value = listOf(future)
+            runCurrent()
+            assertTrue(observed.last().isEmpty())
+
+            mutableClock.current = now + 1.hours
+            advanceTimeBy(1.hours)
+            runCurrent()
+            assertEquals(setOf(MediaId("future")), observed.last())
+
+            collection.entries.value = emptyList()
+            runCurrent()
+            assertTrue(observed.last().isEmpty())
+            job.cancel()
+        }
+
+    @Test
     fun roomMediaAndReleasesReplaceTheRecommendationReactively() =
         runTest {
             val collection = TestCollectionRepository()
@@ -265,25 +363,32 @@ class ObserveTodayQueueUseCaseTest {
     private fun entry(
         mediaId: String,
         updatedAt: String = "2026-08-23T11:00:00Z",
+        status: CollectionStatus = CollectionStatus.CURRENT,
+        progress: Int = 1,
+        progressUnit: ProgressUnit = ProgressUnit.EPISODE,
+        total: UnitTotal? = UnitTotal(12),
     ): CollectionEntry =
         CollectionEntry(
             id = CollectionEntryId("entry-$mediaId"),
             accountId = accountId,
             mediaId = MediaId(mediaId),
-            status = CollectionStatus.CURRENT,
-            progress = ProgressValue(1),
-            progressUnit = ProgressUnit.EPISODE,
-            total = UnitTotal(12),
+            status = status,
+            progress = ProgressValue(progress),
+            progressUnit = progressUnit,
+            total = total,
             updatedAt = Instant.parse(updatedAt),
         )
 
-    private fun media(id: String): Media =
+    private fun media(
+        id: String,
+        publicationStatus: MediaPublicationStatus = MediaPublicationStatus.RELEASING,
+    ): Media =
         Media(
             id = MediaId(id),
             type = MediaType.ANIME,
             title = MediaTitle("Title $id"),
             format = MediaFormat.TV,
-            publicationStatus = MediaPublicationStatus.RELEASING,
+            publicationStatus = publicationStatus,
             synopsis = null,
             artwork = Artwork(null, null),
             totals = MediaTotals(UnitTotal(12), null, null),
@@ -297,10 +402,11 @@ class ObserveTodayQueueUseCaseTest {
         time: io.morgan.mio.domain.media.ReleaseTime =
             io.morgan.mio.domain.media.ReleaseTime
                 .Trusted(now),
+        unit: ProgressUnit = ProgressUnit.EPISODE,
     ): Release =
         Release(
             mediaId = MediaId(mediaId),
-            unit = ProgressUnit.EPISODE,
+            unit = unit,
             number = UnitNumber(number),
             time = time,
         )

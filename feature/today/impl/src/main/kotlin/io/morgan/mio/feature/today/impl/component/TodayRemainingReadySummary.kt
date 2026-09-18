@@ -1,6 +1,7 @@
 package io.morgan.mio.feature.today.impl.component
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -11,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.feature.today.impl.R
@@ -18,6 +20,7 @@ import io.morgan.mio.feature.today.impl.R
 @Composable
 internal fun TodayRemainingReadySummary(
     count: Int,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     require(count > 0)
@@ -28,6 +31,7 @@ internal fun TodayRemainingReadySummary(
                 .heightIn(min = 56.dp)
                 .clip(MioTheme.shapes.sm)
                 .border(1.dp, MioTheme.colors.border, MioTheme.shapes.sm)
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

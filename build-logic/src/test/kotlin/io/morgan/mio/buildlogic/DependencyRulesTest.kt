@@ -89,6 +89,32 @@ class DependencyRulesTest {
     }
 
     @Test
+    fun taskTwentyFiveAllowsOnlyLibraryMetadataAndReadinessAccess() {
+        listOf("api", "implementation").forEach { configuration ->
+            listOf(":domain:media", ":domain:queue").forEach { dependency ->
+                assertTrue(violations(":feature:library:impl", configuration, dependency).isEmpty())
+                assertTrue(violations(":feature:library:api", configuration, dependency).isNotEmpty())
+                assertTrue(violations(dependency, configuration, ":feature:library:impl").isNotEmpty())
+            }
+            listOf(
+                ":domain:sync",
+                ":data:media",
+                ":data:collection",
+                ":data:provider:api",
+                ":core:database",
+                ":sync:work",
+                ":feature:today:impl",
+                ":feature:media:impl",
+            ).forEach { dependency ->
+                assertTrue(
+                    violations(":feature:library:impl", configuration, dependency).isNotEmpty(),
+                    "Expected :feature:library:impl -> $dependency to remain forbidden",
+                )
+            }
+        }
+    }
+
+    @Test
     fun opensOnlyTheTaskSeventeenTodayQueueEdges() {
         listOf(":domain:media", ":domain:collection", ":domain:model").forEach { dependency ->
             assertTrue(

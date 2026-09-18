@@ -19,7 +19,9 @@ import io.morgan.mio.core.designsystem.component.MioSnackbarHost
 import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
 import io.morgan.mio.core.designsystem.layout.MioWindowInsets
 import io.morgan.mio.core.designsystem.theme.MioTheme
+import io.morgan.mio.core.navigation.MioNavigator
 import io.morgan.mio.core.navigation.NavigationRegistry
+import io.morgan.mio.core.navigation.TopLevelNavigationRequest
 import io.morgan.mio.core.navigation.rememberAuthenticatedNavigationState
 import io.morgan.mio.core.navigation.rememberOnboardingNavigationState
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
@@ -104,7 +106,22 @@ private fun AuthenticatedRoot(
     onSnackbarAction: (String) -> Unit,
 ) {
     val state = rememberAuthenticatedNavigationState(navigationRegistry.topLevelDestinations)
-    val navigator = state.navigator
+    val retainedStackNavigator = state.navigator
+    val navigator =
+        remember(state, retainedStackNavigator) {
+            object : MioNavigator {
+                override fun navigate(destination: androidx.navigation3.runtime.NavKey) {
+                    val topLevelRequest = destination as? TopLevelNavigationRequest
+                    if (topLevelRequest?.replacesTargetStack == true) {
+                        state.openTopLevel(topLevelRequest.targetSlot, destination)
+                    } else {
+                        retainedStackNavigator.navigate(destination)
+                    }
+                }
+
+                override fun goBack(): Boolean = retainedStackNavigator.goBack()
+            }
+        }
     val entryProvider = remember(navigator) { navigationRegistry.entryProvider(navigator) }
 
     Box(modifier = Modifier.fillMaxSize()) {

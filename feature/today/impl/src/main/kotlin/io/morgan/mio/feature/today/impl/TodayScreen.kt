@@ -59,6 +59,7 @@ import io.morgan.mio.feature.today.impl.component.TodayRemainingReadySummary
 internal fun TodayRoute(
     modifier: Modifier = Modifier,
     onMediaDetail: (MediaId) -> Unit,
+    onRemainingReady: () -> Unit,
 ) {
     val viewModel = metroViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +90,7 @@ internal fun TodayRoute(
         modifier = modifier,
         state = state,
         onMediaDetail = { mediaId -> onMediaDetail(MediaId(mediaId)) },
+        onRemainingReady = onRemainingReady,
         onAction = viewModel::onAction,
         timeoutMillis = timeoutMillis,
         providerLabel = recoveryActions.providerLabel,
@@ -102,6 +104,7 @@ internal fun TodayScreen(
     modifier: Modifier = Modifier,
     state: TodayUiState,
     onMediaDetail: (String) -> Unit,
+    onRemainingReady: () -> Unit = {},
     onAction: (TodayAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
     providerLabel: String? = null,
@@ -207,6 +210,7 @@ internal fun TodayScreen(
                     if (state.remainingReadyCount > 0) {
                         TodayRemainingReadySummary(
                             count = state.remainingReadyCount,
+                            onClick = onRemainingReady,
                             modifier = Modifier.padding(top = 16.dp),
                         )
                     }

@@ -37,6 +37,28 @@ class AuthenticatedNavigationStateTest {
     }
 
     @Test
+    fun explicitTopLevelEntryReplacesOnlyTheTargetStack() {
+        val state = state()
+        val navigator = state.navigator
+        navigator.navigate(AuthTodayNestedKey)
+        navigator.navigate(AuthLibraryTestKey)
+        navigator.navigate(AuthLibraryNestedKey)
+        navigator.navigate(AuthDiscoverTestKey)
+        navigator.navigate(AuthDiscoverNestedKey)
+
+        state.openTopLevel(TopLevelSlot.LIBRARY, AuthReadyLibraryKey("request-1"))
+
+        assertEquals(TopLevelSlot.LIBRARY, state.selectedDestination.slot)
+        assertEquals(listOf(AuthReadyLibraryKey("request-1")), state.stackSnapshot(TopLevelSlot.LIBRARY))
+        assertEquals(listOf(AuthTodayTestKey, AuthTodayNestedKey), state.stackSnapshot(TopLevelSlot.TODAY))
+        assertEquals(
+            listOf(AuthDiscoverTestKey, AuthDiscoverNestedKey),
+            state.stackSnapshot(TopLevelSlot.DISCOVER),
+        )
+        assertEquals(listOf(AuthYouTestKey), state.stackSnapshot(TopLevelSlot.YOU))
+    }
+
+    @Test
     fun selectingARootNeverPushesIntoEitherStack() {
         val state = state()
         val navigator = state.navigator
@@ -156,6 +178,14 @@ private data object AuthTodayNestedKeyTwo : NavKey
 
 @Serializable
 private data object AuthLibraryNestedKey : NavKey
+
+@Serializable
+private data object AuthDiscoverNestedKey : NavKey
+
+@Serializable
+private data class AuthReadyLibraryKey(
+    val requestId: String,
+) : NavKey
 
 @Serializable
 private data object AuthFocusedTestKey : FocusedDestination

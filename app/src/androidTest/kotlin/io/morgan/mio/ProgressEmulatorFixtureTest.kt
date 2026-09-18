@@ -36,6 +36,14 @@ class ProgressEmulatorFixtureTest {
             val application = targetApplication()
             val database = application.appGraph.database
             assertFixtureDatabaseIsEmpty(database)
+            if (
+                InstrumentationRegistry
+                    .getArguments()
+                    .getString(TASK25_EMPTY_FIXTURE_ARGUMENT) == "true"
+            ) {
+                seedTask25EmptyCollection(application, database)
+                return@runBlocking
+            }
 
             application.appGraph.providerCredentialStore.write(
                 ProviderCredentials(
@@ -69,7 +77,49 @@ class ProgressEmulatorFixtureTest {
             }
 
             assertFixtureCounts(database)
+            if (
+                InstrumentationRegistry
+                    .getArguments()
+                    .getString(TASK25_FIXTURE_ARGUMENT) == "true"
+            ) {
+                seedTask25ReadyOverflow(database)
+            }
         }
+
+    private suspend fun seedTask25EmptyCollection(
+        application: MioApplication,
+        database: MioDatabase,
+    ) {
+        application.appGraph.providerCredentialStore.write(
+            ProviderCredentials(
+                provider = ProviderKey.ANILIST,
+                accessToken = "task25-empty-fixture-access",
+                refreshToken = null,
+                expiresAt = null,
+                tokenType = "Bearer",
+            ),
+        )
+        database.selectedAccountDao().replaceSelectedAccount(
+            SelectedAccountEntity(
+                selectionKey = SELECTED_ACCOUNT_KEY,
+                accountId = TASK25_EMPTY_ACCOUNT_ID,
+                connectedProvider = StoredConnectedProvider.ANILIST,
+                displayName = "Task 25 empty fixture account",
+                avatarReference = null,
+            ),
+            AccountProviderIdEntity(
+                accountId = TASK25_EMPTY_ACCOUNT_ID,
+                provider = StoredConnectedProvider.ANILIST,
+                remoteAccountId = "task25-empty-fixture-provider-account",
+            ),
+        )
+
+        assertEquals(1, countRows(database, "selected_account"))
+        assertEquals(1, countRows(database, "account_provider_id"))
+        assertEquals(0, countRows(database, "media"))
+        assertEquals(0, countRows(database, "collection_entry"))
+        assertEquals(0, countRows(database, "release"))
+    }
 
     @Test
     fun talkBackFocusAndUndo() {
@@ -213,6 +263,63 @@ class ProgressEmulatorFixtureTest {
         assertEquals(0, countRows(database, "pending_operation"))
     }
 
+    private suspend fun seedTask25ReadyOverflow(database: MioDatabase) {
+        val now = Clock.System.now()
+        val mediaId = TASK25_OVERFLOW_MEDIA_ID
+        database.inTransaction {
+            database.mediaDao().upsertMedia(
+                listOf(
+                    MediaEntity(
+                        mediaId = mediaId,
+                        mediaType = StoredMediaType.ANIME,
+                        title = "Task 25 Ready overflow",
+                        format = StoredMediaFormat.TV,
+                        publicationStatus = StoredMediaPublicationStatus.RELEASING,
+                        synopsis = "Cached Task 25 fixture synopsis",
+                        posterReference = null,
+                        bannerReference = null,
+                        episodeTotal = 12,
+                        chapterTotal = null,
+                        volumeTotal = null,
+                    ),
+                ),
+            )
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    CollectionEntryEntity(
+                        collectionEntryId = TASK25_OVERFLOW_ENTRY_ID,
+                        accountId = ACCOUNT_ID,
+                        mediaId = mediaId,
+                        progressUnit = StoredProgressUnit.EPISODE,
+                        remoteStatus = StoredCollectionStatus.CURRENT,
+                        remoteProgress = 1,
+                        remoteTotal = 12,
+                        remoteUpdatedAtUtcMs = now - 60.minutes,
+                        effectiveStatus = StoredCollectionStatus.CURRENT,
+                        effectiveProgress = 1,
+                        effectiveTotal = 12,
+                        effectiveUpdatedAtUtcMs = now - 60.minutes,
+                    ),
+                ),
+            )
+            database.releaseDao().upsertReleases(
+                listOf(
+                    ReleaseEntity(
+                        mediaId = mediaId,
+                        progressUnit = StoredProgressUnit.EPISODE,
+                        unitNumber = 2,
+                        timeKind = StoredReleaseTimeKind.TRUSTED,
+                        releaseInstantUtcMs = now - 1.minutes,
+                    ),
+                ),
+            )
+        }
+
+        assertEquals(MEDIA.size + 1, countRows(database, "media"))
+        assertEquals(ENTRIES.size + 1, countRows(database, "collection_entry"))
+        assertEquals(RELEASES.size + 1, countRows(database, "release"))
+    }
+
     private fun countRows(
         database: MioDatabase,
         table: String,
@@ -292,7 +399,12 @@ class ProgressEmulatorFixtureTest {
 
     private companion object {
         const val FIXTURE_ARGUMENT = "mioTask19Fixture"
+        const val TASK25_FIXTURE_ARGUMENT = "mioTask25Fixture"
+        const val TASK25_EMPTY_FIXTURE_ARGUMENT = "mioTask25EmptyFixture"
         const val ACCOUNT_ID = "task19-emulator-account"
+        const val TASK25_EMPTY_ACCOUNT_ID = "task25-empty-emulator-account"
+        const val TASK25_OVERFLOW_MEDIA_ID = "task25-emulator-ready-overflow"
+        const val TASK25_OVERFLOW_ENTRY_ID = "task25-emulator-ready-overflow-entry"
         const val NOW_MEDIA_ID = "task19-emulator-now"
         const val NOW_ENTRY_ID = "task19-emulator-now-entry"
 
