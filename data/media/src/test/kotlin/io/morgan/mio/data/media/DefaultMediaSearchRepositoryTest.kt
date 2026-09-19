@@ -65,12 +65,16 @@ class DefaultMediaSearchRepositoryTest {
     private lateinit var repository: DefaultMediaSearchRepository
 
     private val accountId = AccountId("search-account")
-    private val provider = ProviderKey.ANILIST
+    private var provider = ProviderKey.ANILIST
 
     @Before
     fun setUp() {
         database = MioDatabaseFactory.createInMemory(ApplicationProvider.getApplicationContext())
         local = RoomMediaLocalDataSource(database)
+        configureProvider()
+    }
+
+    private fun configureProvider() {
         searchSource = FakeProviderMediaSearchDataSource(provider)
         credentials =
             FakeProviderCredentialStore().also { store ->
@@ -478,6 +482,59 @@ class DefaultMediaSearchRepositoryTest {
             )
         }
 
+    @Test
+    fun myAnimeListAllKeepsNamespacedIdentitiesAndContinuesOnlyTheUnfinishedType() =
+        runTest {
+            provider = ProviderKey.MY_ANIME_LIST
+            configureProvider()
+            searchSource.enqueue { _, request ->
+                assertEquals(ProviderMediaType.ANIME, request.type)
+                ProviderResult.Success(searchPage(searchMedia("anime/1")))
+            }
+            searchSource.enqueue { _, request ->
+                assertEquals(ProviderMediaType.MANGA, request.type)
+                ProviderResult.Success(
+                    searchPage(searchMedia("manga/1", ProviderMediaType.MANGA), nextCursor = "10"),
+                )
+            }
+            assertEquals(MediaSearchCommandOutcome.SUCCEEDED, repository.refreshSearch("mixed", MediaSearchFilter.ALL))
+            val first = checkNotNull(repository.observeSearch("mixed", MediaSearchFilter.ALL).first())
+            assertEquals(
+                2,
+                first.media
+                    .map { it.id }
+                    .distinct()
+                    .size,
+            )
+            assertTrue(first.hasMore)
+            searchSource.enqueue { _, request ->
+                assertEquals(ProviderMediaType.MANGA, request.type)
+                assertEquals("10", request.cursor?.value)
+                ProviderResult.Failure(ProviderFailure.NetworkUnavailable)
+            }
+            assertEquals(MediaSearchCommandOutcome.FAILED, repository.loadMore("mixed", MediaSearchFilter.ALL))
+            assertEquals(first, repository.observeSearch("mixed", MediaSearchFilter.ALL).first())
+            searchSource.enqueue { _, request ->
+                assertEquals(ProviderMediaType.MANGA, request.type)
+                assertEquals("10", request.cursor?.value)
+                ProviderResult.Success(
+                    searchPage(
+                        searchMedia("manga/1", ProviderMediaType.MANGA),
+                        searchMedia("manga/2", ProviderMediaType.MANGA),
+                    ),
+                )
+            }
+            assertEquals(MediaSearchCommandOutcome.SUCCEEDED, repository.loadMore("mixed", MediaSearchFilter.ALL))
+            val final = checkNotNull(repository.observeSearch("mixed", MediaSearchFilter.ALL).first())
+            assertEquals(3, final.media.size)
+            assertEquals(first.media, final.media.take(2))
+            assertFalse(final.hasMore)
+            assertNull(repository.observeSearch("other", MediaSearchFilter.ALL).first())
+        }
+
+    private fun storedProvider(): StoredConnectedProvider =
+        if (provider == ProviderKey.ANILIST) StoredConnectedProvider.ANILIST else StoredConnectedProvider.MY_ANIME_LIST
+
     private fun selectAccount() =
         kotlinx.coroutines.runBlocking {
             database.selectedAccountDao().replaceSelectedAccount(
@@ -485,14 +542,14 @@ class DefaultMediaSearchRepositoryTest {
                     SelectedAccountEntity(
                         selectionKey = SELECTED_ACCOUNT_KEY,
                         accountId = accountId.value,
-                        connectedProvider = StoredConnectedProvider.ANILIST,
+                        connectedProvider = storedProvider(),
                         displayName = "Search Fixture",
                         avatarReference = null,
                     ),
                 providerId =
                     AccountProviderIdEntity(
                         accountId = accountId.value,
-                        provider = StoredConnectedProvider.ANILIST,
+                        provider = storedProvider(),
                         remoteAccountId = "remote-search-account",
                     ),
             )

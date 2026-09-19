@@ -40,6 +40,7 @@ internal class DiscoverViewModel(
     private var collection: List<CollectionEntry> = emptyList()
     private var inputGeneration = 0L
     private var requestGeneration = 0L
+    private var observationFailed = false
     private var observationJob: Job? = null
     private var searchJob: Job? = null
     private var loadMoreJob: Job? = null
@@ -80,6 +81,7 @@ internal class DiscoverViewModel(
         this.query = query
         this.filter = filter
         resultSnapshot = null
+        observationFailed = false
         mutableUiState.value =
             DiscoverUiState(
                 query = query,
@@ -95,6 +97,8 @@ internal class DiscoverViewModel(
         if (normalizedQuery.isEmpty()) return
         val observedInputGeneration = inputGeneration
         val observedFilter = filter.toDomain()
+        observationFailed = false
+        observationJob?.cancel()
         observationJob =
             viewModelScope.launch {
                 try {
@@ -103,6 +107,7 @@ internal class DiscoverViewModel(
                         .catch { failure ->
                             if (failure is CancellationException) throw failure
                             if (observedInputGeneration == inputGeneration) {
+                                observationFailed = true
                                 mutableUiState.update { state ->
                                     state.copy(isSearching = false, refreshFailed = true)
                                 }
@@ -151,6 +156,7 @@ internal class DiscoverViewModel(
         val observedInputGeneration = inputGeneration
         val observedFilter = filter.toDomain()
         val currentRequestGeneration = ++requestGeneration
+        if (observationFailed) observeSearch()
         searchJob?.cancel()
         loadMoreJob?.cancel()
         mutableUiState.update { state ->
@@ -181,7 +187,7 @@ internal class DiscoverViewModel(
                 mutableUiState.update { state ->
                     state.copy(
                         isSearching = false,
-                        refreshFailed = outcome == MediaSearchCommandOutcome.FAILED,
+                        refreshFailed = observationFailed || outcome == MediaSearchCommandOutcome.FAILED,
                     )
                 }
             }

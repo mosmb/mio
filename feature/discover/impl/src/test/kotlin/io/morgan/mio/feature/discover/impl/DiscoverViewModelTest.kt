@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -133,11 +134,37 @@ class DiscoverViewModelTest {
             }
         }
 
+    @Test
+    fun retryRestartsFailedCacheObservation() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repository = FakeMediaSearchRepository().apply { failNextObservation = true }
+            val viewModel = DiscoverViewModel(AccountId("discover-account"), repository, EmptyCollectionRepository)
+            val store = ViewModelStore().also { it.put("discover", viewModel) }
+            try {
+                viewModel.onAction(DiscoverAction.QueryChanged("cached"))
+                advanceTimeBy(300)
+                runCurrent()
+                assertTrue(viewModel.uiState.value.refreshFailed)
+                repository.observations.getValue("cached" to MediaSearchFilter.ALL).value =
+                    MediaSearchResults(emptyList(), false)
+                viewModel.onAction(DiscoverAction.Retry)
+                runCurrent()
+                assertTrue(viewModel.uiState.value.hasObservedResults)
+                assertFalse(viewModel.uiState.value.refreshFailed)
+                assertFalse(viewModel.uiState.value.isSearching)
+            } finally {
+                store.clear()
+                Dispatchers.resetMain()
+            }
+        }
+
     private class FakeMediaSearchRepository : MediaSearchRepository {
         val refreshCalls = mutableListOf<Pair<String, MediaSearchFilter>>()
         var refreshBehavior: suspend (String, MediaSearchFilter) -> MediaSearchCommandOutcome = { _, _ ->
             MediaSearchCommandOutcome.SUCCEEDED
         }
+        var failNextObservation = false
         var loadMoreCalls = 0
         val observations =
             mutableMapOf<Pair<String, MediaSearchFilter>, MutableStateFlow<MediaSearchResults?>>()
@@ -145,7 +172,14 @@ class DiscoverViewModelTest {
         override fun observeSearch(
             query: String,
             filter: MediaSearchFilter,
-        ): Flow<MediaSearchResults?> = observations.getOrPut(query to filter) { MutableStateFlow(null) }
+        ): Flow<MediaSearchResults?> {
+            val cached = observations.getOrPut(query to filter) { MutableStateFlow(null) }
+            if (failNextObservation) {
+                failNextObservation = false
+                return flow { throw IllegalStateException("Cache unavailable") }
+            }
+            return cached
+        }
 
         override suspend fun refreshSearch(
             query: String,
