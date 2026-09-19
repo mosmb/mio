@@ -26,6 +26,20 @@ import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitNumber
 import io.morgan.mio.domain.model.UnitTotal
+import io.morgan.mio.domain.preferences.AccountPreferences
+import io.morgan.mio.domain.preferences.AppearancePreference
+import io.morgan.mio.domain.preferences.DevicePreferences
+import io.morgan.mio.domain.preferences.MotionPreference
+import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
+import io.morgan.mio.domain.progress.ProgressAction
+import io.morgan.mio.domain.progress.ProgressChange
+import io.morgan.mio.domain.progress.ProgressRepository
+import io.morgan.mio.domain.progress.ProgressSnapshot
+import io.morgan.mio.domain.progress.ProgressUndo
+import io.morgan.mio.domain.progress.ProgressWriteResult
+import io.morgan.mio.domain.progress.StepProgressUseCase
+import io.morgan.mio.domain.progress.UndoProgressUseCase
 import io.morgan.mio.domain.queue.ObserveReadyMediaIdsUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +47,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -44,7 +59,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import io.morgan.mio.domain.preferences.LibraryMediaFilter as DomainLibraryMediaFilter
+import io.morgan.mio.domain.preferences.LibraryStatusFilter as DomainLibraryStatusFilter
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModelTest {
@@ -105,6 +123,20 @@ class LibraryViewModelTest {
                     viewModel.uiState.value.rows
                         .map(LibraryRowUiModel::mediaId),
                 )
+                viewModel.onAction(LibraryAction.QueryChanged("  MANGA-CURRENT  "))
+                assertEquals(
+                    listOf("manga-current"),
+                    viewModel.uiState.value.rows
+                        .map(LibraryRowUiModel::mediaId),
+                )
+                viewModel.onAction(LibraryAction.QueryChanged("ready"))
+                assertTrue(viewModel.uiState.value.isSearchEmpty)
+                viewModel.onAction(LibraryAction.QueryChanged(""))
+                assertEquals(
+                    listOf("manga-current"),
+                    viewModel.uiState.value.rows
+                        .map(LibraryRowUiModel::mediaId),
+                )
 
                 viewModel.onAction(LibraryAction.SelectStatusFilter(LibraryStatusFilter.ALL))
                 assertEquals(3, viewModel.uiState.value.rows.size)
@@ -149,6 +181,211 @@ class LibraryViewModelTest {
                 )
                 viewModel.onAction(LibraryAction.SelectStatusFilter(LibraryStatusFilter.READY))
                 assertTrue(viewModel.uiState.value.isFilteredEmpty)
+            } finally {
+                store.clear()
+                runCurrent()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun savedFiltersRestoreButReadyAndNewSelectionsWinOverDelayedPreferences() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val animeReady = entry("anime-ready", "account-1", CollectionStatus.CURRENT)
+            val mangaCurrent = entry("manga-current", "account-1", CollectionStatus.CURRENT)
+            val animeCompleted = entry("anime-completed", "account-1", CollectionStatus.COMPLETED)
+            collection.entries.value = listOf(animeReady, mangaCurrent, animeCompleted)
+            media.media("anime-ready").value = media("anime-ready", MediaType.ANIME)
+            media.media("manga-current").value = media("manga-current", MediaType.MANGA)
+            media.media("anime-completed").value = media("anime-completed", MediaType.ANIME)
+            media.releases("anime-ready").value = listOf(release("anime-ready", 2, ReleaseTime.Trusted(now)))
+            val saved =
+                TestPreferencesRepository(
+                    AccountPreferences(
+                        AccountId("account-1"),
+                        DomainLibraryMediaFilter.ANIME,
+                        DomainLibraryStatusFilter.COMPLETED,
+                    ),
+                )
+            val (savedStore, restored) = viewModel(collection, media, preferences = saved)
+            val (readyStore, ready) = viewModel(collection, media, initialReady = true, preferences = saved)
+            val (changedStore, changed) = viewModel(collection, media, preferences = saved)
+            changed.onAction(LibraryAction.SelectMediaFilter(LibraryMediaFilter.MANGA))
+            changed.onAction(LibraryAction.SelectStatusFilter(LibraryStatusFilter.ALL))
+
+            try {
+                runCurrent()
+                assertEquals(LibraryMediaFilter.ANIME, restored.uiState.value.mediaFilter)
+                assertEquals(LibraryStatusFilter.COMPLETED, restored.uiState.value.statusFilter)
+                assertEquals(
+                    listOf("anime-completed"),
+                    restored.uiState.value.rows
+                        .map(LibraryRowUiModel::mediaId),
+                )
+                assertEquals(LibraryMediaFilter.ANIME, ready.uiState.value.mediaFilter)
+                assertEquals(LibraryStatusFilter.READY, ready.uiState.value.statusFilter)
+                assertEquals(
+                    listOf("anime-ready"),
+                    ready.uiState.value.rows
+                        .map(LibraryRowUiModel::mediaId),
+                )
+                assertEquals(LibraryMediaFilter.MANGA, changed.uiState.value.mediaFilter)
+                assertEquals(LibraryStatusFilter.ALL, changed.uiState.value.statusFilter)
+                assertEquals(
+                    listOf("manga-current"),
+                    changed.uiState.value.rows
+                        .map(LibraryRowUiModel::mediaId),
+                )
+            } finally {
+                savedStore.clear()
+                readyStore.clear()
+                changedStore.clear()
+                runCurrent()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun finalStepKeepsCompletedRowForUndoAndRecoverableFailureRetriesTheSameAction() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val finalUnit = entry("final-unit", "account-1", CollectionStatus.CURRENT, progress = 1, total = 2)
+            collection.entries.value = listOf(finalUnit)
+            media.media("final-unit").value = media("final-unit", MediaType.ANIME)
+            val progress = MutableTestProgressRepository(collection, now).apply { failNextCommit = true }
+            val (store, viewModel) = viewModel(collection, media, progress = progress)
+
+            try {
+                runCurrent()
+                val initial =
+                    viewModel.uiState.value.rows
+                        .single()
+                assertTrue(initial.controls?.increaseEnabled == true)
+                viewModel.onAction(LibraryAction.Step("final-unit", LibraryProgressDirection.INCREASE, 6_000))
+                runCurrent()
+                assertTrue(
+                    viewModel.uiState.value.progressError
+                        ?.retryable == true,
+                )
+                val firstActionId = progress.commitActionIds.single()
+
+                viewModel.onAction(LibraryAction.RetryProgress)
+                runCurrent()
+                assertEquals(listOf(firstActionId, firstActionId), progress.commitActionIds)
+                assertEquals(
+                    CollectionStatus.COMPLETED,
+                    collection.entries.value
+                        .single()
+                        .status,
+                )
+                assertEquals(
+                    2,
+                    viewModel.uiState.value.rows
+                        .single()
+                        .progress,
+                )
+                val undo = requireNotNull(viewModel.uiState.value.latestUndo)
+
+                viewModel.onAction(LibraryAction.Undo(undo.groupId))
+                runCurrent()
+                assertEquals(
+                    CollectionStatus.CURRENT,
+                    collection.entries.value
+                        .single()
+                        .status,
+                )
+                assertEquals(
+                    1,
+                    viewModel.uiState.value.rows
+                        .single()
+                        .progress,
+                )
+                assertEquals(null, viewModel.uiState.value.latestUndo)
+            } finally {
+                store.clear()
+                runCurrent()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun explicitSearchAndFiltersOverrideUndoRowProtectionWithoutLosingUndo() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            collection.entries.value = listOf(entry("anime", "account-1", CollectionStatus.CURRENT))
+            media.media("anime").value = media("anime", MediaType.ANIME)
+            val progress = MutableTestProgressRepository(collection, now)
+            val (store, viewModel) = viewModel(collection, media, progress = progress)
+            try {
+                runCurrent()
+                viewModel.onAction(LibraryAction.Step("anime", LibraryProgressDirection.INCREASE, 6_000))
+                runCurrent()
+                val undo = requireNotNull(viewModel.uiState.value.latestUndo)
+
+                viewModel.onAction(LibraryAction.QueryChanged("no match"))
+                assertTrue(viewModel.uiState.value.isSearchEmpty)
+                assertEquals(undo, viewModel.uiState.value.latestUndo)
+                viewModel.onAction(LibraryAction.QueryChanged(""))
+                assertEquals(1, viewModel.uiState.value.rows.size)
+                viewModel.onAction(LibraryAction.SelectMediaFilter(LibraryMediaFilter.MANGA))
+                assertTrue(viewModel.uiState.value.isFilteredEmpty)
+                viewModel.onAction(LibraryAction.SelectMediaFilter(LibraryMediaFilter.ALL))
+                viewModel.onAction(LibraryAction.SelectStatusFilter(LibraryStatusFilter.COMPLETED))
+                assertTrue(viewModel.uiState.value.isFilteredEmpty)
+                viewModel.onAction(LibraryAction.Undo(undo.groupId))
+                runCurrent()
+                assertTrue(
+                    viewModel.uiState.value.rows
+                        .isEmpty(),
+                )
+                assertEquals(
+                    1,
+                    collection.entries.value
+                        .single()
+                        .progress.value,
+                )
+            } finally {
+                store.clear()
+                runCurrent()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun pressedRowKeepsItsPositionDuringRefreshAndReordersAfterRelease() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val collection = TestCollectionRepository()
+            val media = TestMediaRepository()
+            val first = entry("first", "account-1", CollectionStatus.CURRENT)
+            val second = entry("second", "account-1", CollectionStatus.CURRENT, updatedAt = 1)
+            collection.entries.value = listOf(first, second)
+            media.media("first").value = media("first", MediaType.ANIME)
+            media.media("second").value = media("second", MediaType.ANIME)
+            val (store, viewModel) = viewModel(collection, media)
+            try {
+                runCurrent()
+                viewModel.onAction(LibraryAction.InteractionChanged("second", true))
+                collection.entries.value = listOf(first, second.copy(updatedAt = now + 1.seconds))
+                runCurrent()
+                assertEquals(
+                    listOf("first", "second"),
+                    viewModel.uiState.value.rows
+                        .map { it.mediaId },
+                )
+                viewModel.onAction(LibraryAction.InteractionChanged("second", false))
+                assertEquals(
+                    listOf("second", "first"),
+                    viewModel.uiState.value.rows
+                        .map { it.mediaId },
+                )
             } finally {
                 store.clear()
                 runCurrent()
@@ -257,6 +494,8 @@ class LibraryViewModelTest {
         media: TestMediaRepository,
         accountId: String = "account-1",
         initialReady: Boolean = false,
+        preferences: PreferencesRepository = TestPreferencesRepository(),
+        progress: ProgressRepository = TestProgressRepository(),
     ): Pair<ViewModelStore, LibraryViewModel> {
         val store = ViewModelStore()
         val viewModel =
@@ -265,6 +504,10 @@ class LibraryViewModelTest {
                 collectionRepository = collection,
                 mediaRepository = media,
                 observeReadyMediaIds = ObserveReadyMediaIdsUseCase(collection, media, fixedClock()),
+                preferencesRepository = preferences,
+                stepProgress = StepProgressUseCase(progress, fixedClock()),
+                undoProgress = UndoProgressUseCase(progress, fixedClock()),
+                observeUndoUseCase = ObserveProgressUndoUseCase(progress, fixedClock()),
                 initialReady = initialReady,
             )
         store.put("library", viewModel)
@@ -277,15 +520,17 @@ class LibraryViewModelTest {
         status: CollectionStatus,
         progressUnit: ProgressUnit = ProgressUnit.EPISODE,
         updatedAt: Int = 0,
+        progress: Int = 1,
+        total: Int? = 12,
     ): CollectionEntry =
         CollectionEntry(
             id = CollectionEntryId("entry-$mediaId"),
             accountId = AccountId(accountId),
             mediaId = MediaId(mediaId),
             status = status,
-            progress = ProgressValue(1),
+            progress = ProgressValue(progress),
             progressUnit = progressUnit,
-            total = UnitTotal(12),
+            total = total?.let(::UnitTotal),
             updatedAt = now - kotlin.time.Duration.parse("${updatedAt}h"),
         )
 
@@ -322,6 +567,144 @@ class LibraryViewModelTest {
         object : Clock {
             override fun now(): Instant = now
         }
+}
+
+private class TestPreferencesRepository(
+    initial: AccountPreferences? = null,
+) : PreferencesRepository {
+    private val accounts = MutableStateFlow(initial?.let { mapOf(it.accountId to it) }.orEmpty())
+
+    override fun observeDevicePreferences(): Flow<DevicePreferences> = flowOf(DevicePreferences.Default)
+
+    override fun observeAccountPreferences(accountId: AccountId): Flow<AccountPreferences> =
+        accounts.map { it[accountId] ?: AccountPreferences.default(accountId) }
+
+    override suspend fun setAppearance(preference: AppearancePreference) = Unit
+
+    override suspend fun setMotion(preference: MotionPreference) = Unit
+
+    override suspend fun setHapticsEnabled(enabled: Boolean) = Unit
+
+    override suspend fun setLibraryMediaFilter(
+        accountId: AccountId,
+        filter: DomainLibraryMediaFilter,
+    ) {
+        val current = accounts.value[accountId] ?: AccountPreferences.default(accountId)
+        accounts.value = accounts.value + (accountId to current.copy(libraryMediaFilter = filter))
+    }
+
+    override suspend fun setLibraryStatusFilter(
+        accountId: AccountId,
+        filter: DomainLibraryStatusFilter,
+    ) {
+        val current = accounts.value[accountId] ?: AccountPreferences.default(accountId)
+        accounts.value = accounts.value + (accountId to current.copy(libraryStatusFilter = filter))
+    }
+}
+
+private class TestProgressRepository : ProgressRepository {
+    override suspend fun readSnapshot(mediaId: MediaId): ProgressSnapshot? = null
+
+    override suspend fun findAction(actionId: OperationGroupId): ProgressAction? = null
+
+    override fun observeLatestAction(): Flow<ProgressAction?> = flowOf(null)
+
+    override suspend fun readLatestAction(): ProgressAction? = null
+
+    override suspend fun commit(change: ProgressChange): ProgressWriteResult =
+        ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(change: ProgressUndo): ProgressWriteResult =
+        ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.UNDO_UNAVAILABLE)
+}
+
+private class MutableTestProgressRepository(
+    private val collection: TestCollectionRepository,
+    private val now: Instant,
+) : ProgressRepository {
+    private val latestAction = MutableStateFlow<ProgressAction?>(null)
+    private val revisions = mutableMapOf<MediaId, Long>()
+    var failNextCommit: Boolean = false
+    val commitActionIds = mutableListOf<OperationGroupId>()
+
+    override suspend fun readSnapshot(mediaId: MediaId): ProgressSnapshot? =
+        collection.entries.value
+            .firstOrNull { it.mediaId == mediaId }
+            ?.let { ProgressSnapshot(it, revisions[mediaId] ?: 0L) }
+
+    override suspend fun findAction(actionId: OperationGroupId): ProgressAction? =
+        latestAction.value?.takeIf { it.id == actionId }
+
+    override fun observeLatestAction(): Flow<ProgressAction?> = latestAction
+
+    override suspend fun readLatestAction(): ProgressAction? = latestAction.value
+
+    override suspend fun commit(change: ProgressChange): ProgressWriteResult {
+        commitActionIds += change.actionId
+        if (failNextCommit) {
+            failNextCommit = false
+            throw IOException("temporary local write failure")
+        }
+        val before = change.before.entry
+        val afterRevision = change.before.revision + 1
+        val afterUpdatedAt = before.updatedAt + 1.seconds
+        val action =
+            ProgressAction(
+                id = change.actionId,
+                order = afterRevision,
+                accountId = before.accountId,
+                entryId = before.id,
+                mediaId = before.mediaId,
+                direction = change.direction,
+                unit = before.progressUnit,
+                beforeProgress = before.progress,
+                afterProgress = change.targetProgress,
+                beforeStatus = before.status,
+                afterStatus = change.targetStatus,
+                beforeUpdatedAt = before.updatedAt,
+                afterUpdatedAt = afterUpdatedAt,
+                afterRevision = afterRevision,
+                createdAt = now,
+                undoUntil = now + change.undoWindow,
+                undoneAt = null,
+            )
+        revisions[before.mediaId] = afterRevision
+        collection.entries.value =
+            collection.entries.value.map { entry ->
+                if (entry.mediaId == before.mediaId) {
+                    entry.copy(
+                        progress = change.targetProgress,
+                        status = change.targetStatus,
+                        updatedAt = afterUpdatedAt,
+                    )
+                } else {
+                    entry
+                }
+            }
+        latestAction.value = action
+        return ProgressWriteResult.Committed(action)
+    }
+
+    override suspend fun undo(change: ProgressUndo): ProgressWriteResult {
+        val action = change.action
+        val afterRevision = change.current.revision + 1
+        revisions[action.mediaId] = afterRevision
+        collection.entries.value =
+            collection.entries.value.map { entry ->
+                if (entry.mediaId == action.mediaId) {
+                    entry.copy(
+                        progress = action.beforeProgress,
+                        status = action.beforeStatus,
+                        updatedAt = change.requestedAt,
+                    )
+                } else {
+                    entry
+                }
+            }
+        val undone = action.copy(undoneAt = change.requestedAt)
+        latestAction.value = undone
+        return ProgressWriteResult.Committed(undone)
+    }
 }
 
 private class TestCollectionRepository : CollectionRepository {

@@ -10,6 +10,23 @@ internal data class LibraryRowUiModel(
     val progress: Int,
     val progressUnit: LibraryProgressUnit,
     val total: Int?,
+    val controls: LibraryProgressControlsUiModel?,
+)
+
+internal data class LibraryProgressControlsUiModel(
+    val decreaseEnabled: Boolean,
+    val increaseEnabled: Boolean,
+)
+
+internal data class LibraryUndoUiModel(
+    val groupId: String,
+    val mediaId: String,
+    val progress: Int,
+    val unit: LibraryProgressUnit,
+)
+
+internal data class LibraryProgressErrorUiModel(
+    val retryable: Boolean,
 )
 
 internal enum class LibraryRowMediaType {
