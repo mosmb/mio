@@ -30,6 +30,8 @@ public class DataStorePreferencesLocalDataSource(
                 accountId = accountId.value,
                 libraryMediaFilter =
                     preferences[PreferencesKeys.accountLibraryMediaFilter(accountId.value)] ?: "all",
+                libraryStatusFilter =
+                    preferences[PreferencesKeys.accountLibraryStatusFilter(accountId.value)] ?: "current",
             )
         }
 
@@ -54,9 +56,19 @@ public class DataStorePreferencesLocalDataSource(
         }
     }
 
+    public suspend fun setLibraryStatusFilter(
+        accountId: AccountId,
+        value: String,
+    ) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.accountLibraryStatusFilter(accountId.value)] = value
+        }
+    }
+
     public suspend fun clearAccountPreferences(accountId: AccountId) {
         dataStore.edit { preferences ->
             preferences.remove(PreferencesKeys.accountLibraryMediaFilter(accountId.value))
+            preferences.remove(PreferencesKeys.accountLibraryStatusFilter(accountId.value))
         }
     }
 }

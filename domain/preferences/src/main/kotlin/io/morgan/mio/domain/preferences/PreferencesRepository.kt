@@ -18,4 +18,9 @@ public interface PreferencesRepository {
         accountId: AccountId,
         filter: LibraryMediaFilter,
     )
+
+    public suspend fun setLibraryStatusFilter(
+        accountId: AccountId,
+        filter: LibraryStatusFilter,
+    )
 }

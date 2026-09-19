@@ -11,6 +11,7 @@ import io.morgan.mio.domain.preferences.AccountPreferences
 import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
+import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
 import io.morgan.mio.domain.progress.ProgressActivityRepository
@@ -147,6 +148,11 @@ class YouViewModelTest {
         override suspend fun setLibraryMediaFilter(
             accountId: AccountId,
             filter: LibraryMediaFilter,
+        ) = Unit
+
+        override suspend fun setLibraryStatusFilter(
+            accountId: AccountId,
+            filter: LibraryStatusFilter,
         ) = Unit
 
         override fun observeState() = source("recovery", SyncRecoveryState(null, emptyList()))

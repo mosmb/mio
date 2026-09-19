@@ -158,7 +158,11 @@ class RepositoryFakesTest {
                 fake.observeDevicePreferences().first(),
             )
             assertEquals(
-                AccountPreferences(accountId, LibraryMediaFilter.MANGA),
+                AccountPreferences(
+                    accountId,
+                    LibraryMediaFilter.MANGA,
+                    io.morgan.mio.domain.preferences.LibraryStatusFilter.CURRENT,
+                ),
                 fake.observeAccountPreferences(accountId).first(),
             )
             assertEquals(

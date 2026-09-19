@@ -17,6 +17,9 @@ class PreferencesTest {
             ),
             DevicePreferences.Default,
         )
-        assertEquals(AccountPreferences.default(accountId), AccountPreferences(accountId, LibraryMediaFilter.ALL))
+        assertEquals(
+            AccountPreferences.default(accountId),
+            AccountPreferences(accountId, LibraryMediaFilter.ALL, LibraryStatusFilter.CURRENT),
+        )
     }
 }

@@ -5,6 +5,7 @@ import io.morgan.mio.domain.preferences.AccountPreferences
 import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
+import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +56,18 @@ public class FakePreferencesRepository : PreferencesRepository {
                 accounts =
                     current.accounts +
                         (accountId to accountPreferences.copy(libraryMediaFilter = filter)),
+            )
+        }
+    }
+
+    override suspend fun setLibraryStatusFilter(
+        accountId: AccountId,
+        filter: LibraryStatusFilter,
+    ) {
+        state.update { current ->
+            val accountPreferences = current.accounts[accountId] ?: AccountPreferences.default(accountId)
+            current.copy(
+                accounts = current.accounts + (accountId to accountPreferences.copy(libraryStatusFilter = filter)),
             )
         }
     }

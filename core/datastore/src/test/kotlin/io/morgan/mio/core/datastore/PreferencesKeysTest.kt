@@ -14,12 +14,19 @@ class PreferencesKeysTest {
             "account.account-1.library_media_filter",
             PreferencesKeys.accountLibraryMediaFilter("account-1").name,
         )
+        assertEquals(
+            "account.account-1.library_status_filter",
+            PreferencesKeys.accountLibraryStatusFilter("account-1").name,
+        )
     }
 
     @Test
     fun dynamicKeysRejectBlankAccountIds() {
         assertThrows(IllegalArgumentException::class.java) {
             PreferencesKeys.accountLibraryMediaFilter(" ")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            PreferencesKeys.accountLibraryStatusFilter(" ")
         }
     }
 }

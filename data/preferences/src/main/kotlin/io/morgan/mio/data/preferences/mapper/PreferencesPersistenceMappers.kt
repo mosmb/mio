@@ -7,6 +7,7 @@ import io.morgan.mio.domain.preferences.AccountPreferences
 import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
+import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 
 internal fun DevicePreferencesRecord.toDomain(): DevicePreferences =
@@ -20,6 +21,7 @@ internal fun AccountPreferencesRecord.toDomain(): AccountPreferences =
     AccountPreferences(
         accountId = AccountId(accountId),
         libraryMediaFilter = libraryMediaFilter.toDomainLibraryMediaFilter(),
+        libraryStatusFilter = libraryStatusFilter.toDomainLibraryStatusFilter(),
     )
 
 internal fun AppearancePreference.toStoredValue(): String =
@@ -40,6 +42,18 @@ internal fun LibraryMediaFilter.toStoredValue(): String =
         LibraryMediaFilter.ALL -> "all"
         LibraryMediaFilter.ANIME -> "anime"
         LibraryMediaFilter.MANGA -> "manga"
+    }
+
+internal fun LibraryStatusFilter.toStoredValue(): String =
+    when (this) {
+        LibraryStatusFilter.ALL -> "all"
+        LibraryStatusFilter.READY -> "ready"
+        LibraryStatusFilter.CURRENT -> "current"
+        LibraryStatusFilter.PLANNED -> "planned"
+        LibraryStatusFilter.PAUSED -> "paused"
+        LibraryStatusFilter.COMPLETED -> "completed"
+        LibraryStatusFilter.DROPPED -> "dropped"
+        LibraryStatusFilter.REPEATING -> "repeating"
     }
 
 private fun String.toDomainAppearance(): AppearancePreference =
@@ -63,4 +77,17 @@ private fun String.toDomainLibraryMediaFilter(): LibraryMediaFilter =
         "anime" -> LibraryMediaFilter.ANIME
         "manga" -> LibraryMediaFilter.MANGA
         else -> LibraryMediaFilter.ALL
+    }
+
+private fun String.toDomainLibraryStatusFilter(): LibraryStatusFilter =
+    when (this) {
+        "all" -> LibraryStatusFilter.ALL
+        "ready" -> LibraryStatusFilter.READY
+        "current" -> LibraryStatusFilter.CURRENT
+        "planned" -> LibraryStatusFilter.PLANNED
+        "paused" -> LibraryStatusFilter.PAUSED
+        "completed" -> LibraryStatusFilter.COMPLETED
+        "dropped" -> LibraryStatusFilter.DROPPED
+        "repeating" -> LibraryStatusFilter.REPEATING
+        else -> LibraryStatusFilter.CURRENT
     }

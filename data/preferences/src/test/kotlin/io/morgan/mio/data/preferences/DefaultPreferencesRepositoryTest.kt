@@ -9,6 +9,7 @@ import io.morgan.mio.domain.preferences.AccountPreferences
 import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
+import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -45,13 +46,14 @@ class DefaultPreferencesRepositoryTest {
             repository.setMotion(MotionPreference.REDUCED)
             repository.setHapticsEnabled(false)
             repository.setLibraryMediaFilter(accountOne, LibraryMediaFilter.MANGA)
+            repository.setLibraryStatusFilter(accountOne, LibraryStatusFilter.COMPLETED)
 
             assertEquals(
                 DevicePreferences(AppearancePreference.DARK, MotionPreference.REDUCED, false),
                 repository.observeDevicePreferences().first(),
             )
             assertEquals(
-                AccountPreferences(accountOne, LibraryMediaFilter.MANGA),
+                AccountPreferences(accountOne, LibraryMediaFilter.MANGA, LibraryStatusFilter.COMPLETED),
                 repository.observeAccountPreferences(accountOne).first(),
             )
             assertEquals(
@@ -69,11 +71,12 @@ class DefaultPreferencesRepositoryTest {
             val accountId = AccountId("account-1")
 
             firstRepository.setLibraryMediaFilter(accountId, LibraryMediaFilter.ANIME)
+            firstRepository.setLibraryStatusFilter(accountId, LibraryStatusFilter.PAUSED)
 
             val reconstructedRepository =
                 DefaultPreferencesRepository(DataStorePreferencesLocalDataSource(dataStore))
             assertEquals(
-                AccountPreferences(accountId, LibraryMediaFilter.ANIME),
+                AccountPreferences(accountId, LibraryMediaFilter.ANIME, LibraryStatusFilter.PAUSED),
                 reconstructedRepository.observeAccountPreferences(accountId).first(),
             )
         }
@@ -86,6 +89,7 @@ class DefaultPreferencesRepositoryTest {
                 preferences[PreferencesKeys.deviceAppearance] = "old-value"
                 preferences[PreferencesKeys.deviceMotion] = "future-value"
                 preferences[PreferencesKeys.accountLibraryMediaFilter("account-1")] = "bad-value"
+                preferences[PreferencesKeys.accountLibraryStatusFilter("account-1")] = "future-value"
             }
             val repository =
                 DefaultPreferencesRepository(DataStorePreferencesLocalDataSource(dataStore))
@@ -107,6 +111,7 @@ class DefaultPreferencesRepositoryTest {
 
             repository.setAppearance(AppearancePreference.LIGHT)
             repository.setLibraryMediaFilter(accountId, LibraryMediaFilter.MANGA)
+            repository.setLibraryStatusFilter(accountId, LibraryStatusFilter.DROPPED)
             local.clearAccountPreferences(accountId)
 
             assertEquals(

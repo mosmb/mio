@@ -12,6 +12,7 @@ import io.morgan.mio.domain.preferences.AccountPreferences
 import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
+import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
@@ -46,5 +47,12 @@ public class DefaultPreferencesRepository(
         filter: LibraryMediaFilter,
     ) {
         localDataSource.setLibraryMediaFilter(accountId, filter.toStoredValue())
+    }
+
+    override suspend fun setLibraryStatusFilter(
+        accountId: AccountId,
+        filter: LibraryStatusFilter,
+    ) {
+        localDataSource.setLibraryStatusFilter(accountId, filter.toStoredValue())
     }
 }
