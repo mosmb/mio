@@ -18,8 +18,10 @@ import io.morgan.mio.core.database.model.StoredPendingOperationKind
 import io.morgan.mio.core.database.model.StoredPendingOperationState
 import io.morgan.mio.core.database.model.StoredProgressUnit
 import io.morgan.mio.data.sync.local.RoomSyncLocalDataSource
+import io.morgan.mio.data.sync.local.RoomSyncRecoveryLocalDataSource
 import io.morgan.mio.data.sync.mapper.toSyncEntryState
 import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.sync.ProjectSyncEntryUseCase
 import io.morgan.mio.domain.sync.SyncCommitResult
 import io.morgan.mio.domain.sync.SyncIssueKind
@@ -74,6 +76,52 @@ class DefaultSyncRepositoryTest {
                 now + 120.seconds,
             ),
         )
+
+    @Test
+    fun conflictPublishesFetchedProviderValueWithoutChangingEffectiveProgress() =
+        runTest {
+            insertGroup("conflict", 1, "entry-one", "operation")
+            val owner = lease()
+            val candidate = checkNotNull(local.claimNext(owner, now))
+            val before = checkNotNull(database.syncDao().getEntry("entry-one"))
+            val remote =
+                before.toSyncEntryState().copy(
+                    progress = ProgressValue(8),
+                    updatedAt = now + 1.seconds,
+                )
+            assertEquals(
+                SyncCommitResult.Applied,
+                local.recordFailure(owner, candidate, SyncIssueKind.CONFLICT, null, remote),
+            )
+            val recovery = RoomSyncRecoveryLocalDataSource(database)
+            val observed =
+                recovery
+                    .observeState(owner.accountId)
+                    .first()
+                    .entryIssues
+                    .single()
+            val read = checkNotNull(recovery.readIssue(owner.accountId, candidate.operation.id))
+            assertEquals(8, observed.remote?.progress?.value)
+            assertEquals(observed, read)
+            assertEquals(before.toSyncEntryState(), read.local)
+            assertEquals(8, database.syncDao().getEntry("entry-one")?.remoteProgress)
+        }
+
+    @Test
+    fun staleConflictSnapshotDoesNotReplaceNewerCachedProviderValue() =
+        runTest {
+            insertGroup("conflict", 1, "entry-one", "operation")
+            val owner = lease()
+            val candidate = checkNotNull(local.claimNext(owner, now))
+            val before = checkNotNull(database.syncDao().getEntry("entry-one"))
+            val remote =
+                before.toSyncEntryState().copy(
+                    progress = ProgressValue(8),
+                    updatedAt = before.remoteUpdatedAtUtcMs - 1.seconds,
+                )
+            local.recordFailure(owner, candidate, SyncIssueKind.CONFLICT, null, remote)
+            assertEquals(before, database.syncDao().getEntry("entry-one"))
+        }
 
     @Test
     fun leaseAcquisitionAndRenewalTolerateRoomMillisecondPrecision() =

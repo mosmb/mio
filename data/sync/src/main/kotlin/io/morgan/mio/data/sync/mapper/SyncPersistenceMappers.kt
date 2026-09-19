@@ -124,6 +124,7 @@ internal fun SyncIssueEntity.toDomain(
                 ),
         remote =
             latestRemote
+                ?.takeIf { remote -> remoteUpdatedAtUtcMs?.let { remote.updatedAt >= it } != false }
                 ?: remoteProgress?.let { progress ->
                     io.morgan.mio.domain.sync.SyncEntryState(
                         accountId = AccountId(accountId),

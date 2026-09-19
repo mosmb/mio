@@ -32,7 +32,7 @@
     <string name="you_sync_rejected_title">An update wasn’t accepted</string>
     <string name="you_sync_rejected_message">Retry this update after checking your provider connection.</string>
     <string name="you_sync_conflict_title">Choose which progress is correct</string>
-    <string name="you_sync_conflict_message">On this device: %1$d %2$s. On your provider: %3$d %4$s.</string>
+    <string name="you_sync_conflict_message">On this device: %2$s %1$d. On your provider: %4$s %3$d.</string>
     <string name="you_sync_conflict_unavailable_message">A provider update changed this progress. Review both values before syncing again.</string>
     <string name="you_sync_retry_exhausted_title">An update needs another try</string>
     <string name="you_sync_retry_exhausted_message">Retry this update when you’re ready.</string>

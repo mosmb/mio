@@ -132,7 +132,7 @@ public class RoomSyncRecoveryLocalDataSource(
                     latestRemote = entry.toRemoteSyncEntryState(),
                 )
             if (currentIssue != issue) return@recoveryTransaction false
-            if (entry.toSyncEntryState() != issue.local || entry.toRemoteSyncEntryState() != issueRemote) {
+            if (entry.toSyncEntryState() != issue.local) {
                 return@recoveryTransaction false
             }
             val isStatus = issue.base is OperationValue.Status && issue.target is OperationValue.Status
@@ -301,10 +301,12 @@ public class RoomSyncRecoveryLocalDataSource(
                     entryId = entry.collectionEntryId,
                     accountId = accountId.value,
                     mediaId = entry.mediaId,
-                    remoteStatus = entry.remoteStatus,
-                    remoteProgress = entry.remoteProgress,
-                    remoteTotal = entry.remoteTotal,
-                    remoteUpdatedAtUtcMs = entry.remoteUpdatedAtUtcMs,
+                    remoteStatus =
+                        io.morgan.mio.core.database.model.StoredCollectionStatus
+                            .valueOf(issueRemote.status.name),
+                    remoteProgress = issueRemote.progress.value,
+                    remoteTotal = issueRemote.total?.value,
+                    remoteUpdatedAtUtcMs = issueRemote.updatedAt,
                     effectiveStatus =
                         io.morgan.mio.core.database.model.StoredCollectionStatus.valueOf(
                             effective.status.name,

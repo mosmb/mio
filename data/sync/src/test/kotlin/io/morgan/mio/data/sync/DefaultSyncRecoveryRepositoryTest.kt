@@ -27,6 +27,7 @@ import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.sync.ProgressConflictChoice
 import io.morgan.mio.domain.sync.ResolveProgressConflictUseCase
 import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -447,6 +448,42 @@ class DefaultSyncRecoveryRepositoryTest {
                     .single()
                     .dependsOnOperationId,
             )
+        }
+
+    @Test
+    fun persistedConflictUsesItsNewerProviderSnapshotBeforeAnyRefresh() =
+        runTest {
+            seedProgressConflict()
+            val entry = checkNotNull(database.syncDao().getEntry(ENTRY_ID))
+            database.collectionEntryDao().upsertEntries(
+                listOf(entry.copy(remoteProgress = 6, remoteUpdatedAtUtcMs = NOW - 1.seconds)),
+            )
+            val repository = repository()
+            val issue = checkNotNull(repository.readIssue(OperationId(OPERATION_ID)))
+            assertEquals(7, issue.remote?.progress?.value)
+            assertEquals(
+                issue,
+                repository
+                    .observeState()
+                    .first()
+                    .entryIssues
+                    .single(),
+            )
+            assertTrue(
+                ResolveProgressConflictUseCase(repository, RecoveryClock(NOW + 1.seconds))(
+                    issue,
+                    ProgressConflictChoice.USE_PROVIDER,
+                    OperationGroupId("old-conflict-provider"),
+                ),
+            )
+            val resolved = checkNotNull(database.syncDao().getEntry(ENTRY_ID))
+            assertEquals(7, resolved.remoteProgress)
+            assertEquals(7, resolved.effectiveProgress)
+            assertEquals(
+                StoredPendingOperationState.DELIVERED,
+                database.syncDao().getOperation("old-conflict-provider:progress")?.lifecycleState,
+            )
+            assertNull(database.syncDao().getIssue(ACCOUNT_ID.value, ISSUE_ID))
         }
 
     @Test

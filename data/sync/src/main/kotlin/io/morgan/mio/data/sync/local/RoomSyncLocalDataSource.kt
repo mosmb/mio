@@ -299,6 +299,25 @@ public class RoomSyncLocalDataSource(
                         retryNotBeforeUtcMs = retryAt.takeUnless { hasCompensation },
                     ) == 1,
                 )
+                // Recovery observes the entry's remote snapshot. Publish the fetched conflict
+                // value in the same transaction as the issue, preserving all local intent.
+                if (kind == SyncIssueKind.CONFLICT && remote != null) {
+                    require(remote.accountId == lease.accountId)
+                    require(remote.entryId.value == row.collectionEntryId)
+                    require(remote.unit.toStoredUnit() == row.progressUnit)
+                    if (remote.updatedAt >= row.remoteUpdatedAtUtcMs) {
+                        database.collectionEntryDao().upsertEntries(
+                            listOf(
+                                row.copy(
+                                    remoteStatus = remote.status.toStoredStatus(),
+                                    remoteProgress = remote.progress.value,
+                                    remoteTotal = remote.total?.value,
+                                    remoteUpdatedAtUtcMs = remote.updatedAt,
+                                ),
+                            ),
+                        )
+                    }
+                }
                 if (kind != null) {
                     val operation =
                         operationEntity.toDomain(
