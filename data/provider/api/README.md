@@ -19,7 +19,7 @@ Provider-specific evidence must be added by tasks 13 and 14 before either provid
 | Activity/favorites | no task-05 contract | unsupported and omitted | later slice | later slice |
 | Discovery/mutations | no task-05 contract | unsupported and omitted | later slice | later slice |
 
-`REPEATING` was added to the canonical `Collection status` set by task 13, with repository-owner approval recorded in `docs/tasks/13-connect-anilist-initial-import.md` section 0, to represent AniList's `MediaListStatus.REPEATING` (rewatching/rereading) honestly rather than collapsing it into `CURRENT`. Today eligibility, Library filter chips, and queue-eligibility rules do not yet surface it; that product decision belongs to tasks 17, 18, and 26.
+`REPEATING` was added to the canonical `Collection status` set by task 13, with repository-owner approval recorded in historical Task 13 section 0 (available in Git history; completed tickets are removed from the active backlog), to represent AniList's `MediaListStatus.REPEATING` (rewatching/rereading) honestly rather than collapsing it into `CURRENT`. Today eligibility, Library filter chips, and queue-eligibility rules do not yet surface it; that product decision belongs to tasks 17, 18, and 26.
 
 The contract rules are:
 
@@ -33,7 +33,7 @@ Neither provider is claimed to support an optional field until its provider task
 
 ## AniList mapping evidence
 
-Verified 2026-08-19 against `https://docs.anilist.co` and the live AniList GraphQL schema at `https://graphql.anilist.co` (introspection of `MediaListStatus`, `MediaFormat`, `MediaStatus`, `MediaListSort`, `Page.mediaList` arguments, and `Media.airingSchedule` arguments; a representative `MioMediaListPage` query was submitted and returned a schema-valid response). All enum constant names and query argument shapes matched `docs/tasks/13-connect-anilist-initial-import.md` section 5.3/5.10 exactly; no plan revision was required.
+Verified 2026-08-19 against `https://docs.anilist.co` and the live AniList GraphQL schema at `https://graphql.anilist.co` (introspection of `MediaListStatus`, `MediaFormat`, `MediaStatus`, `MediaListSort`, `Page.mediaList` arguments, and `Media.airingSchedule` arguments; a representative `MioMediaListPage` query was submitted and returned a schema-valid response). All enum constant names and query argument shapes matched historical Task 13 sections 5.3/5.10 exactly (available in Git history); no plan revision was required.
 
 | AniList field | Normalization rule | Absence behavior |
 |---|---|---|
