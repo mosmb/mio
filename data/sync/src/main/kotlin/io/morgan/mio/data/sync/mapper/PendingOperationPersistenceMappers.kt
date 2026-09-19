@@ -37,6 +37,12 @@ internal fun PendingOperation.toPendingOperationEntity(): PendingOperationEntity
         } else {
             null
         }
+    val membershipValues =
+        if (baseValue is OperationValue.Membership && targetValue is OperationValue.Membership) {
+            baseValue.present to targetValue.present
+        } else {
+            null
+        }
 
     return PendingOperationEntity(
         operationId = id.value,
@@ -49,6 +55,8 @@ internal fun PendingOperation.toPendingOperationEntity(): PendingOperationEntity
         targetProgress = progressValues?.second,
         baseStatus = statusValues?.first,
         targetStatus = statusValues?.second,
+        basePresent = membershipValues?.first,
+        targetPresent = membershipValues?.second,
         lifecycleState = state.toStoredPendingOperationState(),
         attemptCount = attemptCount,
         lastAttemptAtUtcMs = lastAttemptAt,
@@ -72,6 +80,8 @@ private fun PendingOperationKind.toStoredPendingOperationKind(): StoredPendingOp
         PendingOperationKind.SET_PROGRESS_CORRECTION -> StoredPendingOperationKind.SET_PROGRESS_CORRECTION
         PendingOperationKind.SET_STATUS -> StoredPendingOperationKind.SET_STATUS
         PendingOperationKind.SET_STATUS_CORRECTION -> StoredPendingOperationKind.SET_STATUS_CORRECTION
+        PendingOperationKind.CREATE_ENTRY -> StoredPendingOperationKind.CREATE_ENTRY
+        PendingOperationKind.REMOVE_ENTRY -> StoredPendingOperationKind.REMOVE_ENTRY
     }
 
 private fun PendingOperationState.toStoredPendingOperationState(): StoredPendingOperationState =

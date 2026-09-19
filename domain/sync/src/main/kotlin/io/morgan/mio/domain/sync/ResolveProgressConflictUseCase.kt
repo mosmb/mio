@@ -17,6 +17,66 @@ public class ResolveProgressConflictUseCase(
         val issue = repository.readIssue(expectedIssue.operationId) ?: return false
         if (issue != expectedIssue || !issue.isProgressConflict()) return false
         val remote = requireNotNull(issue.remote)
+        if (issue.base is OperationValue.Membership) {
+            val operations = mutableListOf<PendingOperation>()
+
+            fun add(
+                kind: PendingOperationKind,
+                base: OperationValue,
+                target: OperationValue,
+            ) {
+                operations +=
+                    PendingOperation(
+                        OperationId("${groupId.value}:${operations.size}"),
+                        groupId,
+                        issue.accountId,
+                        issue.entryId,
+                        kind,
+                        base,
+                        target,
+                        operations.size,
+                        operations.mapTo(linkedSetOf()) { it.id },
+                    )
+            }
+            if (choice == ProgressConflictChoice.KEEP_DEVICE && issue.localPresent) {
+                if (remote.progress != issue.local.progress) {
+                    add(
+                        PendingOperationKind.SET_PROGRESS_CORRECTION,
+                        OperationValue.Progress(remote.progress),
+                        OperationValue.Progress(issue.local.progress),
+                    )
+                }
+                if (remote.status != issue.local.status) {
+                    add(
+                        PendingOperationKind.SET_STATUS_CORRECTION,
+                        OperationValue.Status(remote.status),
+                        OperationValue.Status(issue.local.status),
+                    )
+                }
+            } else if (choice == ProgressConflictChoice.KEEP_DEVICE) {
+                add(
+                    PendingOperationKind.REMOVE_ENTRY,
+                    OperationValue.Membership(true),
+                    OperationValue.Membership(false),
+                )
+            }
+            if (operations.isEmpty()) {
+                add(
+                    PendingOperationKind.CREATE_ENTRY,
+                    OperationValue.Membership(false),
+                    OperationValue.Membership(true),
+                )
+            }
+            return repository.resolveConflict(
+                issue,
+                PendingOperationGroup(
+                    groupId,
+                    issue.accountId,
+                    clock.now().let { Instant.fromEpochMilliseconds(it.toEpochMilliseconds()) },
+                    operations,
+                ),
+            )
+        }
         val localValue: OperationValue =
             if (issue.base is OperationValue.Status) {
                 OperationValue.Status(issue.local.status)
@@ -98,6 +158,7 @@ public class ResolveProgressConflictUseCase(
             local.unit == remote.unit &&
             (
                 (base is OperationValue.Progress && target is OperationValue.Progress) ||
-                    (base is OperationValue.Status && target is OperationValue.Status)
+                    (base is OperationValue.Status && target is OperationValue.Status) ||
+                    (base is OperationValue.Membership && target is OperationValue.Membership)
             )
 }

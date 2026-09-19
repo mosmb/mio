@@ -66,6 +66,38 @@ class DefaultSyncRecoveryRepositoryTest {
     }
 
     @Test
+    fun membershipConflictCanRestoreHiddenEntryFromProviderWithoutRemoteWrite() =
+        runTest {
+            seedProgressConflict()
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE pending_operation SET kind = 'remove_entry', base_progress = NULL, target_progress = NULL, base_present = 1, target_present = 0",
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE sync_issue SET base_progress = NULL, target_progress = NULL, base_present = 1, target_present = 0",
+            )
+            database.collectionEntryDao().upsertEntries(
+                listOf(checkNotNull(database.syncDao().getEntry(ENTRY_ID)).copy(effectivePresent = false)),
+            )
+            val repo = repository()
+            val captured = checkNotNull(repo.readIssue(OperationId(OPERATION_ID)))
+            assertTrue(
+                ResolveProgressConflictUseCase(repo, RecoveryClock(NOW + 1.seconds))(
+                    captured,
+                    ProgressConflictChoice.USE_PROVIDER,
+                    OperationGroupId("membership-resolution"),
+                ),
+            )
+            val restored = checkNotNull(database.syncDao().getEntry(ENTRY_ID))
+            assertTrue(restored.effectivePresent)
+            assertEquals(7, restored.effectiveProgress)
+            assertNull(database.syncDao().getIssue(ACCOUNT_ID.value, ISSUE_ID))
+            assertEquals(
+                StoredPendingOperationState.DELIVERED,
+                database.syncDao().getOperation("membership-resolution:0")?.lifecycleState,
+            )
+        }
+
+    @Test
     fun doubleRetryRearmsOnce() =
         runTest {
             seedOperationAndIssue()

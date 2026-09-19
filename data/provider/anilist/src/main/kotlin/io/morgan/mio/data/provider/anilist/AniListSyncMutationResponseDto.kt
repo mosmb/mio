@@ -11,6 +11,12 @@ internal data class AniListSyncMutationResponseDto(
     @Serializable
     internal data class Data(
         @SerialName("SaveMediaListEntry") val mediaList: Entry? = null,
+        @SerialName("DeleteMediaListEntry") val deleteResult: DeleteResult? = null,
+    )
+
+    @Serializable
+    internal data class DeleteResult(
+        val deleted: Boolean? = null,
     )
 
     @Serializable

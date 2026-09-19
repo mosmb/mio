@@ -29,6 +29,9 @@ public class ReconcilePendingOperationUseCase {
                     else -> SyncReconciliationDecision.Conflict
                 }
             }
+
+            PendingOperationKind.CREATE_ENTRY -> SyncReconciliationDecision.Satisfied
+            PendingOperationKind.REMOVE_ENTRY -> SyncReconciliationDecision.Rejected
         }
     }
 
@@ -93,14 +96,13 @@ public class ReconcilePendingOperationUseCase {
                 else -> SyncReconciliationDecision.Conflict
             }
         }
-        if (!candidate.isAutomaticCompletion ||
-            base != CollectionStatus.CURRENT ||
-            target != CollectionStatus.COMPLETED
-        ) {
-            return SyncReconciliationDecision.Rejected
+        if (candidate.isAutomaticCompletion) {
+            if (base != CollectionStatus.CURRENT || target != CollectionStatus.COMPLETED) {
+                return SyncReconciliationDecision.Rejected
+            }
+            val total = remote.total
+            if (total != null && remote.progress.value < total.value) return SyncReconciliationDecision.Conflict
         }
-        val total = remote.total
-        if (total != null && remote.progress.value < total.value) return SyncReconciliationDecision.Conflict
         if (remote.status == target) return SyncReconciliationDecision.Satisfied
         return if (remote.status == base) {
             SyncReconciliationDecision.Write(OperationValue.Status(target))

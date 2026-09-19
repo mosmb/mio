@@ -18,6 +18,53 @@ internal class MyAnimeListSyncDataSource(
 ) : ProviderSyncDataSource {
     override val provider: ProviderKey = ProviderKey.MY_ANIME_LIST
 
+    override suspend fun findEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+    ): ProviderResult<ProviderCollectionEntry?> {
+        require(credentials.provider == provider)
+        val entryId = ProviderCollectionEntryId(mediaId.value)
+        val match = parseId(entryId) ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        return try {
+            val response =
+                if (match.kind == Kind.ANIME) {
+                    service.syncAnimeDetails(
+                        match.id,
+                        authorization(credentials),
+                        MyAnimeListRequestParameters.SYNC_ANIME_FIELDS,
+                    )
+                } else {
+                    service.syncMangaDetails(
+                        match.id,
+                        authorization(credentials),
+                        MyAnimeListRequestParameters.SYNC_MANGA_FIELDS,
+                    )
+                }
+            if (!response.isSuccessful) {
+                return ProviderResult.Failure(
+                    MyAnimeListFailureMapper.mapSyncHttpStatus(response.code(), response.headers()["Retry-After"]),
+                )
+            }
+            val body = response.body() ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+            if (body.id != match.id) return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+            if (body.myListStatus == null) {
+                ProviderResult.Success(null)
+            } else {
+                MyAnimeListSyncEntryMapper.map(accountId, entryId, mediaId, unit, body)
+            }
+        } catch (
+            cancellation: CancellationException,
+        ) {
+            throw cancellation
+        } catch (
+            throwable: Throwable,
+        ) {
+            ProviderResult.Failure(MyAnimeListFailureMapper.mapThrowable(throwable))
+        }
+    }
+
     override suspend fun readEntry(
         credentials: ProviderCredentials,
         accountId: ProviderAccountId,
@@ -146,6 +193,95 @@ internal class MyAnimeListSyncDataSource(
                 ProviderResult.Failure(failure)
             } else {
                 readEntry(credentials, accountId, entryId, mediaId, unit)
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            ProviderResult.Failure(MyAnimeListFailureMapper.mapThrowable(throwable))
+        }
+    }
+
+    override suspend fun createEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+        status: ProviderCollectionStatus,
+        progress: Int,
+    ): ProviderResult<ProviderCollectionEntry> {
+        require(progress >= 0)
+        val match =
+            parseId(ProviderCollectionEntryId(mediaId.value))
+                ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        val wireStatus =
+            status.toWireValue(match.kind)
+                ?: return ProviderResult.Failure(ProviderFailure.MutationRejected)
+        return try {
+            val response =
+                if (match.kind == Kind.ANIME) {
+                    if (unit != ProviderProgressUnit.EPISODE) {
+                        return ProviderResult.Failure(ProviderFailure.MutationRejected)
+                    }
+                    service.updateAnimeListStatus(
+                        id = match.id,
+                        authorization = authorization(credentials),
+                        status = wireStatus,
+                        numWatchedEpisodes = progress,
+                    )
+                } else {
+                    when (unit) {
+                        ProviderProgressUnit.CHAPTER ->
+                            service.updateMangaListStatus(
+                                id = match.id,
+                                authorization = authorization(credentials),
+                                status = wireStatus,
+                                numChaptersRead = progress,
+                            )
+                        ProviderProgressUnit.VOLUME ->
+                            service.updateMangaListStatus(
+                                id = match.id,
+                                authorization = authorization(credentials),
+                                status = wireStatus,
+                                numVolumesRead = progress,
+                            )
+                        ProviderProgressUnit.EPISODE ->
+                            return ProviderResult.Failure(ProviderFailure.MutationRejected)
+                    }
+                }
+            val failure = mapMutationResponse(response)
+            if (failure != null) {
+                ProviderResult.Failure(failure)
+            } else {
+                readEntry(credentials, accountId, ProviderCollectionEntryId(mediaId.value), mediaId, unit)
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            ProviderResult.Failure(MyAnimeListFailureMapper.mapThrowable(throwable))
+        }
+    }
+
+    override suspend fun removeEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        entryId: ProviderCollectionEntryId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+    ): ProviderResult<Unit> {
+        val match = parseId(entryId) ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        return try {
+            val response =
+                if (match.kind == Kind.ANIME) {
+                    service.deleteAnimeListStatus(match.id, authorization(credentials))
+                } else {
+                    service.deleteMangaListStatus(match.id, authorization(credentials))
+                }
+            if (response.isSuccessful || response.code() == 404) {
+                ProviderResult.Success(Unit)
+            } else {
+                ProviderResult.Failure(
+                    MyAnimeListFailureMapper.mapSyncHttpStatus(response.code(), response.headers()["Retry-After"]),
+                )
             }
         } catch (cancellation: CancellationException) {
             throw cancellation

@@ -15,6 +15,7 @@ import io.morgan.mio.data.provider.api.ProviderProgressUnit
 import io.morgan.mio.domain.collection.CollectionStatus
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.CollectionEntryId
+import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.model.ProgressUnit
@@ -46,8 +47,8 @@ internal fun PendingOperationEntity.toDomain(dependencies: Set<OperationId>): Pe
         accountId = AccountId(accountId),
         collectionEntryId = CollectionEntryId(collectionEntryId),
         kind = kind.toDomainKind(),
-        base = operationValue(baseProgress, baseStatus),
-        target = operationValue(targetProgress, targetStatus),
+        base = operationValue(kind, baseProgress, baseStatus, basePresent),
+        target = operationValue(kind, targetProgress, targetStatus, targetPresent),
         positionInGroup = positionInGroup,
         dependsOn = dependencies,
         state = lifecycleState.toDomainState(),
@@ -101,6 +102,8 @@ internal fun SyncLeaseEntity.toDomain(): SyncLease = SyncLease(AccountId(account
 internal fun SyncIssueEntity.toDomain(
     current: SyncEntryState? = null,
     latestRemote: SyncEntryState? = null,
+    mediaId: MediaId? = null,
+    localPresent: Boolean = true,
 ): SyncIssue =
     SyncIssue(
         accountId = AccountId(accountId),
@@ -108,8 +111,20 @@ internal fun SyncIssueEntity.toDomain(
         groupId = OperationGroupId(operationGroupId),
         operationId = OperationId(operationId),
         kind = kind.toDomainIssueKind(),
-        base = operationValue(baseProgress, baseStatus),
-        target = operationValue(targetProgress, targetStatus),
+        base =
+            operationValue(
+                kind = null,
+                progress = baseProgress,
+                status = baseStatus,
+                present = basePresent,
+            ),
+        target =
+            operationValue(
+                kind = null,
+                progress = targetProgress,
+                status = targetStatus,
+                present = targetPresent,
+            ),
         local =
             current
                 ?: io.morgan.mio.domain.sync.SyncEntryState(
@@ -138,13 +153,19 @@ internal fun SyncIssueEntity.toDomain(
                     )
                 },
         detectedAt = detectedAtUtcMs,
+        mediaId = mediaId,
+        localPresent = localPresent,
     )
 
 private fun operationValue(
+    kind: StoredPendingOperationKind?,
     progress: Int?,
     status: StoredCollectionStatus?,
+    present: Boolean?,
 ): OperationValue =
     when {
+        present != null ->
+            OperationValue.Membership(present)
         progress != null && status == null -> OperationValue.Progress(ProgressValue(progress))
         progress == null && status != null -> OperationValue.Status(status.toDomainStatus())
         else -> error("Pending operation field pair is invalid")
@@ -156,6 +177,8 @@ private fun StoredPendingOperationKind.toDomainKind(): PendingOperationKind =
         StoredPendingOperationKind.SET_PROGRESS_CORRECTION -> PendingOperationKind.SET_PROGRESS_CORRECTION
         StoredPendingOperationKind.SET_STATUS -> PendingOperationKind.SET_STATUS
         StoredPendingOperationKind.SET_STATUS_CORRECTION -> PendingOperationKind.SET_STATUS_CORRECTION
+        StoredPendingOperationKind.CREATE_ENTRY -> PendingOperationKind.CREATE_ENTRY
+        StoredPendingOperationKind.REMOVE_ENTRY -> PendingOperationKind.REMOVE_ENTRY
     }
 
 private fun StoredPendingOperationState.toDomainState(): PendingOperationState =

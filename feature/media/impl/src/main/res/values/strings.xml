@@ -84,4 +84,15 @@
     <string name="media_detail_sync_chapters">chapters</string>
     <string name="media_detail_sync_volumes">volumes</string>
     <string name="media_detail_edit_progress">Edit exact progress</string>
+    <string name="media_detail_add_to_library">Add to library</string>
+    <string name="media_detail_change_status">Change status</string>
+    <string name="media_detail_status_sheet_title">Choose a status</string>
+    <string name="media_detail_collection_watching">Watching</string>
+    <string name="media_detail_collection_reading">Reading</string>
+    <string name="media_detail_collection_plan_to_watch">Plan to watch</string>
+    <string name="media_detail_collection_plan_to_read">Plan to read</string>
+    <string name="media_detail_collection_rewatching">Rewatching</string>
+    <string name="media_detail_collection_rereading">Rereading</string>
+    <string name="media_detail_added_to_library">Added to library</string>
+    <string name="media_detail_saved_status">Saved status: %1$s</string>
 </resources>

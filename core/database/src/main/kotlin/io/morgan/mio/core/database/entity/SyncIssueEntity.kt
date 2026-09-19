@@ -53,6 +53,10 @@ public data class SyncIssueEntity(
     public val targetProgress: Int?,
     @ColumnInfo(name = "target_status")
     public val targetStatus: StoredCollectionStatus?,
+    @ColumnInfo(name = "base_present", defaultValue = "NULL")
+    public val basePresent: Boolean? = null,
+    @ColumnInfo(name = "target_present", defaultValue = "NULL")
+    public val targetPresent: Boolean? = null,
     @ColumnInfo(name = "progress_unit")
     public val progressUnit: StoredProgressUnit,
     @ColumnInfo(name = "local_progress")
@@ -94,7 +98,19 @@ public data class SyncIssueEntity(
         require(remoteTotal == null || remoteProgress == null || remoteProgress <= remoteTotal)
         require((baseProgress == null) == (targetProgress == null))
         require((baseStatus == null) == (targetStatus == null))
-        require((baseProgress == null) xor (baseStatus == null))
+        require(
+            if (basePresent != null || targetPresent != null) {
+                basePresent != null &&
+                    targetPresent != null &&
+                    basePresent != targetPresent &&
+                    baseProgress == null &&
+                    targetProgress == null &&
+                    baseStatus == null &&
+                    targetStatus == null
+            } else {
+                (baseProgress == null) xor (baseStatus == null)
+            },
+        )
         require((remoteProgress == null) == (remoteStatus == null))
         require((remoteProgress == null) == (remoteUpdatedAtUtcMs == null))
     }

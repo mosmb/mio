@@ -102,6 +102,25 @@ public class SynchronizeAccountUseCase(
                             continue
                         }
 
+                        if (
+                            candidate.operation.kind == PendingOperationKind.CREATE_ENTRY ||
+                            candidate.operation.kind == PendingOperationKind.REMOVE_ENTRY
+                        ) {
+                            val written =
+                                withLeaseTimeout(activeLease.get()) {
+                                    repository.writeRemote(candidate, candidate.operation.target)
+                                } ?: SyncRemoteResult.Transient()
+                            handleRemoteResult(
+                                lease = activeLease.get(),
+                                candidate = candidate,
+                                result = written,
+                                retryAt = { value -> earliestRetryAt = earlierOf(earliestRetryAt, value) },
+                                leaseLost = leaseLost,
+                                accountGone = accountGone,
+                            )
+                            continue
+                        }
+
                         val remote =
                             withLeaseTimeout(activeLease.get()) { repository.readRemote(candidate) }
                                 ?: SyncRemoteResult.Transient()
@@ -232,6 +251,7 @@ public class SynchronizeAccountUseCase(
                     repository.recordFailure(lease, candidate, SyncIssueKind.REJECTED, null, result.remote)
                 is SyncRemoteResult.Conflict ->
                     repository.recordFailure(lease, candidate, SyncIssueKind.CONFLICT, null, result.remote)
+                SyncRemoteResult.Removed -> repository.commitRemoval(lease, candidate)
                 SyncRemoteResult.InvalidData ->
                     repository.recordFailure(lease, candidate, SyncIssueKind.INVALID_REMOTE_DATA, null, null)
             }

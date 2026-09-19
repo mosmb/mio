@@ -37,6 +37,11 @@ public interface SyncRepository {
         settledOperationIds: Set<OperationId>,
     ): SyncCommitResult
 
+    public suspend fun commitRemoval(
+        lease: SyncLease,
+        candidate: SyncCandidate,
+    ): SyncCommitResult = commitSnapshot(lease, listOf(candidate.current), setOf(candidate.operation.id))
+
     public suspend fun recordFailure(
         lease: SyncLease,
         candidate: SyncCandidate,

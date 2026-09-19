@@ -1,6 +1,7 @@
 package io.morgan.mio.data.provider.myanimelist
 
 import retrofit2.Response
+import retrofit2.http.DELETE
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
@@ -97,4 +98,16 @@ internal interface MyAnimeListApiService {
         @Field("num_chapters_read") numChaptersRead: Int? = null,
         @Field("num_volumes_read") numVolumesRead: Int? = null,
     ): Response<MyAnimeListSyncMutationResponseDto>
+
+    @DELETE("anime/{id}/my_list_status")
+    suspend fun deleteAnimeListStatus(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+    ): Response<Unit>
+
+    @DELETE("manga/{id}/my_list_status")
+    suspend fun deleteMangaListStatus(
+        @Path("id") id: Int,
+        @Header("Authorization") authorization: String,
+    ): Response<Unit>
 }

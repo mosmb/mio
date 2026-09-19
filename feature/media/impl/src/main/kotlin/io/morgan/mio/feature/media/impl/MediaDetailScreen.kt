@@ -370,7 +370,10 @@ private fun MediaDetailSections(
             onAction = onAction,
         )
         MediaDetailCollectionContext(
+            title = state.media.title,
             collection = state.collection,
+            mediaType = state.media.type,
+            writableStatuses = state.writableStatuses,
             onDecrease = {
                 onAction(
                     MediaDetailAction.Step(
@@ -390,6 +393,9 @@ private fun MediaDetailSections(
                 )
             },
             onEditProgress = onEditProgress,
+            onChangeStatus = { status ->
+                onAction(MediaDetailAction.ChangeStatus(status, timeoutMillis))
+            },
             onInteractionChanged = { pressed ->
                 onAction(MediaDetailAction.InteractionChanged(state.media.id, pressed))
             },
@@ -576,14 +582,52 @@ private fun MediaDetailSnackbar(
                 MioSnackbarMessage(
                     id = undo.groupId,
                     message =
-                        stringResource(
-                            when (undo.unit) {
-                                MediaDetailProgressUnit.EPISODE -> R.string.media_detail_saved_episode
-                                MediaDetailProgressUnit.CHAPTER -> R.string.media_detail_saved_chapter
-                                MediaDetailProgressUnit.VOLUME -> R.string.media_detail_saved_volume
-                            },
-                            undo.progress,
-                        ),
+                        if (undo.collectionAction) {
+                            if (undo.collectionKind == MediaDetailCollectionActionKind.ADD) {
+                                stringResource(R.string.media_detail_added_to_library)
+                            } else {
+                                stringResource(
+                                    R.string.media_detail_saved_status,
+                                    undo.status?.let { status ->
+                                        when (status) {
+                                            MediaDetailCollectionStatus.CURRENT ->
+                                                stringResource(
+                                                    R.string.media_detail_collection_current,
+                                                )
+                                            MediaDetailCollectionStatus.PLANNED ->
+                                                stringResource(
+                                                    R.string.media_detail_collection_planned,
+                                                )
+                                            MediaDetailCollectionStatus.PAUSED ->
+                                                stringResource(
+                                                    R.string.media_detail_collection_paused,
+                                                )
+                                            MediaDetailCollectionStatus.COMPLETED ->
+                                                stringResource(
+                                                    R.string.media_detail_collection_completed,
+                                                )
+                                            MediaDetailCollectionStatus.DROPPED ->
+                                                stringResource(
+                                                    R.string.media_detail_collection_dropped,
+                                                )
+                                            MediaDetailCollectionStatus.REPEATING ->
+                                                stringResource(
+                                                    R.string.media_detail_collection_repeating,
+                                                )
+                                        }
+                                    } ?: "",
+                                )
+                            }
+                        } else {
+                            stringResource(
+                                when (undo.unit) {
+                                    MediaDetailProgressUnit.EPISODE -> R.string.media_detail_saved_episode
+                                    MediaDetailProgressUnit.CHAPTER -> R.string.media_detail_saved_chapter
+                                    MediaDetailProgressUnit.VOLUME -> R.string.media_detail_saved_volume
+                                },
+                                undo.progress,
+                            )
+                        },
                     actionLabel = stringResource(R.string.media_detail_undo),
                 )
             else -> null

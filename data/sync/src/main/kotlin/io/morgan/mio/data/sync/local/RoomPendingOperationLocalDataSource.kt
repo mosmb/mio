@@ -200,11 +200,6 @@ public class RoomPendingOperationLocalDataSource(
         decision: io.morgan.mio.domain.sync.SyncUndoDecision.Compensate,
     ): PendingOperationGroup {
         val originalOperations = operations.sortedBy { operation -> operation.positionInGroup }
-        val progress =
-            originalOperations.firstOrNull { operation ->
-                operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.SET_PROGRESS_FORWARD ||
-                    operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.SET_PROGRESS_CORRECTION
-            } ?: return requested
         val activeDependencies =
             decision.waitForMemberIds
                 .mapTo(linkedSetOf()) { operationId ->
@@ -212,27 +207,61 @@ public class RoomPendingOperationLocalDataSource(
                         .OperationId(operationId.value)
                 }
         val progressId = OperationGroupId("${id.value}:undo")
+        val progress =
+            originalOperations.firstOrNull { operation ->
+                operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.SET_PROGRESS_FORWARD ||
+                    operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.SET_PROGRESS_CORRECTION
+            }
+        val membership =
+            originalOperations.firstOrNull { operation ->
+                operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.CREATE_ENTRY ||
+                    operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.REMOVE_ENTRY
+            }
+        val inverseMembership =
+            membership?.let {
+                io.morgan.mio.domain.sync.PendingOperation(
+                    id =
+                        io.morgan.mio.domain.model
+                            .OperationId("${id.value}:undo:membership"),
+                    groupId = progressId,
+                    accountId = accountId,
+                    collectionEntryId = it.collectionEntryId,
+                    kind =
+                        if (it.kind == io.morgan.mio.domain.sync.PendingOperationKind.CREATE_ENTRY) {
+                            io.morgan.mio.domain.sync.PendingOperationKind.REMOVE_ENTRY
+                        } else {
+                            io.morgan.mio.domain.sync.PendingOperationKind.CREATE_ENTRY
+                        },
+                    base = it.target,
+                    target = it.base,
+                    positionInGroup = 0,
+                    dependsOn = activeDependencies,
+                )
+            }
         val inverseProgress =
-            io.morgan.mio.domain.sync.PendingOperation(
-                id =
-                    io.morgan.mio.domain.model
-                        .OperationId("${id.value}:undo:progress"),
-                groupId = progressId,
-                accountId = accountId,
-                collectionEntryId = progress.collectionEntryId,
-                kind = io.morgan.mio.domain.sync.PendingOperationKind.SET_PROGRESS_CORRECTION,
-                base = progress.target,
-                target = progress.base,
-                positionInGroup = 0,
-                dependsOn = activeDependencies,
-            )
+            progress?.let {
+                io.morgan.mio.domain.sync.PendingOperation(
+                    id =
+                        io.morgan.mio.domain.model
+                            .OperationId("${id.value}:undo:progress"),
+                    groupId = progressId,
+                    accountId = accountId,
+                    collectionEntryId = it.collectionEntryId,
+                    kind = io.morgan.mio.domain.sync.PendingOperationKind.SET_PROGRESS_CORRECTION,
+                    base = it.target,
+                    target = it.base,
+                    positionInGroup = if (inverseMembership != null) 1 else 0,
+                    dependsOn = activeDependencies,
+                )
+            }
         val originalStatus =
             originalOperations.firstOrNull { operation ->
                 operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.SET_STATUS
             }
         val inverseOperations =
             buildList {
-                add(inverseProgress)
+                inverseMembership?.let(::add)
+                inverseProgress?.let(::add)
                 if (originalStatus != null) {
                     add(
                         io.morgan.mio.domain.sync.PendingOperation(
@@ -245,12 +274,16 @@ public class RoomPendingOperationLocalDataSource(
                             kind = io.morgan.mio.domain.sync.PendingOperationKind.SET_STATUS,
                             base = originalStatus.target,
                             target = originalStatus.base,
-                            positionInGroup = 1,
-                            dependsOn = activeDependencies + inverseProgress.id,
+                            positionInGroup =
+                                listOfNotNull(inverseMembership, inverseProgress).size,
+                            dependsOn =
+                                activeDependencies +
+                                    listOfNotNull(inverseMembership?.id, inverseProgress?.id),
                         ),
                     )
                 }
             }
+        if (inverseOperations.isEmpty()) return requested
         return PendingOperationGroup(
             id = progressId,
             accountId = accountId,

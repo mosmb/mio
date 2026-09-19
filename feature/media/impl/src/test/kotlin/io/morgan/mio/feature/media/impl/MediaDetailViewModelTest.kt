@@ -1,7 +1,11 @@
 package io.morgan.mio.feature.media.impl
 
+import io.morgan.mio.domain.collection.CollectionAction
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
+import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.collection.CollectionStatusChange
+import io.morgan.mio.domain.collection.CollectionWriteResult
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.media.Release
@@ -9,6 +13,7 @@ import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.OperationId
+import io.morgan.mio.domain.progress.ChangeCollectionStatusUseCase
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressChange
@@ -223,6 +228,7 @@ class MediaDetailViewModelTest {
             accountId = accountId,
             mediaRepository = repository,
             collectionRepository = TestCollectionRepository(),
+            changeCollectionStatus = ChangeCollectionStatusUseCase(TestCollectionRepository(), fixedClock()),
             syncRecoveryRepository = EmptySyncRecoveryRepository(),
             retrySyncIssue = RetrySyncIssueUseCase(EmptySyncRecoveryRepository()),
             stepProgress = StepProgressUseCase(progress, fixedClock()),
@@ -340,6 +346,28 @@ private class TestCollectionRepository : CollectionRepository {
         accountId: AccountId,
         mediaId: MediaId,
     ): Flow<CollectionEntry?> = entry
+
+    override suspend fun readEntryForMedia(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): CollectionEntry? = entry.value
+
+    override fun observeWritableStatuses(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): Flow<List<CollectionStatus>> = flowOf(CollectionStatus.entries.toList())
+
+    override suspend fun findAction(actionId: OperationGroupId): CollectionAction? = null
+
+    override fun observeLatestAction(): Flow<CollectionAction?> = flowOf(null)
+
+    override suspend fun readLatestAction(): CollectionAction? = null
+
+    override suspend fun commitStatus(change: CollectionStatusChange): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(actionId: OperationGroupId): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.UNDO_UNAVAILABLE)
 
     override suspend fun refreshCollection(accountId: AccountId): Unit = Unit
 }

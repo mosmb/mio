@@ -26,4 +26,6 @@ public sealed interface SyncRemoteResult {
     ) : SyncRemoteResult
 
     public data object InvalidData : SyncRemoteResult
+
+    public data object Removed : SyncRemoteResult
 }

@@ -20,6 +20,68 @@ class ResolveProgressConflictUseCaseTest {
     private val now = Instant.parse("2026-09-18T10:00:00Z")
 
     @Test
+    fun undoDuringCreateConflictKeepsTheLatestUntrackedIntent() =
+        runTest {
+            val conflict =
+                issue().copy(
+                    base = OperationValue.Membership(false),
+                    target = OperationValue.Membership(true),
+                    localPresent = false,
+                )
+            val repository = RecordingRepository(conflict)
+            assertTrue(
+                ResolveProgressConflictUseCase(
+                    repository,
+                    FixedClock(now),
+                )(conflict, ProgressConflictChoice.KEEP_DEVICE, OperationGroupId("keep-untracked")),
+            )
+            assertEquals(
+                PendingOperationKind.REMOVE_ENTRY,
+                repository.resolution
+                    ?.operations
+                    ?.single()
+                    ?.kind,
+            )
+        }
+
+    @Test
+    fun membershipConflictRequiresExplicitChoiceAndNeverRecreatesAnExistingEntry() =
+        runTest {
+            val conflict =
+                issue().copy(
+                    base = OperationValue.Membership(false),
+                    target = OperationValue.Membership(true),
+                )
+            val repository = RecordingRepository(conflict)
+            assertTrue(
+                ResolveProgressConflictUseCase(
+                    repository,
+                    FixedClock(now),
+                )(conflict, ProgressConflictChoice.KEEP_DEVICE, OperationGroupId("keep")),
+            )
+            assertEquals(
+                PendingOperationKind.SET_PROGRESS_CORRECTION,
+                repository.resolution
+                    ?.operations
+                    ?.single()
+                    ?.kind,
+            )
+            assertTrue(
+                ResolveProgressConflictUseCase(
+                    repository,
+                    FixedClock(now),
+                )(conflict, ProgressConflictChoice.USE_PROVIDER, OperationGroupId("accept")),
+            )
+            assertEquals(
+                OperationValue.Membership(true),
+                repository.resolution
+                    ?.operations
+                    ?.single()
+                    ?.target,
+            )
+        }
+
+    @Test
     fun bothExplicitChoicesCreateCorrectionOperationsFromTheCurrentSnapshot() =
         runTest {
             ProgressConflictChoice.entries.forEach { choice ->

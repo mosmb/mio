@@ -1,11 +1,14 @@
 package io.morgan.mio.feature.media.impl
 
 import android.text.Html
+import io.morgan.mio.domain.collection.CollectionAction
+import io.morgan.mio.domain.collection.CollectionActionKind
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionStatus
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.MediaFormat
 import io.morgan.mio.domain.media.MediaPublicationStatus
+import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.progress.ProgressAction
@@ -23,7 +26,8 @@ internal object MediaDetailUiMapper {
         media: Media,
         related: List<Media>,
         collection: CollectionEntry?,
-        latestUndo: ProgressAction? = null,
+        latestUndo: MediaDetailUndoUiModel? = null,
+        writableStatuses: List<CollectionStatus> = CollectionStatus.entries.toList(),
         progressError: MediaDetailProgressErrorUiModel? = null,
         syncIssues: List<MediaDetailUiState.SyncIssueUiModel> = emptyList(),
         accountIssue: MediaDetailUiState.AccountIssueUiModel? = null,
@@ -32,7 +36,8 @@ internal object MediaDetailUiMapper {
             media = media.toUiModel(),
             relatedTitles = related.map { item -> item.toRelatedUiModel() }.toList(),
             collection = collection?.toUiModel(),
-            latestUndo = latestUndo?.toUiModel(),
+            writableStatuses = writableStatuses.map { status -> status.toUiStatus() },
+            latestUndo = latestUndo,
             progressError = progressError,
             syncIssues = syncIssues,
             accountIssue = accountIssue,
@@ -41,17 +46,35 @@ internal object MediaDetailUiMapper {
     internal fun mapRecovery(
         recovery: SyncRecoveryState,
         collection: CollectionEntry?,
+        mediaId: MediaId,
         title: String,
     ): MediaDetailRecoveryUiModel =
         MediaDetailRecoveryUiModel(
             syncIssues =
                 recovery.entryIssues
-                    .filter { issue -> issue.entryId == collection?.id }
+                    .filter { issue -> issue.mediaId == mediaId || issue.entryId == collection?.id }
                     .map { issue -> issue.toUiModel(title) },
             accountIssue =
                 recovery.accountIssue?.let { issue ->
                     MediaDetailUiState.AccountIssueUiModel(issue.kind.toUiKind())
                 },
+        )
+
+    internal fun mapUndo(action: CollectionAction): MediaDetailUndoUiModel =
+        MediaDetailUndoUiModel(
+            groupId = action.id.value,
+            mediaId = action.mediaId.value,
+            progress = action.after.progress.value,
+            unit = action.after.progressUnit.toUiUnit(),
+            completed = action.after.status == CollectionStatus.COMPLETED,
+            collectionAction = true,
+            collectionKind =
+                if (action.kind == CollectionActionKind.ADD) {
+                    MediaDetailCollectionActionKind.ADD
+                } else {
+                    MediaDetailCollectionActionKind.STATUS
+                },
+            status = action.after.status.toUiStatus(),
         )
 
     internal fun mapSynopsis(value: String?): String? =

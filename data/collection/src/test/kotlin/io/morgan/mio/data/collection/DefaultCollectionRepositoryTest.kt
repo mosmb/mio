@@ -16,11 +16,15 @@ import io.morgan.mio.data.collection.RoomCollectionStatisticsLocalDataSource
 import io.morgan.mio.data.collection.local.RoomCollectionLocalDataSource
 import io.morgan.mio.data.collection.mapper.CollectionEntryPersistenceSnapshot
 import io.morgan.mio.data.collection.mapper.CollectionEntryProviderIdInput
+import io.morgan.mio.data.sync.DefaultPendingOperationWriter
+import io.morgan.mio.data.sync.local.RoomPendingOperationLocalDataSource
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.collection.CollectionStatusChange
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitTotal
@@ -34,13 +38,17 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
@@ -80,11 +88,71 @@ class DefaultCollectionRepositoryTest {
     }
 
     @Test
+    fun undoRejectsChangedRevisionAndReusedActionCannotChangePayload() =
+        runTest {
+            val writer = DefaultPendingOperationWriter(accountId, RoomPendingOperationLocalDataSource(database))
+            val id = OperationGroupId("review-add")
+            val result =
+                localDataSource.commitStatus(
+                    change(id),
+                    writer,
+                ) as io.morgan.mio.domain.collection.CollectionWriteResult.Committed
+            val before = checkNotNull(database.collectionEntryDao().getEntry(result.action.entryId.value))
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    before.copy(
+                        localProgressRevision =
+                            before.localProgressRevision + 1,
+                        effectiveProgress = 1,
+                    ),
+                ),
+            )
+            assertTrue(
+                localDataSource.undo(
+                    accountId,
+                    id,
+                    writer,
+                ) is io.morgan.mio.domain.collection.CollectionWriteResult.Rejected,
+            )
+            assertEquals(1, database.collectionEntryDao().getEntry(before.collectionEntryId)?.effectiveProgress)
+            assertNotNull(database.pendingOperationDao().getGroup(id.value))
+            assertTrue(
+                localDataSource.commitStatus(change(id).copy(targetStatus = CollectionStatus.PAUSED), writer)
+                    is io.morgan.mio.domain.collection.CollectionWriteResult.Rejected,
+            )
+        }
+
+    @Test
+    fun laterCollectionActionInvalidatesPreviousUndoEvenOnAnotherTitle() =
+        runTest {
+            val writer = DefaultPendingOperationWriter(accountId, RoomPendingOperationLocalDataSource(database))
+            val first = OperationGroupId("review-first")
+            val second = OperationGroupId("review-second")
+            localDataSource.commitStatus(change(first), writer)
+            localDataSource.commitStatus(change(second).copy(mediaId = mediaTwoId), writer)
+            assertTrue(
+                localDataSource.undo(
+                    accountId,
+                    first,
+                    writer,
+                ) is io.morgan.mio.domain.collection.CollectionWriteResult.Rejected,
+            )
+            assertNotNull(localDataSource.readEntryForMedia(accountId, mediaOneId))
+        }
+
+    @Test
     fun initialObservationIsEmptyAndRefreshIsSeparate() =
         runTest {
             var refreshedAccountId: AccountId? = null
             val repository =
                 DefaultCollectionRepository(
+                    accountId = accountId,
+                    pendingOperationWriter =
+                        io.morgan.mio.data.sync.DefaultPendingOperationWriter(
+                            accountId,
+                            io.morgan.mio.data.sync.local
+                                .RoomPendingOperationLocalDataSource(database),
+                        ),
                     localDataSource = localDataSource,
                     refreshRequester = CollectionRefreshRequester { refreshedAccountId = it },
                 )
@@ -102,6 +170,13 @@ class DefaultCollectionRepositoryTest {
             val entryTwo = entry("entry-2", mediaTwoId, progress = 2)
             val repository =
                 DefaultCollectionRepository(
+                    accountId = accountId,
+                    pendingOperationWriter =
+                        io.morgan.mio.data.sync.DefaultPendingOperationWriter(
+                            accountId,
+                            io.morgan.mio.data.sync.local
+                                .RoomPendingOperationLocalDataSource(database),
+                        ),
                     localDataSource = localDataSource,
                     refreshRequester = CollectionRefreshRequester {},
                 )
@@ -155,6 +230,13 @@ class DefaultCollectionRepositoryTest {
             )
             val repository =
                 DefaultCollectionRepository(
+                    accountId = accountId,
+                    pendingOperationWriter =
+                        io.morgan.mio.data.sync.DefaultPendingOperationWriter(
+                            accountId,
+                            io.morgan.mio.data.sync.local
+                                .RoomPendingOperationLocalDataSource(database),
+                        ),
                     localDataSource = localDataSource,
                     refreshRequester = CollectionRefreshRequester {},
                 )
@@ -193,6 +275,13 @@ class DefaultCollectionRepositoryTest {
             )
             val repository =
                 DefaultCollectionRepository(
+                    accountId = accountId,
+                    pendingOperationWriter =
+                        io.morgan.mio.data.sync.DefaultPendingOperationWriter(
+                            accountId,
+                            io.morgan.mio.data.sync.local
+                                .RoomPendingOperationLocalDataSource(database),
+                        ),
                     localDataSource = localDataSource,
                     refreshRequester = CollectionRefreshRequester {},
                 )
@@ -200,6 +289,198 @@ class DefaultCollectionRepositoryTest {
             assertEquals(
                 CollectionStatus.REPEATING,
                 repository.observeEntry(CollectionEntryId("entry-1")).first()?.status,
+            )
+        }
+
+    @Test
+    fun hiddenEntryReusesStableIdentityAndUndoCancelsCreationBeforeDelivery() =
+        runTest {
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    CollectionEntryEntity(
+                        collectionEntryId = "entry-hidden",
+                        accountId = accountId.value,
+                        mediaId = mediaOneId.value,
+                        progressUnit = StoredProgressUnit.EPISODE,
+                        remoteStatus = StoredCollectionStatus.CURRENT,
+                        remoteProgress = 0,
+                        remoteTotal = null,
+                        remoteUpdatedAtUtcMs = TIME,
+                        remotePresent = false,
+                        effectiveStatus = StoredCollectionStatus.CURRENT,
+                        effectiveProgress = 0,
+                        effectiveTotal = null,
+                        effectiveUpdatedAtUtcMs = TIME,
+                        effectivePresent = false,
+                    ),
+                ),
+            )
+            val writer = DefaultPendingOperationWriter(accountId, RoomPendingOperationLocalDataSource(database))
+            val firstAction = OperationGroupId("collection-add-1")
+            val firstResult =
+                localDataSource.commitStatus(
+                    change(firstAction),
+                    writer,
+                )
+            assertEquals(true, firstResult is io.morgan.mio.domain.collection.CollectionWriteResult.Committed)
+            assertEquals(
+                "entry-hidden",
+                database.collectionActivityDao().get(accountId.value, firstAction.value)?.collectionEntryId,
+            )
+            assertEquals(
+                io.morgan.mio.core.database.model.StoredPendingOperationKind.CREATE_ENTRY,
+                database
+                    .pendingOperationDao()
+                    .getOperationsForGroup(firstAction.value)
+                    .single()
+                    .kind,
+            )
+            assertEquals(
+                "entry-hidden",
+                localDataSource
+                    .observeEntryForMedia(accountId, mediaOneId)
+                    .first()
+                    ?.id
+                    ?.value,
+            )
+
+            val undo = localDataSource.undo(accountId, firstAction, writer)
+            assertEquals(true, undo is io.morgan.mio.domain.collection.CollectionWriteResult.Committed)
+            assertEquals(null, localDataSource.observeEntryForMedia(accountId, mediaOneId).first())
+            assertEquals(false, database.collectionEntryDao().getEntry("entry-hidden")?.effectivePresent)
+            assertEquals(null, database.pendingOperationDao().getGroup(firstAction.value))
+
+            val secondAction = OperationGroupId("collection-add-2")
+            localDataSource.commitStatus(change(secondAction), writer)
+            assertEquals(
+                "entry-hidden",
+                localDataSource
+                    .observeEntryForMedia(accountId, mediaOneId)
+                    .first()
+                    ?.id
+                    ?.value,
+            )
+            writer.cancelUndelivered(secondAction)
+        }
+
+    @Test
+    fun inFlightAddUndoWaitsForCreateBeforeCompensatingRemoval() =
+        runTest {
+            val writer = DefaultPendingOperationWriter(accountId, RoomPendingOperationLocalDataSource(database))
+            val actionId = OperationGroupId("collection-add-in-flight")
+            val result = localDataSource.commitStatus(change(actionId), writer)
+            val action = (result as io.morgan.mio.domain.collection.CollectionWriteResult.Committed).action
+            val create = database.pendingOperationDao().getOperationsForGroup(actionId.value).single()
+            assertEquals(
+                1,
+                database.syncDao().claimOperation(
+                    accountId.value,
+                    create.operationId,
+                    ACTION_TIME,
+                    ACTION_TIME - 120.seconds,
+                ),
+            )
+
+            val undo = localDataSource.undo(accountId, actionId, writer)
+
+            assertTrue(undo is io.morgan.mio.domain.collection.CollectionWriteResult.Committed)
+            assertEquals(
+                io.morgan.mio.core.database.model.StoredPendingOperationState.IN_FLIGHT,
+                database.pendingOperationDao().getOperation(create.operationId)?.lifecycleState,
+            )
+            val compensationId = "${actionId.value}:undo"
+            val compensation = database.pendingOperationDao().getOperationsForGroup(compensationId).single()
+            assertEquals(
+                io.morgan.mio.core.database.model.StoredPendingOperationKind.REMOVE_ENTRY,
+                compensation.kind,
+            )
+            assertEquals(
+                listOf(create.operationId),
+                database
+                    .pendingOperationDao()
+                    .getDependenciesForOperation(compensation.operationId)
+                    .map { dependency -> dependency.dependsOnOperationId },
+            )
+            assertFalse(checkNotNull(database.collectionEntryDao().getEntry(action.entryId.value)).effectivePresent)
+            assertNotNull(database.pendingOperationDao().getGroup(compensationId))
+        }
+
+    @Test
+    fun deliveredStatusUndoCreatesCompensationAndRestoresBeforeState() =
+        runTest {
+            val entryId = CollectionEntryId("entry-status")
+            database.collectionEntryDao().upsertEntries(
+                listOf(
+                    CollectionEntryEntity(
+                        collectionEntryId = entryId.value,
+                        accountId = accountId.value,
+                        mediaId = mediaOneId.value,
+                        progressUnit = StoredProgressUnit.EPISODE,
+                        remoteStatus = StoredCollectionStatus.CURRENT,
+                        remoteProgress = 0,
+                        remoteTotal = 12,
+                        remoteUpdatedAtUtcMs = TIME,
+                        effectiveStatus = StoredCollectionStatus.CURRENT,
+                        effectiveProgress = 0,
+                        effectiveTotal = 12,
+                        effectiveUpdatedAtUtcMs = TIME,
+                    ),
+                ),
+            )
+            val writer = DefaultPendingOperationWriter(accountId, RoomPendingOperationLocalDataSource(database))
+            val actionId = OperationGroupId("collection-status-delivered")
+            val result =
+                localDataSource.commitStatus(
+                    CollectionStatusChange(
+                        actionId = actionId,
+                        accountId = accountId,
+                        mediaId = mediaOneId,
+                        progressUnit = ProgressUnit.EPISODE,
+                        before = entry(entryId.value, mediaOneId, progress = 0),
+                        targetStatus = CollectionStatus.PAUSED,
+                        targetProgress = ProgressValue(0),
+                        targetTotal = UnitTotal(12),
+                        createdAt = ACTION_TIME,
+                        undoUntil = ACTION_TIME + 30.seconds,
+                    ),
+                    writer,
+                )
+            assertTrue(result is io.morgan.mio.domain.collection.CollectionWriteResult.Committed)
+            val operation = database.pendingOperationDao().getOperationsForGroup(actionId.value).single()
+            assertEquals(
+                1,
+                database.syncDao().claimOperation(
+                    accountId = accountId.value,
+                    operationId = operation.operationId,
+                    nowUtcMs = ACTION_TIME,
+                    abandonedBeforeUtcMs = ACTION_TIME - 120.seconds,
+                ),
+            )
+            assertEquals(
+                1,
+                database.syncDao().setOperationState(
+                    accountId = accountId.value,
+                    operationId = operation.operationId,
+                    state = io.morgan.mio.core.database.model.StoredPendingOperationState.DELIVERED,
+                    retryNotBeforeUtcMs = null,
+                ),
+            )
+
+            val undo = localDataSource.undo(accountId, actionId, writer)
+
+            assertTrue(undo is io.morgan.mio.domain.collection.CollectionWriteResult.Committed)
+            assertEquals(
+                CollectionStatus.CURRENT,
+                localDataSource.observeEntryForMedia(accountId, mediaOneId).first()?.status,
+            )
+            val compensation = database.pendingOperationDao().getOperationsForGroup("${actionId.value}:undo").single()
+            assertEquals(
+                io.morgan.mio.core.database.model.StoredPendingOperationKind.SET_STATUS,
+                compensation.kind,
+            )
+            assertEquals(
+                io.morgan.mio.core.database.model.StoredPendingOperationState.ENQUEUED,
+                compensation.lifecycleState,
             )
         }
 
@@ -429,5 +710,20 @@ class DefaultCollectionRepositoryTest {
 
     private companion object {
         val TIME: Instant = Instant.parse("2026-01-01T00:00:00Z")
+        val ACTION_TIME: Instant = Instant.parse("2099-01-01T00:00:00Z")
     }
+
+    private fun change(actionId: OperationGroupId): CollectionStatusChange =
+        CollectionStatusChange(
+            actionId = actionId,
+            accountId = accountId,
+            mediaId = mediaOneId,
+            progressUnit = ProgressUnit.EPISODE,
+            before = null,
+            targetStatus = CollectionStatus.CURRENT,
+            targetProgress = ProgressValue(0),
+            targetTotal = null,
+            createdAt = ACTION_TIME,
+            undoUntil = ACTION_TIME + 30.seconds,
+        )
 }

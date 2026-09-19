@@ -386,6 +386,13 @@ class TodayRoomQueueNavigationTest {
                 ),
             collectionRepository =
                 DefaultCollectionRepository(
+                    accountId = AccountId("account-1"),
+                    pendingOperationWriter =
+                        io.morgan.mio.data.sync.DefaultPendingOperationWriter(
+                            AccountId("account-1"),
+                            io.morgan.mio.data.sync.local
+                                .RoomPendingOperationLocalDataSource(fixture.database),
+                        ),
                     localDataSource = RoomCollectionLocalDataSource(fixture.database),
                     refreshRequester = CollectionRefreshRequester {},
                 ),

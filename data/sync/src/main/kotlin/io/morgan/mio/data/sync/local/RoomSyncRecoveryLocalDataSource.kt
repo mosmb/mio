@@ -12,6 +12,7 @@ import io.morgan.mio.data.sync.mapper.toPendingOperationGroupEntity
 import io.morgan.mio.data.sync.mapper.toRemoteSyncEntryState
 import io.morgan.mio.data.sync.mapper.toSyncEntryState
 import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.sync.OperationValue
 import io.morgan.mio.domain.sync.PendingOperationGroup
@@ -41,7 +42,12 @@ public class RoomSyncRecoveryLocalDataSource(
                     val entry = entriesById[issue.collectionEntryId]
                     val current = entry?.toSyncEntryState()
                     val latestRemote = if (issue.remoteProgress != null) entry?.toRemoteSyncEntryState() else null
-                    issue.toDomain(current = current, latestRemote = latestRemote)
+                    issue.toDomain(
+                        current = current,
+                        latestRemote = latestRemote,
+                        mediaId = entry?.mediaId?.let(::MediaId),
+                        localPresent = entry?.effectivePresent ?: false,
+                    )
                 }
             }.combine(database.syncDao().observeAccountIssue(accountId.value)) { entryIssues, accountIssue ->
                 io.morgan.mio.domain.sync.SyncRecoveryState(
@@ -70,6 +76,8 @@ public class RoomSyncRecoveryLocalDataSource(
                     entry
                         ?.takeIf { it.accountId == accountId.value && issue.remoteProgress != null }
                         ?.toRemoteSyncEntryState(),
+                mediaId = entry?.takeIf { it.accountId == accountId.value }?.mediaId?.let(::MediaId),
+                localPresent = entry?.effectivePresent ?: false,
             )
         }
 
@@ -85,7 +93,16 @@ public class RoomSyncRecoveryLocalDataSource(
             val current =
                 database.syncDao().getIssue(accountId.value, "${issue.operationId.value}:sync")
                     ?: return@recoveryTransaction false
-            if (current.toDomain().copy(local = issue.local, remote = issue.remote) != issue) {
+            val entry =
+                database.syncDao().getEntry(current.collectionEntryId)
+                    ?: return@recoveryTransaction false
+            if (
+                current
+                    .toDomain(
+                        mediaId = MediaId(entry.mediaId),
+                        localPresent = entry.effectivePresent,
+                    ).copy(local = issue.local, remote = issue.remote, mediaId = issue.mediaId) != issue
+            ) {
                 return@recoveryTransaction false
             }
             val operation =
@@ -130,10 +147,15 @@ public class RoomSyncRecoveryLocalDataSource(
                 currentEntity.toDomain(
                     current = entry.toSyncEntryState(),
                     latestRemote = entry.toRemoteSyncEntryState(),
+                    mediaId = MediaId(entry.mediaId),
+                    localPresent = entry.effectivePresent,
                 )
-            if (currentIssue != issue) return@recoveryTransaction false
+            if (currentIssue.copy(mediaId = issue.mediaId) != issue) return@recoveryTransaction false
             if (entry.toSyncEntryState() != issue.local) {
                 return@recoveryTransaction false
+            }
+            if (issue.base is OperationValue.Membership) {
+                return@recoveryTransaction resolveMembership(issue, resolution, entry)
             }
             val isStatus = issue.base is OperationValue.Status && issue.target is OperationValue.Status
             if (!isStatus && (issue.base !is OperationValue.Progress || issue.target !is OperationValue.Progress)) {
@@ -320,6 +342,116 @@ public class RoomSyncRecoveryLocalDataSource(
             database.syncDao().requestDispatch(accountId.value)
             true
         }
+
+    private suspend fun resolveMembership(
+        issue: SyncIssue,
+        resolution: PendingOperationGroup,
+        entry: io.morgan.mio.core.database.entity.CollectionEntryEntity,
+    ): Boolean {
+        val remote = issue.remote ?: return false
+        val original = database.syncDao().getOperation(issue.operationId.value) ?: return false
+        if (original.lifecycleState != StoredPendingOperationState.TERMINAL_FAILURE ||
+            original.kind !in setOf(StoredPendingOperationKind.CREATE_ENTRY, StoredPendingOperationKind.REMOVE_ENTRY) ||
+            resolution.compensatesGroupId != null ||
+            database.syncDao().getGroup(resolution.id.value) != null
+        ) {
+            return false
+        }
+        val operations = resolution.operations
+        val acceptsRemote = operations.size == 1 && operations[0].kind == PendingOperationKind.CREATE_ENTRY
+        val removes = operations.size == 1 && operations[0].kind == PendingOperationKind.REMOVE_ENTRY
+        val targetPresent = issue.localPresent
+        if (removes && targetPresent) return false
+        val expected = mutableListOf<Pair<OperationValue, OperationValue>>()
+        if (acceptsRemote) {
+            expected += OperationValue.Membership(false) to OperationValue.Membership(true)
+        } else if (removes) {
+            expected += OperationValue.Membership(true) to OperationValue.Membership(false)
+        } else {
+            if (!targetPresent) return false
+            if (remote.progress !=
+                issue.local.progress
+            ) {
+                expected +=
+                    OperationValue.Progress(remote.progress) to OperationValue.Progress(issue.local.progress)
+            }
+            if (remote.status !=
+                issue.local.status
+            ) {
+                expected +=
+                    OperationValue.Status(remote.status) to OperationValue.Status(issue.local.status)
+            }
+        }
+        if (operations.size != expected.size ||
+            operations.withIndex().any { (index, op) ->
+                op.accountId != issue.accountId ||
+                    op.collectionEntryId != issue.entryId ||
+                    op.groupId != resolution.id ||
+                    op.id.value != "${resolution.id.value}:$index" ||
+                    op.positionInGroup != index ||
+                    op.base != expected[index].first ||
+                    op.target != expected[index].second ||
+                    op.dependsOn != operations.take(index).map { it.id }.toSet() ||
+                    op.state != io.morgan.mio.domain.sync.PendingOperationState.ENQUEUED
+            }
+        ) {
+            return false
+        }
+        val pending =
+            database.syncDao().getOrderedOperations(issue.accountId.value).filter {
+                it.collectionEntryId ==
+                    entry.collectionEntryId
+            }
+        if (pending.any { it.lifecycleState == StoredPendingOperationState.IN_FLIGHT }) return false
+        pending
+            .filter {
+                it.lifecycleState !in
+                    setOf(StoredPendingOperationState.DELIVERED, StoredPendingOperationState.CANCELLED)
+            }.forEach { check(database.syncDao().cancelOperation(issue.accountId.value, it.operationId) == 1) }
+        check(database.syncDao().deleteIssue(issue.accountId.value, "${issue.operationId.value}:sync") == 1)
+        check(database.pendingOperationDao().insertGroup(resolution.toPendingOperationGroupEntity()) > 0)
+        database.pendingOperationDao().insertOperations(
+            operations.map {
+                it.toPendingOperationEntity().let { stored ->
+                    if (acceptsRemote) {
+                        stored.copy(
+                            lifecycleState = StoredPendingOperationState.DELIVERED,
+                            attemptCount = 1,
+                            lastAttemptAtUtcMs = resolution.createdAt,
+                        )
+                    } else {
+                        stored
+                    }
+                }
+            },
+        )
+        database.pendingOperationDao().insertDependencies(
+            operations.flatMap { op ->
+                op.dependsOn.map {
+                    io.morgan.mio.core.database.entity
+                        .PendingOperationDependencyEntity(op.id.value, it.value)
+                }
+            },
+        )
+        val selected = if (acceptsRemote) remote else issue.local
+        if (entry.localProgressRevision == Long.MAX_VALUE) error("Collection revision exhausted")
+        database.collectionEntryDao().upsertEntries(
+            listOf(
+                entry.copy(
+                    effectivePresent = !removes,
+                    effectiveProgress = selected.progress.value,
+                    effectiveStatus =
+                        io.morgan.mio.core.database.model.StoredCollectionStatus
+                            .valueOf(selected.status.name),
+                    effectiveTotal = selected.total?.value,
+                    effectiveUpdatedAtUtcMs = resolution.createdAt,
+                    localProgressRevision = entry.localProgressRevision + 1,
+                ),
+            ),
+        )
+        database.syncDao().requestDispatch(issue.accountId.value)
+        return true
+    }
 
     public suspend fun recoverAuthentication(
         accountId: AccountId,

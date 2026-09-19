@@ -52,27 +52,66 @@ public class ProviderSyncRemoteDataSource internal constructor(
         candidate: SyncCandidate,
         value: OperationValue,
     ): SyncRemoteResult =
-        call(candidate) { credentials, accountId, entryId, mediaId, unit ->
-            when (value) {
-                is OperationValue.Progress ->
-                    providerBinding.syncDataSource.setProgress(
-                        credentials = credentials,
-                        accountId = accountId,
-                        entryId = entryId,
-                        mediaId = mediaId,
-                        unit = unit,
-                        target = value.value.value,
-                    )
-                is OperationValue.Status ->
-                    providerBinding.syncDataSource.setStatus(
-                        credentials = credentials,
-                        accountId = accountId,
-                        entryId = entryId,
-                        mediaId = mediaId,
-                        unit = unit,
-                        target = value.value.toProviderStatus(),
-                    )
+        if (candidate.operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.CREATE_ENTRY) {
+            create(candidate)
+        } else if (candidate.operation.kind == io.morgan.mio.domain.sync.PendingOperationKind.REMOVE_ENTRY) {
+            remove(candidate)
+        } else {
+            call(candidate) { credentials, accountId, entryId, mediaId, unit ->
+                when (value) {
+                    is OperationValue.Progress ->
+                        providerBinding.syncDataSource.setProgress(
+                            credentials = credentials,
+                            accountId = accountId,
+                            entryId = entryId,
+                            mediaId = mediaId,
+                            unit = unit,
+                            target = value.value.value,
+                        )
+                    is OperationValue.Status ->
+                        providerBinding.syncDataSource.setStatus(
+                            credentials = credentials,
+                            accountId = accountId,
+                            entryId = entryId,
+                            mediaId = mediaId,
+                            unit = unit,
+                            target = value.value.toProviderStatus(),
+                        )
+                    is OperationValue.Membership ->
+                        error("Membership operations are handled by their dedicated provider path")
+                }
             }
+        }
+
+    private suspend fun create(candidate: SyncCandidate): SyncRemoteResult =
+        callCreate(candidate) { credentials, accountId, mediaId, unit ->
+            providerBinding.syncDataSource.createEntry(
+                credentials = credentials,
+                accountId = accountId,
+                mediaId = mediaId,
+                unit = unit,
+                status =
+                    database
+                        .collectionActivityDao()
+                        .get(
+                            candidate.current.accountId.value,
+                            candidate.operation.groupId.value,
+                        )?.afterStatus
+                        ?.let { ProviderCollectionStatus.valueOf(it.name) }
+                        ?: candidate.current.status.toProviderStatus(),
+                progress =
+                    database
+                        .collectionActivityDao()
+                        .get(
+                            candidate.current.accountId.value,
+                            candidate.operation.groupId.value,
+                        )?.afterProgress ?: candidate.current.progress.value,
+            )
+        }
+
+    private suspend fun remove(candidate: SyncCandidate): SyncRemoteResult =
+        callRemove(candidate) { credentials, accountId, entryId, mediaId, unit ->
+            providerBinding.syncDataSource.removeEntry(credentials, accountId, entryId, mediaId, unit)
         }
 
     private suspend fun call(
@@ -118,6 +157,203 @@ public class ProviderSyncRemoteDataSource internal constructor(
                 remoteEntryId = entryMapping.remoteCollectionEntryId,
                 remoteMediaId = mediaMapping.remoteMediaId,
             )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: SQLiteException) {
+            throw SyncInfrastructureException(SyncInfrastructureException.Kind.STORAGE)
+        }
+    }
+
+    private suspend fun callCreate(
+        candidate: SyncCandidate,
+        request: suspend (
+            io.morgan.mio.data.provider.api.ProviderCredentials,
+            ProviderAccountId,
+            ProviderMediaId,
+            ProviderProgressUnit,
+        ) -> ProviderResult<ProviderCollectionEntry>,
+    ): SyncRemoteResult {
+        val accountId = candidate.current.accountId
+        return try {
+            val storedProvider = providerBinding.provider.toStoredProvider()
+            val accountMapping =
+                database.syncDao().getAccountProviderId(accountId.value)
+                    ?: return SyncRemoteResult.Rejected()
+            if (accountMapping.provider != storedProvider) return SyncRemoteResult.Rejected()
+            val localEntry =
+                database.syncDao().getEntry(candidate.current.entryId.value)
+                    ?: return SyncRemoteResult.Rejected()
+            val mediaMapping =
+                database.syncDao().getMediaProviderId(localEntry.mediaId, storedProvider)
+                    ?: return SyncRemoteResult.Rejected()
+            var alreadyPresent = false
+            val result =
+                credentialReader.execute(accountId) { verified ->
+                    when (
+                        val found =
+                            providerBinding.syncDataSource.findEntry(
+                                verified.credentials,
+                                verified.remoteAccountId,
+                                ProviderMediaId(mediaMapping.remoteMediaId),
+                                candidate.current.unit.toProviderUnit(),
+                            )
+                    ) {
+                        is ProviderResult.Failure -> found
+                        is ProviderResult.Success -> {
+                            val existing = found.value
+                            if (existing != null) {
+                                alreadyPresent = true
+                                ProviderResult.Success(existing)
+                            } else {
+                                request(
+                                    verified.credentials,
+                                    verified.remoteAccountId,
+                                    ProviderMediaId(mediaMapping.remoteMediaId),
+                                    candidate.current.unit.toProviderUnit(),
+                                )
+                            }
+                        }
+                    }
+                }
+            when (result) {
+                is ProviderResult.Success -> {
+                    val value = result.value
+                    if (value.accountId.value != accountMapping.remoteAccountId ||
+                        value.mediaId.value != mediaMapping.remoteMediaId ||
+                        value.progressUnit != candidate.current.unit.toProviderUnit()
+                    ) {
+                        SyncRemoteResult.InvalidData
+                    } else {
+                        val localMapping =
+                            database.providerIdDao().findCollectionEntryProviderId(
+                                entryId = candidate.current.entryId.value,
+                                provider = storedProvider,
+                            )
+                        val remoteMapping =
+                            database.syncDao().findEntryProviderIdByRemote(storedProvider, value.id.value)
+                        if (
+                            localMapping?.remoteCollectionEntryId?.takeIf { id -> id != value.id.value } != null ||
+                            remoteMapping?.collectionEntryId?.takeIf { id ->
+                                id != candidate.current.entryId.value
+                            } !=
+                            null
+                        ) {
+                            SyncRemoteResult.Conflict()
+                        } else {
+                            val entryMapping =
+                                io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity(
+                                    provider = storedProvider,
+                                    remoteCollectionEntryId = value.id.value,
+                                    collectionEntryId = candidate.current.entryId.value,
+                                )
+                            if (localMapping == null) {
+                                database.providerIdDao().upsertCollectionEntryProviderIds(listOf(entryMapping))
+                            }
+                            try {
+                                if (alreadyPresent) {
+                                    SyncRemoteResult.Conflict(value.toSyncEntryState(candidate.current))
+                                } else {
+                                    SyncRemoteResult.Success(value.toSyncEntryState(candidate.current))
+                                }
+                            } catch (_: IllegalArgumentException) {
+                                SyncRemoteResult.InvalidData
+                            }
+                        }
+                    }
+                }
+                is ProviderResult.Failure -> result.failure.toDomainResult()
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: SQLiteException) {
+            throw SyncInfrastructureException(SyncInfrastructureException.Kind.STORAGE)
+        }
+    }
+
+    private suspend fun callRemove(
+        candidate: SyncCandidate,
+        request: suspend (
+            io.morgan.mio.data.provider.api.ProviderCredentials,
+            ProviderAccountId,
+            ProviderCollectionEntryId,
+            ProviderMediaId,
+            ProviderProgressUnit,
+        ) -> ProviderResult<Unit>,
+    ): SyncRemoteResult {
+        val accountId = candidate.current.accountId
+        return try {
+            val storedProvider = providerBinding.provider.toStoredProvider()
+            val accountMapping =
+                database.syncDao().getAccountProviderId(accountId.value)
+                    ?: return SyncRemoteResult.Rejected()
+            if (accountMapping.provider != storedProvider) return SyncRemoteResult.Rejected()
+            val entryMapping =
+                database.syncDao().getEntryProviderId(candidate.current.entryId.value, storedProvider)
+            val localEntry =
+                database.syncDao().getEntry(candidate.current.entryId.value)
+                    ?: return SyncRemoteResult.Rejected()
+            val mediaMapping =
+                database.syncDao().getMediaProviderId(localEntry.mediaId, storedProvider)
+                    ?: return SyncRemoteResult.Rejected()
+            val found =
+                credentialReader.execute(accountId) { verified ->
+                    providerBinding.syncDataSource.findEntry(
+                        verified.credentials,
+                        verified.remoteAccountId,
+                        ProviderMediaId(mediaMapping.remoteMediaId),
+                        candidate.current.unit.toProviderUnit(),
+                    )
+                }
+            when (found) {
+                is ProviderResult.Failure -> return found.failure.toDomainResult()
+                is ProviderResult.Success -> {
+                    val value = found.value ?: return SyncRemoteResult.Removed
+                    if (value.accountId.value != accountMapping.remoteAccountId ||
+                        value.mediaId.value != mediaMapping.remoteMediaId ||
+                        value.progressUnit != candidate.current.unit.toProviderUnit()
+                    ) {
+                        return SyncRemoteResult.InvalidData
+                    }
+                    if (value.id.value != entryMapping?.remoteCollectionEntryId ||
+                        value.status.name != localEntry.remoteStatus.name ||
+                        value.progress != localEntry.remoteProgress
+                    ) {
+                        val owner = database.syncDao().findEntryProviderIdByRemote(storedProvider, value.id.value)
+                        if (owner != null &&
+                            owner.collectionEntryId != localEntry.collectionEntryId
+                        ) {
+                            return SyncRemoteResult.InvalidData
+                        }
+                        database.inTransaction {
+                            database.providerIdDao().deleteCollectionEntryProviderIds(localEntry.collectionEntryId)
+                            database.providerIdDao().upsertCollectionEntryProviderIds(
+                                listOf(
+                                    io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity(
+                                        storedProvider,
+                                        value.id.value,
+                                        localEntry.collectionEntryId,
+                                    ),
+                                ),
+                            )
+                        }
+                        return SyncRemoteResult.Conflict(value.toSyncEntryState(candidate.current))
+                    }
+                }
+            }
+            val result =
+                credentialReader.execute(accountId) { verified ->
+                    request(
+                        verified.credentials,
+                        verified.remoteAccountId,
+                        ProviderCollectionEntryId(requireNotNull(entryMapping).remoteCollectionEntryId),
+                        ProviderMediaId(mediaMapping.remoteMediaId),
+                        candidate.current.unit.toProviderUnit(),
+                    )
+                }
+            when (result) {
+                is ProviderResult.Success -> SyncRemoteResult.Removed
+                is ProviderResult.Failure -> result.failure.toDomainResult()
+            }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: SQLiteException) {

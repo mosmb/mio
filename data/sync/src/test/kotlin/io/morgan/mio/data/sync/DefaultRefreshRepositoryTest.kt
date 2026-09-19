@@ -142,6 +142,42 @@ class DefaultRefreshRepositoryTest {
         }
 
     @Test
+    fun refreshReconcilesRemoteEntryWithOptimisticLocalMediaIdentity() =
+        runTest {
+            seedMappedEntry("optimistic-entry", "local-media", "201", "101", progress = 1)
+            database.providerIdDao().deleteCollectionEntryProviderIds("optimistic-entry")
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE collection_entry SET remote_present = 0 WHERE collection_entry_id = ?",
+                arrayOf("optimistic-entry"),
+            )
+
+            val harness = harness()
+            harness.imports.enqueue { _, _ -> ProviderResult.Success(snapshot(listOf(remoteEntry("202", "101", 2)))) }
+            harness.sync.enqueueRead { _, _, _, _, unit ->
+                ProviderResult.Success(remoteEntry("202", "101", 2, unit = unit))
+            }
+
+            assertEquals(SyncRefreshResult.Success, harness.repository.refresh(lease()))
+            assertEquals(1, database.syncDao().getEntries(ACCOUNT_ID.value).size)
+            assertEquals(
+                "optimistic-entry",
+                database
+                    .syncDao()
+                    .getEntries(ACCOUNT_ID.value)
+                    .single()
+                    .collectionEntryId,
+            )
+            assertEquals(
+                "optimistic-entry",
+                database
+                    .syncDao()
+                    .findEntryProviderIdByRemote(StoredConnectedProvider.ANILIST, "202")
+                    ?.collectionEntryId,
+            )
+            assertTrue(checkNotNull(database.syncDao().getEntry("optimistic-entry")).remotePresent)
+        }
+
+    @Test
     fun refreshKeepsPendingCorrectionUndoActivityAndDependencies() =
         runTest {
             seedMappedEntry(

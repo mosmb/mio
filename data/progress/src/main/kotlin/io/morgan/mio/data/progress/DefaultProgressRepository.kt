@@ -120,6 +120,8 @@ public class DefaultProgressRepository(
                     undoUntilUtcMs = undoUntil,
                     undoneAtUtcMs = null,
                 )
+            database.collectionActivityDao().expireUndo(accountId.value, createdAt)
+            database.progressDao().expireUndo(accountId.value, createdAt)
             val order = localDataSource.insertActivity(activity)
             ProgressWriteResult.Committed(activity.copy(activityOrder = order).toProgressAction())
         }

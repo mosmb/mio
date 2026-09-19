@@ -1,9 +1,12 @@
 package io.morgan.mio.feature.library.impl
 
 import androidx.lifecycle.ViewModelStore
+import io.morgan.mio.domain.collection.CollectionAction
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.collection.CollectionStatusChange
+import io.morgan.mio.domain.collection.CollectionWriteResult
 import io.morgan.mio.domain.media.Artwork
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.MediaFormat
@@ -18,6 +21,7 @@ import io.morgan.mio.domain.model.ImageReference
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.MediaTitle
 import io.morgan.mio.domain.model.MediaType
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitNumber
@@ -344,6 +348,28 @@ private class TestCollectionRepository : CollectionRepository {
             error?.let { throw it }
             current.firstOrNull { item -> item.accountId == accountId && item.mediaId == mediaId }
         }
+
+    override suspend fun readEntryForMedia(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): CollectionEntry? = entries.value.firstOrNull { item -> item.accountId == accountId && item.mediaId == mediaId }
+
+    override fun observeWritableStatuses(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): Flow<List<CollectionStatus>> = flowOf(CollectionStatus.entries.toList())
+
+    override suspend fun findAction(actionId: OperationGroupId): CollectionAction? = null
+
+    override fun observeLatestAction(): Flow<CollectionAction?> = flowOf(null)
+
+    override suspend fun readLatestAction(): CollectionAction? = null
+
+    override suspend fun commitStatus(change: CollectionStatusChange): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(actionId: OperationGroupId): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.UNDO_UNAVAILABLE)
 
     override suspend fun refreshCollection(accountId: AccountId) = Unit
 }

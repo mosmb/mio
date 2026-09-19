@@ -51,11 +51,19 @@ internal object AniListQueries {
             "id userId mediaId status progress progressVolumes updatedAt " +
             "media { id episodes chapters volumes } } }"
 
+    internal const val FIND_SYNC_ENTRY: String =
+        "query MioFindSyncEntry(\$mediaId: Int!, \$userId: Int!) { MediaList(mediaId: \$mediaId, userId: \$userId) { " +
+            "id userId mediaId status progress progressVolumes updatedAt " +
+            "media { id episodes chapters volumes } } }"
+
     internal const val SYNC_MUTATION: String =
-        "mutation MioSaveMediaListEntry(\$id: Int!, \$progress: Int, " +
+        "mutation MioSaveMediaListEntry(\$id: Int, \$mediaId: Int, \$progress: Int, " +
             "\$progressVolumes: Int, \$status: MediaListStatus) { " +
-            "SaveMediaListEntry(id: \$id, progress: \$progress, " +
+            "SaveMediaListEntry(id: \$id, mediaId: \$mediaId, progress: \$progress, " +
             "progressVolumes: \$progressVolumes, status: \$status) { " +
             "id userId mediaId status progress progressVolumes updatedAt " +
             "media { id episodes chapters volumes } } }"
+
+    internal const val SYNC_DELETE_MUTATION: String =
+        "mutation MioDeleteMediaListEntry(\$id: Int!) { DeleteMediaListEntry(id: \$id) { deleted } }"
 }

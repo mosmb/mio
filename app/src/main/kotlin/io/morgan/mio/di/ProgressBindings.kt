@@ -11,6 +11,7 @@ import io.morgan.mio.data.progress.DefaultProgressRepository
 import io.morgan.mio.data.progress.local.RoomProgressLocalDataSource
 import io.morgan.mio.data.sync.PendingOperationWriter
 import io.morgan.mio.domain.model.AccountId
+import io.morgan.mio.domain.progress.ChangeCollectionStatusUseCase
 import io.morgan.mio.domain.progress.CorrectProgressUseCase
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressActivityRepository
@@ -56,6 +57,13 @@ public object ProgressBindings {
         repository: ProgressRepository,
         clock: Clock,
     ): StepProgressUseCase = StepProgressUseCase(repository, clock)
+
+    @Provides
+    @SingleIn(AccountScope::class)
+    public fun provideChangeCollectionStatusUseCase(
+        repository: io.morgan.mio.domain.collection.CollectionRepository,
+        clock: Clock,
+    ): ChangeCollectionStatusUseCase = ChangeCollectionStatusUseCase(repository, clock)
 
     @Provides
     @SingleIn(AccountScope::class)

@@ -18,6 +18,64 @@ internal class AniListSyncDataSource(
 ) : ProviderSyncDataSource {
     override val provider: ProviderKey = ProviderKey.ANILIST
 
+    override suspend fun findEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+    ): ProviderResult<ProviderCollectionEntry?> {
+        require(credentials.provider == provider)
+        val media =
+            mediaId.value.toIntOrNull()?.takeIf { it > 0 }
+                ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        val user =
+            accountId.value.toIntOrNull()?.takeIf { it > 0 }
+                ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        return try {
+            val response =
+                service.syncEntry(
+                    authorization(credentials),
+                    AniListSyncEntryRequestDto(
+                        AniListQueries.FIND_SYNC_ENTRY,
+                        AniListSyncEntryRequestDto.Variables(mediaId = media, userId = user),
+                    ),
+                )
+            val body = response.body()
+            if (response.code() == 404 ||
+                (
+                    response.isSuccessful &&
+                        body?.errors?.isNotEmpty() == true &&
+                        body.errors.all { it?.status == 404 }
+                )
+            ) {
+                return ProviderResult.Success(null)
+            }
+            if (!response.isSuccessful) {
+                return ProviderResult.Failure(
+                    AniListFailureMapper.mapSyncHttpStatus(response.code(), response.headers()["Retry-After"]),
+                )
+            }
+            if (body == null) return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+            graphQlFailure(body.errors)?.let { return ProviderResult.Failure(it) }
+            val entry =
+                body.data?.mediaList ?: return if (body.data != null) {
+                    ProviderResult.Success(null)
+                } else {
+                    ProviderResult.Failure(ProviderFailure.MalformedResponse)
+                }
+            val id = entry.id?.takeIf { it > 0 } ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+            mapReadResponse(response, accountId, ProviderCollectionEntryId(id.toString()), mediaId, unit)
+        } catch (
+            cancellation: CancellationException,
+        ) {
+            throw cancellation
+        } catch (
+            throwable: Throwable,
+        ) {
+            ProviderResult.Failure(AniListFailureMapper.mapThrowable(throwable))
+        }
+    }
+
     override suspend fun readEntry(
         credentials: ProviderCredentials,
         accountId: ProviderAccountId,
@@ -104,6 +162,109 @@ internal class AniListSyncDataSource(
                     status = target.toWireValue(),
                 ),
         )
+    }
+
+    override suspend fun createEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+        status: ProviderCollectionStatus,
+        progress: Int,
+    ): ProviderResult<ProviderCollectionEntry> {
+        require(progress >= 0)
+        val remoteMediaId =
+            mediaId.value.toIntOrNull()?.takeIf { value -> value > 0 }
+                ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        return try {
+            val variables =
+                when (unit) {
+                    ProviderProgressUnit.VOLUME ->
+                        AniListSyncMutationRequestDto.Variables(
+                            mediaId = remoteMediaId,
+                            progressVolumes = progress,
+                            status = status.toWireValue(),
+                        )
+                    ProviderProgressUnit.EPISODE,
+                    ProviderProgressUnit.CHAPTER,
+                    ->
+                        AniListSyncMutationRequestDto.Variables(
+                            mediaId = remoteMediaId,
+                            progress = progress,
+                            status = status.toWireValue(),
+                        )
+                }
+            val response =
+                service.syncMutation(
+                    authorization = authorization(credentials),
+                    request = AniListSyncMutationRequestDto(AniListQueries.SYNC_MUTATION, variables),
+                )
+            if (!response.isSuccessful) {
+                ProviderResult.Failure(
+                    AniListFailureMapper.mapSyncHttpStatus(response.code(), response.headers()["Retry-After"]),
+                )
+            } else {
+                val body = response.body() ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+                graphQlFailure(body.errors)?.let { return ProviderResult.Failure(it) }
+                val remoteEntryId =
+                    body.data
+                        ?.mediaList
+                        ?.id
+                        ?.takeIf { it > 0 }
+                        ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+                readEntry(
+                    credentials = credentials,
+                    accountId = accountId,
+                    entryId = ProviderCollectionEntryId(remoteEntryId.toString()),
+                    mediaId = mediaId,
+                    unit = unit,
+                )
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            ProviderResult.Failure(AniListFailureMapper.mapThrowable(throwable))
+        }
+    }
+
+    override suspend fun removeEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        entryId: ProviderCollectionEntryId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+    ): ProviderResult<Unit> {
+        val remoteEntryId =
+            entryId.value.toIntOrNull()?.takeIf { value -> value > 0 }
+                ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+        return try {
+            val response =
+                service.syncDelete(
+                    authorization = authorization(credentials),
+                    request =
+                        AniListSyncDeleteRequestDto(
+                            query = AniListQueries.SYNC_DELETE_MUTATION,
+                            variables = AniListSyncDeleteRequestDto.Variables(remoteEntryId),
+                        ),
+                )
+            if (!response.isSuccessful) {
+                ProviderResult.Failure(
+                    AniListFailureMapper.mapSyncHttpStatus(response.code(), response.headers()["Retry-After"]),
+                )
+            } else {
+                val body = response.body() ?: return ProviderResult.Failure(ProviderFailure.MalformedResponse)
+                graphQlFailure(body.errors)?.let { return ProviderResult.Failure(it) }
+                if (body.data?.deleteResult?.deleted == true) {
+                    ProviderResult.Success(Unit)
+                } else {
+                    ProviderResult.Failure(ProviderFailure.MutationRejected)
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            ProviderResult.Failure(AniListFailureMapper.mapThrowable(throwable))
+        }
     }
 
     private suspend fun mutateAndReadBack(

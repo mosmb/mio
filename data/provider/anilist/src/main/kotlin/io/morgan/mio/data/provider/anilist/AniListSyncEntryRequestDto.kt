@@ -9,6 +9,8 @@ internal data class AniListSyncEntryRequestDto(
 ) {
     @Serializable
     internal data class Variables(
-        val id: Int,
+        val id: Int? = null,
+        val mediaId: Int? = null,
+        val userId: Int? = null,
     )
 }

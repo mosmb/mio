@@ -58,13 +58,13 @@ internal class ProgressConflictViewModel(
         }
     private val source =
         combine(activeIssue, collectionRepository.observeEntry(entryId)) { issue, entry ->
-            if (issue == null || entry == null) null else issue to entry
+            if (issue == null) null else (entry?.mediaId ?: issue.mediaId)?.let { issue to it }
         }.flatMapLatest { pair ->
             if (pair == null) {
                 flowOf(null)
             } else {
-                val (issue, entry) = pair
-                mediaRepository.observeMedia(entry.mediaId).map { media ->
+                val (issue, mediaId) = pair
+                mediaRepository.observeMedia(mediaId).map { media ->
                     ConflictSource(issue = issue, title = media?.title?.value ?: "Saved title")
                 }
             }

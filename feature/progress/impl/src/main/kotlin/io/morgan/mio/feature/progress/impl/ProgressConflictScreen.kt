@@ -249,6 +249,12 @@ private fun io.morgan.mio.domain.collection.CollectionStatus.displayName(): Stri
 
 @Composable
 private fun ProgressConflictUiState.Content.choiceLabel(keepDevice: Boolean): String {
+    if (issue.base is io.morgan.mio.domain.sync.OperationValue.Membership &&
+        keepDevice &&
+        !issue.localPresent
+    ) {
+        return stringResource(R.string.progress_conflict_not_in_library)
+    }
     val snapshot = if (keepDevice) issue.local else requireNotNull(issue.remote)
     if (issue.base is io.morgan.mio.domain.sync.OperationValue.Status) return snapshot.status.displayName()
     val progress = stringResource(R.string.progress_conflict_value, snapshot.progress.value, unit.displayName())

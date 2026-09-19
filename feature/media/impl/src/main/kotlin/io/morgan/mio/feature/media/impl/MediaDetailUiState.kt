@@ -19,6 +19,7 @@ internal sealed interface MediaDetailUiState {
         val media: MediaDetailUiModel,
         val relatedTitles: List<MediaDetailRelatedTitleUiModel>,
         val collection: MediaDetailCollectionUiModel?,
+        val writableStatuses: List<MediaDetailCollectionStatus> = emptyList(),
         val latestUndo: MediaDetailUndoUiModel? = null,
         val progressError: MediaDetailProgressErrorUiModel? = null,
         val syncIssues: List<SyncIssueUiModel> = emptyList(),
@@ -92,6 +93,9 @@ internal data class MediaDetailUndoUiModel(
     val progress: Int,
     val unit: MediaDetailProgressUnit,
     val completed: Boolean,
+    val collectionAction: Boolean = false,
+    val collectionKind: MediaDetailCollectionActionKind? = null,
+    val status: MediaDetailCollectionStatus? = null,
 )
 
 internal data class MediaDetailProgressErrorUiModel(
@@ -132,6 +136,11 @@ internal enum class MediaDetailCollectionStatus {
     COMPLETED,
     DROPPED,
     REPEATING,
+}
+
+internal enum class MediaDetailCollectionActionKind {
+    ADD,
+    STATUS,
 }
 
 internal enum class MediaDetailProgressUnit {

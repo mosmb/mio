@@ -41,4 +41,10 @@ internal interface AniListGraphQlService {
         @Header("Authorization") authorization: String,
         @Body request: AniListSyncMutationRequestDto,
     ): Response<AniListSyncMutationResponseDto>
+
+    @POST(".")
+    suspend fun syncDelete(
+        @Header("Authorization") authorization: String,
+        @Body request: AniListSyncDeleteRequestDto,
+    ): Response<AniListSyncMutationResponseDto>
 }

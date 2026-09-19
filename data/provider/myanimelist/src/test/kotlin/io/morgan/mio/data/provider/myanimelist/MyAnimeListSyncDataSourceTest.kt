@@ -2,6 +2,7 @@ package io.morgan.mio.data.provider.myanimelist
 
 import io.morgan.mio.data.provider.api.ProviderAccountId
 import io.morgan.mio.data.provider.api.ProviderCollectionEntryId
+import io.morgan.mio.data.provider.api.ProviderCollectionStatus
 import io.morgan.mio.data.provider.api.ProviderCredentials
 import io.morgan.mio.data.provider.api.ProviderKey
 import io.morgan.mio.data.provider.api.ProviderMediaId
@@ -38,6 +39,32 @@ class MyAnimeListSyncDataSourceTest {
     fun tearDown() {
         server.close()
     }
+
+    @Test
+    fun authenticatedLookupDistinguishesUntrackedFromMalformedIdentity() =
+        runTest {
+            server.enqueue("""{"id":101,"my_list_status":null}""")
+            assertEquals(
+                null,
+                (
+                    dataSource.findEntry(
+                        credentials,
+                        ProviderAccountId("42"),
+                        ProviderMediaId("anime/101"),
+                        ProviderProgressUnit.EPISODE,
+                    ) as ProviderResult.Success
+                ).value,
+            )
+            server.enqueue("""{"id":999,"my_list_status":null}""")
+            assertTrue(
+                dataSource.findEntry(
+                    credentials,
+                    ProviderAccountId("42"),
+                    ProviderMediaId("anime/101"),
+                    ProviderProgressUnit.EPISODE,
+                ) is ProviderResult.Failure,
+            )
+        }
 
     @Test
     fun animeMutationUsesTheAsymmetricAbsoluteRequestKeyAndReadBack() =
@@ -90,6 +117,44 @@ class MyAnimeListSyncDataSourceTest {
             val patch = server.takeRequest()
             assertEquals("num_volumes_read=2", patch.body!!.utf8())
             assertFalse(patch.body!!.utf8().contains("num_chapters_read"))
+        }
+
+    @Test
+    fun createUsesMediaListPostAndRemovalUsesMatchingAnimeOrMangaEndpoint() =
+        runTest {
+            server.enqueue("{}", code = 201)
+            server.enqueue(animeEntry(progress = 0))
+
+            val created =
+                dataSource.createEntry(
+                    credentials,
+                    ProviderAccountId("42"),
+                    ProviderMediaId("anime/1"),
+                    ProviderProgressUnit.EPISODE,
+                    ProviderCollectionStatus.CURRENT,
+                    0,
+                ) as ProviderResult.Success
+
+            assertEquals("anime/1", created.value.id.value)
+            val post = server.takeRequest()
+            assertEquals("PATCH", post.method)
+            assertTrue(post.target.contains("/anime/1/my_list_status"))
+            assertEquals("status=watching&num_watched_episodes=0", post.body!!.utf8())
+            assertEquals("GET", server.takeRequest().method)
+
+            server.enqueue("", code = 204)
+            assertTrue(
+                dataSource.removeEntry(
+                    credentials,
+                    ProviderAccountId("42"),
+                    ProviderCollectionEntryId("manga/2"),
+                    ProviderMediaId("manga/2"),
+                    ProviderProgressUnit.VOLUME,
+                ) is ProviderResult.Success,
+            )
+            val delete = server.takeRequest()
+            assertEquals("DELETE", delete.method)
+            assertTrue(delete.target.contains("/manga/2/my_list_status"))
         }
 
     private fun animeEntry(progress: Int): String =

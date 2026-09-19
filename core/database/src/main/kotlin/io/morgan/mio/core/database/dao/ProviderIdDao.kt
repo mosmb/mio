@@ -35,4 +35,13 @@ public abstract class ProviderIdDao {
 
     @Query("DELETE FROM collection_entry_provider_id WHERE collection_entry_id = :entryId")
     public abstract suspend fun deleteCollectionEntryProviderIds(entryId: String)
+
+    @Query(
+        "SELECT * FROM collection_entry_provider_id " +
+            "WHERE collection_entry_id = :entryId AND provider = :provider LIMIT 1",
+    )
+    public abstract suspend fun findCollectionEntryProviderId(
+        entryId: String,
+        provider: StoredConnectedProvider,
+    ): CollectionEntryProviderIdEntity?
 }

@@ -53,6 +53,8 @@ public data class CollectionEntryEntity(
     public val remoteTotal: Int?,
     @ColumnInfo(name = "remote_updated_at_utc_ms")
     public val remoteUpdatedAtUtcMs: Instant,
+    @ColumnInfo(name = "remote_present", defaultValue = "1")
+    public val remotePresent: Boolean = true,
     @ColumnInfo(name = "effective_status")
     public val effectiveStatus: StoredCollectionStatus,
     @ColumnInfo(name = "effective_progress")
@@ -61,6 +63,8 @@ public data class CollectionEntryEntity(
     public val effectiveTotal: Int?,
     @ColumnInfo(name = "effective_updated_at_utc_ms")
     public val effectiveUpdatedAtUtcMs: Instant,
+    @ColumnInfo(name = "effective_present", defaultValue = "1")
+    public val effectivePresent: Boolean = true,
     @ColumnInfo(name = "local_progress_revision", defaultValue = "0")
     public val localProgressRevision: Long = 0L,
 ) {

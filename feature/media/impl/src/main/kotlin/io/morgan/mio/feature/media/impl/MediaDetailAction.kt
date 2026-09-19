@@ -13,6 +13,11 @@ internal sealed interface MediaDetailAction {
         val groupId: String,
     ) : MediaDetailAction
 
+    data class ChangeStatus(
+        val status: MediaDetailCollectionStatus,
+        val timeoutMillis: Long,
+    ) : MediaDetailAction
+
     data object RetryProgress : MediaDetailAction
 
     data class RetrySync(

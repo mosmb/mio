@@ -20,6 +20,13 @@ public class ProjectSyncEntryUseCase {
                 operation.state != PendingOperationState.DELIVERED &&
                     operation.state != PendingOperationState.CANCELLED
             }
+        // Membership has its own before/after state; a refresh must not replace its optimistic values.
+        if (ordered.any {
+                it.kind == PendingOperationKind.CREATE_ENTRY || it.kind == PendingOperationKind.REMOVE_ENTRY
+            }
+        ) {
+            return current
+        }
         val hasExplicitProgressCorrection =
             ordered.any { operation -> operation.kind == PendingOperationKind.SET_PROGRESS_CORRECTION }
         var progress =
@@ -50,6 +57,10 @@ public class ProjectSyncEntryUseCase {
                 -> {
                     status = (operation.target as OperationValue.Status).value
                 }
+
+                PendingOperationKind.CREATE_ENTRY,
+                PendingOperationKind.REMOVE_ENTRY,
+                -> Unit
             }
         }
 

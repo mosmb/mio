@@ -78,11 +78,12 @@ class MioDatabaseTest {
         }
 
     @Test
-    fun versionSevenExposesSynchronizationAndSearchTablesAndDaos() =
+    fun versionEightExposesCollectionActivitySynchronizationAndSearchTablesAndDaos() =
         runTest {
-            assertEquals(7, MioDatabase.VERSION)
+            assertEquals(8, MioDatabase.VERSION)
             assertNotNull(database.syncDao())
             assertNotNull(database.mediaSearchDao())
+            assertNotNull(database.collectionActivityDao())
             assertEquals(
                 setOf("sync_lease", "sync_schedule", "sync_issue", "sync_account_issue"),
                 database

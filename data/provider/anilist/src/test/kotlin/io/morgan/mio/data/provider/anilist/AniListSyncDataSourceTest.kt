@@ -41,6 +41,38 @@ class AniListSyncDataSourceTest {
     }
 
     @Test
+    fun authenticatedLookupDistinguishesAbsentAndExistingMembership() =
+        runTest {
+            server.enqueue("""{"data":{"MediaList":null}}""")
+            assertEquals(
+                null,
+                (
+                    dataSource.findEntry(
+                        credentials,
+                        ProviderAccountId("42"),
+                        ProviderMediaId("101"),
+                        ProviderProgressUnit.EPISODE,
+                    ) as ProviderResult.Success
+                ).value,
+            )
+            val request = server.takeRequest().body!!.utf8()
+            assertTrue(request.contains("MioFindSyncEntry"))
+            assertTrue(request.contains("\"userId\":42"))
+            server.enqueue(entry(progress = 5))
+            assertEquals(
+                5,
+                (
+                    dataSource.findEntry(
+                        credentials,
+                        ProviderAccountId("42"),
+                        ProviderMediaId("101"),
+                        ProviderProgressUnit.EPISODE,
+                    ) as ProviderResult.Success
+                ).value?.progress,
+            )
+        }
+
+    @Test
     fun progressMutationUsesTheAbsoluteFieldAndValidatesTheReadBack() =
         runTest {
             server.enqueue(entry(progress = 4))
@@ -96,6 +128,43 @@ class AniListSyncDataSourceTest {
                     .utf8()
             assertTrue(mutationBody.contains("\"progressVolumes\":2"))
             assertFalse(mutationBody.contains("\"progress\":2"))
+        }
+
+    @Test
+    fun createUsesMediaIdentityAndRemovalUsesReturnedEntryIdentity() =
+        runTest {
+            server.enqueue("""{"data":{"SaveMediaListEntry":{"id":7}}}""")
+            server.enqueue(entry(progress = 0))
+
+            val created =
+                dataSource.createEntry(
+                    credentials = credentials,
+                    accountId = ProviderAccountId("42"),
+                    mediaId = ProviderMediaId("101"),
+                    unit = ProviderProgressUnit.EPISODE,
+                    status = io.morgan.mio.data.provider.api.ProviderCollectionStatus.CURRENT,
+                    progress = 0,
+                ) as ProviderResult.Success
+
+            assertEquals("7", created.value.id.value)
+            val createBody = server.takeRequest().body!!.utf8()
+            assertTrue(createBody.contains("\"mediaId\":101"))
+            assertTrue(createBody.contains("\"status\":\"CURRENT\""))
+            assertFalse(createBody.contains("\"id\":7"))
+            server.takeRequest()
+            server.enqueue("""{"data":{"DeleteMediaListEntry":{"deleted":true}}}""")
+            assertTrue(
+                dataSource.removeEntry(
+                    credentials = credentials,
+                    accountId = ProviderAccountId("42"),
+                    entryId = ProviderCollectionEntryId("7"),
+                    mediaId = ProviderMediaId("101"),
+                    unit = ProviderProgressUnit.EPISODE,
+                ) is ProviderResult.Success,
+            )
+            val deleteBody = server.takeRequest().body!!.utf8()
+            assertTrue(deleteBody.contains("MioDeleteMediaListEntry"))
+            assertTrue(deleteBody.contains("\"id\":7"))
         }
 
     @Test

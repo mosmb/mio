@@ -15,6 +15,7 @@ import io.morgan.mio.data.sync.mapper.toRemoteSyncEntryState
 import io.morgan.mio.data.sync.mapper.toSyncEntryState
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.OperationId
+import io.morgan.mio.domain.sync.OperationValue
 import io.morgan.mio.domain.sync.PendingOperation
 import io.morgan.mio.domain.sync.ProjectSyncEntryUseCase
 import io.morgan.mio.domain.sync.SyncAccountIssueKind
@@ -84,12 +85,34 @@ public class RoomRefreshLocalDataSource(
                             }
                             item.id.value to mapping.collectionEntryId
                         }.toMap()
-                val persistence =
+                val initialPersistence =
                     snapshot.toRefreshPersistence(
                         localAccountId = lease.accountId,
                         existingMediaLocalIds = existingMediaLocalIds,
                         existingEntryLocalIds = existingEntryLocalIds,
                     )
+                val resolvedEntryLocalIds = existingEntryLocalIds.toMutableMap()
+                snapshot.entries.zip(initialPersistence.entries).forEach { (remoteEntry, candidate) ->
+                    if (remoteEntry.id.value !in resolvedEntryLocalIds) {
+                        val existing =
+                            database
+                                .collectionEntryDao()
+                                .getEntryForMedia(lease.accountId.value, candidate.mediaId)
+                        if (existing != null) {
+                            resolvedEntryLocalIds[remoteEntry.id.value] = existing.collectionEntryId
+                        }
+                    }
+                }
+                val persistence =
+                    if (resolvedEntryLocalIds == existingEntryLocalIds) {
+                        initialPersistence
+                    } else {
+                        snapshot.toRefreshPersistence(
+                            localAccountId = lease.accountId,
+                            existingMediaLocalIds = existingMediaLocalIds,
+                            existingEntryLocalIds = resolvedEntryLocalIds,
+                        )
+                    }
                 upsertMediaSnapshot(persistence)
                 upsertCollectionSnapshot(lease.accountId, persistence)
                 database.syncDao().deleteAccountIssueIfKind(
@@ -182,7 +205,7 @@ public class RoomRefreshLocalDataSource(
             require(current.accountId == accountId.value)
             require(current.progressUnit == incoming.progressUnit)
             val remote =
-                if (incoming.remoteUpdatedAtUtcMs >= current.remoteUpdatedAtUtcMs) {
+                if (!current.remotePresent || incoming.remoteUpdatedAtUtcMs >= current.remoteUpdatedAtUtcMs) {
                     incoming.toRemoteSyncEntryState()
                 } else {
                     current.toRemoteSyncEntryState()
@@ -208,6 +231,13 @@ public class RoomRefreshLocalDataSource(
                     effectiveTotal = effective.total?.value,
                     effectiveUpdatedAtUtcMs = effective.updatedAt,
                     localProgressRevision = effective.revision,
+                    effectivePresent =
+                        pendingByEntry[current.collectionEntryId]
+                            .orEmpty()
+                            .lastOrNull { it.target is OperationValue.Membership }
+                            ?.let {
+                                (it.target as OperationValue.Membership).present
+                            } ?: true,
                 ) == 1,
             )
         }

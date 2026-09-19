@@ -55,7 +55,7 @@ class MediaDetailScreenTest {
     }
 
     @Test
-    fun populatedTitleHasHeadingsCallbacksAndNoMutationControls() {
+    fun populatedTitleHasHeadingsCallbacksAndCollectionControls() {
         var backCalls = 0
         var relatedId: String? = null
         show(
@@ -77,7 +77,8 @@ class MediaDetailScreenTest {
 
         assertEquals(1, backCalls)
         assertEquals("related-1", relatedId)
-        listOf("Add to library", "Change status", "Set status", "+1", "-1", "Progress editor", "Correction")
+        composeRule.onNodeWithText("Add to library").performScrollTo().assertIsDisplayed()
+        listOf("Change status", "Set status", "+1", "-1", "Progress editor", "Correction")
             .forEach { forbidden ->
                 composeRule.onAllNodesWithText(forbidden, substring = true, ignoreCase = true).assertCountEquals(0)
             }
@@ -187,7 +188,7 @@ class MediaDetailScreenTest {
 
         assertEquals(0f, initialTop, 1f)
         composeRule.onNodeWithTag("media-detail-scrolling-hero").assertDoesNotExist()
-        composeRule.onAllNodesWithText("Add", substring = true, ignoreCase = true).assertCountEquals(0)
+        composeRule.onNodeWithText("Add to library").performScrollTo().assertIsDisplayed()
     }
 
     @Test

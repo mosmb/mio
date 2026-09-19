@@ -91,6 +91,35 @@ class ReconcilePendingOperationUseCaseTest {
     }
 
     @Test
+    fun ordinaryStatusChangesWriteFromTheirRecordedBaseAndAcknowledgeTheTarget() {
+        val operation =
+            PendingOperation(
+                id = OperationId("ordinary-status"),
+                groupId = OperationGroupId("ordinary-status"),
+                accountId = ACCOUNT,
+                collectionEntryId = ENTRY,
+                kind = PendingOperationKind.SET_STATUS,
+                base = OperationValue.Status(CollectionStatus.CURRENT),
+                target = OperationValue.Status(CollectionStatus.PLANNED),
+                positionInGroup = 0,
+            )
+        val candidate = candidate(operation)
+
+        assertEquals(
+            SyncReconciliationDecision.Write(operation.target),
+            reconcile(SyncReconciliationInput(candidate, remote(status = CollectionStatus.CURRENT))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Satisfied,
+            reconcile(SyncReconciliationInput(candidate, remote(status = CollectionStatus.PLANNED))),
+        )
+        assertEquals(
+            SyncReconciliationDecision.Conflict,
+            reconcile(SyncReconciliationInput(candidate, remote(status = CollectionStatus.DROPPED))),
+        )
+    }
+
+    @Test
     fun correctionReopensCompletedOnlyWhenRemoteStillHasTheCorrectedProgress() {
         val operation =
             PendingOperation(
@@ -113,7 +142,7 @@ class ReconcilePendingOperationUseCaseTest {
             reconcile(SyncReconciliationInput(candidate, remote(progress = 12, status = CollectionStatus.COMPLETED))),
         )
         assertEquals(
-            SyncReconciliationDecision.Rejected,
+            SyncReconciliationDecision.Satisfied,
             reconcile(SyncReconciliationInput(candidate.copy(correctionProgress = null), remote(progress = 9))),
         )
     }
@@ -198,7 +227,7 @@ class ReconcilePendingOperationUseCaseTest {
     }
 
     @Test
-    fun unrelatedStatusIntentIsRejectedEvenIfTheRemoteAlreadyMatches() {
+    fun automaticCompletionCannotSkipItsProgressCorrection() {
         val operation =
             PendingOperation(
                 id = OperationId("unrelated-status"),
@@ -212,8 +241,13 @@ class ReconcilePendingOperationUseCaseTest {
             )
 
         assertEquals(
-            SyncReconciliationDecision.Rejected,
-            reconcile(SyncReconciliationInput(candidate(operation), remote(status = CollectionStatus.COMPLETED))),
+            SyncReconciliationDecision.Conflict,
+            reconcile(
+                SyncReconciliationInput(
+                    candidate(operation, isAutomaticCompletion = true),
+                    remote(progress = 4, total = 12, status = CollectionStatus.COMPLETED),
+                ),
+            ),
         )
     }
 

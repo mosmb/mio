@@ -10,13 +10,14 @@ import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import io.morgan.mio.core.common.di.AccountScope
 import io.morgan.mio.domain.collection.CollectionRepository
+import io.morgan.mio.domain.collection.CollectionWriteResult
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.OperationId
+import io.morgan.mio.domain.progress.ChangeCollectionStatusUseCase
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
-import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressWriteResult
 import io.morgan.mio.domain.progress.StepProgressUseCase
@@ -44,6 +45,7 @@ internal class MediaDetailViewModel(
     private val mediaRepository: MediaRepository,
     private val collectionRepository: CollectionRepository,
     private val stepProgress: StepProgressUseCase,
+    private val changeCollectionStatus: ChangeCollectionStatusUseCase,
     private val undoProgress: UndoProgressUseCase,
     observeUndoUseCase: ObserveProgressUndoUseCase,
     private val syncRecoveryRepository: SyncRecoveryRepository,
@@ -57,12 +59,29 @@ internal class MediaDetailViewModel(
     private val interactionMediaIds = MutableStateFlow<Set<String>>(emptySet())
     private val motionGenerations = mutableMapOf<String, Long>()
     private var lastRequest: PendingProgressRequest? = null
+    private var statusMutationInFlight: Boolean = false
 
     internal val routineHaptics: SharedFlow<Unit> = routineHapticEvents
 
-    private val latestUndo: Flow<ProgressAction?> =
-        combine(observeUndoUseCase(), latestHiddenUndoId) { action, hiddenId ->
-            action?.takeIf { value -> value.id.value != hiddenId }
+    private val latestUndo: Flow<MediaDetailUndoUiModel?> =
+        combine(observeUndoUseCase(), collectionRepository.observeLatestAction(), latestHiddenUndoId) {
+            progressAction,
+            collectionAction,
+            hiddenId,
+            ->
+            val progress = progressAction?.let(MediaDetailUiMapper::mapUndo)
+            val collection =
+                collectionAction
+                    ?.takeIf { action -> action.undoneAt == null }
+                    ?.let(MediaDetailUiMapper::mapUndo)
+            val selected =
+                when {
+                    progress == null -> collection
+                    collection == null -> progress
+                    progressAction.createdAt >= collectionAction.createdAt -> progress
+                    else -> collection
+                }
+            selected?.takeIf { value -> value.groupId != hiddenId }
         }
 
     private val observedContent: Flow<ObservedContent> =
@@ -70,8 +89,14 @@ internal class MediaDetailViewModel(
             mediaRepository.observeMedia(mediaId),
             mediaRepository.observeRelatedMedia(mediaId),
             collectionRepository.observeEntryForMedia(accountId, mediaId),
-        ) { media, related, collection ->
-            ObservedContent(media = media, related = related, collection = collection)
+            collectionRepository.observeWritableStatuses(accountId, mediaId),
+        ) { media, related, collection, writableStatuses ->
+            ObservedContent(
+                media = media,
+                related = related,
+                collection = collection,
+                writableStatuses = writableStatuses,
+            )
         }
 
     internal val uiState: StateFlow<MediaDetailUiState> =
@@ -86,6 +111,7 @@ internal class MediaDetailViewModel(
                 MediaDetailUiMapper.mapRecovery(
                     recovery = recovery,
                     collection = content.collection,
+                    mediaId = mediaId,
                     title = content.media?.title?.value ?: "Saved title",
                 )
             when {
@@ -95,20 +121,21 @@ internal class MediaDetailViewModel(
                         related = content.related,
                         collection = content.collection,
                         latestUndo = undo,
+                        writableStatuses = content.writableStatuses,
                         progressError = error,
                         syncIssues = recoveryUi.syncIssues,
                         accountIssue = recoveryUi.accountIssue,
                     )
                 phase == RequestPhase.FAILED ->
                     MediaDetailUiState.Error(
-                        latestUndo = undo?.let(MediaDetailUiMapper::mapUndo),
+                        latestUndo = undo,
                         progressError = error,
                         syncIssues = recoveryUi.syncIssues,
                         accountIssue = recoveryUi.accountIssue,
                     )
                 else ->
                     MediaDetailUiState.Loading(
-                        latestUndo = undo?.let(MediaDetailUiMapper::mapUndo),
+                        latestUndo = undo,
                         progressError = error,
                         syncIssues = recoveryUi.syncIssues,
                         accountIssue = recoveryUi.accountIssue,
@@ -131,6 +158,7 @@ internal class MediaDetailViewModel(
                     refresh()
                 }
             is MediaDetailAction.Step -> startStep(action)
+            is MediaDetailAction.ChangeStatus -> startChangeStatus(action)
             is MediaDetailAction.Undo -> startUndo(action)
             is MediaDetailAction.RetrySync -> startSyncRetry(action)
             MediaDetailAction.RetryProgress -> lastRequest?.let(::startRequest)
@@ -212,21 +240,73 @@ internal class MediaDetailViewModel(
         }
     }
 
+    private fun startChangeStatus(action: MediaDetailAction.ChangeStatus) {
+        val content = uiState.value as? MediaDetailUiState.Content ?: return
+        if (action.status !in content.writableStatuses) return
+        if (statusMutationInFlight) return
+        val collection = content.collection
+        val unit = collection?.progressUnit?.toDomainUnit() ?: content.media.defaultProgressUnit()
+        val total = collection?.total ?: content.media.totalFor(unit)
+        val actionId = OperationGroupId(UUID.randomUUID().toString())
+        progressError.value = null
+        statusMutationInFlight = true
+        viewModelScope.launch {
+            try {
+                val result =
+                    try {
+                        changeCollectionStatus(
+                            accountId = accountId,
+                            mediaId = mediaId,
+                            progressUnit = unit,
+                            knownTotal =
+                                total?.let { value ->
+                                    io.morgan.mio.domain.model
+                                        .UnitTotal(value)
+                                },
+                            targetStatus = action.status.toDomainStatus(),
+                            actionId = actionId,
+                            undoWindow = action.timeoutMillis.milliseconds,
+                        )
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.INVALID_REQUEST)
+                    }
+                when (result) {
+                    is CollectionWriteResult.Committed,
+                    is CollectionWriteResult.AlreadyHandled,
+                    -> {
+                        latestHiddenUndoId.value = null
+                        routineHapticEvents.tryEmit(Unit)
+                    }
+                    else -> progressError.value = MediaDetailProgressErrorUiModel(retryable = false)
+                }
+            } finally {
+                statusMutationInFlight = false
+            }
+        }
+    }
+
     private fun startUndo(action: MediaDetailAction.Undo) {
         val groupId = runCatching { OperationGroupId(action.groupId) }.getOrNull() ?: return
         viewModelScope.launch {
             val result =
                 try {
-                    undoProgress(groupId)
+                    if (collectionRepository.findAction(groupId) != null) {
+                        collectionRepository.undo(groupId)
+                    } else {
+                        undoProgress(groupId)
+                    }
                 } catch (cancellation: CancellationException) {
                     throw cancellation
                 } catch (_: Exception) {
                     ProgressWriteResult.Rejected(ProgressWriteResult.Rejection.UNDO_UNAVAILABLE)
                 }
-            when (result) {
-                is ProgressWriteResult.Committed,
-                is ProgressWriteResult.AlreadyHandled,
-                -> latestHiddenUndoId.value = groupId.value
+            when {
+                result is ProgressWriteResult.Committed ||
+                    result is ProgressWriteResult.AlreadyHandled ||
+                    result is CollectionWriteResult.Committed ||
+                    result is CollectionWriteResult.AlreadyHandled -> latestHiddenUndoId.value = groupId.value
                 else -> {
                     latestHiddenUndoId.value = groupId.value
                     progressError.value = MediaDetailProgressErrorUiModel(retryable = false)
@@ -271,7 +351,41 @@ internal class MediaDetailViewModel(
         val media: io.morgan.mio.domain.media.Media?,
         val related: List<io.morgan.mio.domain.media.Media>,
         val collection: io.morgan.mio.domain.collection.CollectionEntry?,
+        val writableStatuses: List<io.morgan.mio.domain.collection.CollectionStatus>,
     )
+
+    private fun MediaDetailCollectionStatus.toDomainStatus(): io.morgan.mio.domain.collection.CollectionStatus =
+        when (this) {
+            MediaDetailCollectionStatus.CURRENT -> io.morgan.mio.domain.collection.CollectionStatus.CURRENT
+            MediaDetailCollectionStatus.PLANNED -> io.morgan.mio.domain.collection.CollectionStatus.PLANNED
+            MediaDetailCollectionStatus.PAUSED -> io.morgan.mio.domain.collection.CollectionStatus.PAUSED
+            MediaDetailCollectionStatus.COMPLETED -> io.morgan.mio.domain.collection.CollectionStatus.COMPLETED
+            MediaDetailCollectionStatus.DROPPED -> io.morgan.mio.domain.collection.CollectionStatus.DROPPED
+            MediaDetailCollectionStatus.REPEATING -> io.morgan.mio.domain.collection.CollectionStatus.REPEATING
+        }
+
+    private fun MediaDetailProgressUnit.toDomainUnit(): io.morgan.mio.domain.model.ProgressUnit =
+        when (this) {
+            MediaDetailProgressUnit.EPISODE -> io.morgan.mio.domain.model.ProgressUnit.EPISODE
+            MediaDetailProgressUnit.CHAPTER -> io.morgan.mio.domain.model.ProgressUnit.CHAPTER
+            MediaDetailProgressUnit.VOLUME -> io.morgan.mio.domain.model.ProgressUnit.VOLUME
+        }
+
+    private fun MediaDetailUiModel.defaultProgressUnit(): io.morgan.mio.domain.model.ProgressUnit =
+        if (type == MediaDetailMediaType.ANIME) {
+            io.morgan.mio.domain.model.ProgressUnit.EPISODE
+        } else if (totals.chapters != null) {
+            io.morgan.mio.domain.model.ProgressUnit.CHAPTER
+        } else {
+            io.morgan.mio.domain.model.ProgressUnit.VOLUME
+        }
+
+    private fun MediaDetailUiModel.totalFor(unit: io.morgan.mio.domain.model.ProgressUnit): Int? =
+        when (unit) {
+            io.morgan.mio.domain.model.ProgressUnit.EPISODE -> totals.episodes
+            io.morgan.mio.domain.model.ProgressUnit.CHAPTER -> totals.chapters
+            io.morgan.mio.domain.model.ProgressUnit.VOLUME -> totals.volumes
+        }
 
     @AssistedFactory
     @ContributesIntoMap(AccountScope::class)

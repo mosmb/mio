@@ -227,6 +227,38 @@ class SynchronizeAccountUseCaseTest {
         }
 
     @Test
+    fun createMembershipUsesTheWritePathWithoutReadingAndSettlesTheOperation() =
+        runTest {
+            val operation = membershipOperation(PendingOperationKind.CREATE_ENTRY, targetPresent = true)
+            val repository = RecordingRepository(listOf(candidate(operation)))
+
+            assertEquals(SyncRunResult.Complete, synchronize(repository))
+            assertEquals(listOf(OperationValue.Membership(true)), repository.writes)
+            assertEquals(setOf(operation.id), repository.settledOperationIds)
+            assertEquals(0, repository.readCount)
+            assertEquals(1, repository.commitCount)
+            assertEquals(0, repository.removalCommitCount)
+        }
+
+    @Test
+    fun removeMembershipUsesTheRemovalCommitPathWithoutReading() =
+        runTest {
+            val operation = membershipOperation(PendingOperationKind.REMOVE_ENTRY, targetPresent = false)
+            val repository =
+                RecordingRepository(
+                    candidates = listOf(candidate(operation)),
+                    remoteResult = SyncRemoteResult.Removed,
+                )
+
+            assertEquals(SyncRunResult.Complete, synchronize(repository))
+            assertEquals(listOf(OperationValue.Membership(false)), repository.writes)
+            assertEquals(setOf(operation.id), repository.settledOperationIds)
+            assertEquals(0, repository.readCount)
+            assertEquals(0, repository.commitCount)
+            assertEquals(1, repository.removalCommitCount)
+        }
+
+    @Test
     fun successfulHttpWithUnchangedReadBackDoesNotDiscardIntent() =
         runTest {
             val repository =
@@ -292,6 +324,24 @@ class SynchronizeAccountUseCaseTest {
             lastAttemptAt = now,
         )
 
+    private fun membershipOperation(
+        kind: PendingOperationKind,
+        targetPresent: Boolean,
+    ): PendingOperation =
+        PendingOperation(
+            id = OperationId("operation-${kind.name.lowercase()}"),
+            groupId = OperationGroupId("group-${kind.name.lowercase()}"),
+            accountId = accountId,
+            collectionEntryId = entryId,
+            kind = kind,
+            base = OperationValue.Membership(!targetPresent),
+            target = OperationValue.Membership(targetPresent),
+            positionInGroup = 0,
+            state = PendingOperationState.IN_FLIGHT,
+            attemptCount = 1,
+            lastAttemptAt = now,
+        )
+
     private fun state(progress: Int): SyncEntryState =
         SyncEntryState(
             accountId = accountId,
@@ -319,6 +369,7 @@ class SynchronizeAccountUseCaseTest {
         val renewals = mutableListOf<SyncLease>()
         var readCount: Int = 0
         var commitCount: Int = 0
+        var removalCommitCount: Int = 0
         var releaseCount: Int = 0
         var released: Boolean = false
 
@@ -360,11 +411,15 @@ class SynchronizeAccountUseCaseTest {
             value: OperationValue,
         ): SyncRemoteResult {
             writes += value
-            return SyncRemoteResult.Success(
-                state(
-                    progress = writeProgress ?: (value as OperationValue.Progress).value.value,
-                ),
-            )
+            return remoteResult
+                ?: SyncRemoteResult.Success(
+                    state(
+                        progress =
+                            writeProgress
+                                ?: (value as? OperationValue.Progress)?.value?.value
+                                ?: candidate.current.progress.value,
+                    ),
+                )
         }
 
         override suspend fun commitSnapshot(
@@ -374,6 +429,15 @@ class SynchronizeAccountUseCaseTest {
         ): SyncCommitResult {
             commitCount += 1
             this.settledOperationIds += settledOperationIds
+            return SyncCommitResult.Applied
+        }
+
+        override suspend fun commitRemoval(
+            lease: SyncLease,
+            candidate: SyncCandidate,
+        ): SyncCommitResult {
+            removalCommitCount += 1
+            settledOperationIds += candidate.operation.id
             return SyncCommitResult.Applied
         }
 

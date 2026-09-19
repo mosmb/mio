@@ -296,6 +296,76 @@ public object MioMigrations {
             }
         }
 
+    public val MIGRATION_7_8: Migration =
+        object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `collection_entry` ADD COLUMN `effective_present` INTEGER NOT NULL DEFAULT 1",
+                )
+                db.execSQL(
+                    "ALTER TABLE `collection_entry` ADD COLUMN `remote_present` INTEGER NOT NULL DEFAULT 1",
+                )
+                db.execSQL("ALTER TABLE `pending_operation` ADD COLUMN `base_present` INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE `pending_operation` ADD COLUMN `target_present` INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE `sync_issue` ADD COLUMN `base_present` INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE `sync_issue` ADD COLUMN `target_present` INTEGER DEFAULT NULL")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `local_collection_activity` (
+                        `activity_order` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `operation_group_id` TEXT NOT NULL,
+                        `account_id` TEXT NOT NULL,
+                        `collection_entry_id` TEXT NOT NULL,
+                        `media_id` TEXT NOT NULL,
+                        `progress_unit` TEXT NOT NULL,
+                        `action_kind` TEXT NOT NULL,
+                        `before_present` INTEGER NOT NULL,
+                        `before_progress` INTEGER,
+                        `before_status` TEXT,
+                        `before_total` INTEGER,
+                        `before_updated_at_utc_ms` INTEGER,
+                        `before_revision` INTEGER,
+                        `after_progress` INTEGER NOT NULL,
+                        `after_status` TEXT NOT NULL,
+                        `after_total` INTEGER,
+                        `after_updated_at_utc_ms` INTEGER NOT NULL,
+                        `after_revision` INTEGER NOT NULL,
+                        `created_at_utc_ms` INTEGER NOT NULL,
+                        `undo_until_utc_ms` INTEGER NOT NULL,
+                        `undone_at_utc_ms` INTEGER,
+                        FOREIGN KEY(`account_id`) REFERENCES `selected_account`(`account_id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`collection_entry_id`) REFERENCES `collection_entry`(`collection_entry_id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`media_id`) REFERENCES `media`(`media_id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_local_collection_activity_operation_group_id` " +
+                        "ON `local_collection_activity` (`operation_group_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_collection_activity_account_id_activity_order` " +
+                        "ON `local_collection_activity` (`account_id`, `activity_order`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_collection_activity_collection_entry_id` " +
+                        "ON `local_collection_activity` (`collection_entry_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_collection_activity_media_id` " +
+                        "ON `local_collection_activity` (`media_id`)",
+                )
+            }
+        }
+
     public val ALL: Array<Migration> =
-        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+        )
 }

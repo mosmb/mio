@@ -14,6 +14,16 @@ import kotlin.time.Instant
 @Dao
 public abstract class ProgressDao {
     @Query(
+        "UPDATE local_progress_activity SET " +
+            "undo_until_utc_ms = MAX(created_at_utc_ms, MIN(undo_until_utc_ms, :now)) " +
+            "WHERE account_id = :accountId AND undone_at_utc_ms IS NULL",
+    )
+    public abstract suspend fun expireUndo(
+        accountId: String,
+        now: Instant,
+    ): Int
+
+    @Query(
         "SELECT activity.created_at_utc_ms AS created_at_utc_ms, " +
             "media.media_type AS media_type, activity.direction AS direction " +
             "FROM local_progress_activity AS activity " +
@@ -32,7 +42,7 @@ public abstract class ProgressDao {
 
     @Query(
         "SELECT * FROM collection_entry " +
-            "WHERE account_id = :accountId AND media_id = :mediaId",
+            "WHERE account_id = :accountId AND media_id = :mediaId AND effective_present = 1",
     )
     public abstract suspend fun getEntryForMedia(
         accountId: String,
@@ -48,6 +58,7 @@ public abstract class ProgressDao {
             "WHERE collection_entry_id = :entryId " +
             "AND account_id = :accountId " +
             "AND media_id = :mediaId " +
+            "AND effective_present = 1 " +
             "AND local_progress_revision = :expectedRevision " +
             "AND effective_status = :expectedStatus " +
             "AND effective_progress = :expectedProgress " +

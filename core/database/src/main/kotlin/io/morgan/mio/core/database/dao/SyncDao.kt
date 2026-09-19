@@ -296,16 +296,31 @@ public abstract class SyncDao {
     ): LocalProgressActivityEntity?
 
     @Query(
+        "SELECT * FROM local_collection_activity " +
+            "WHERE account_id = :accountId AND operation_group_id = :groupId",
+    )
+    public abstract suspend fun getCollectionActivity(
+        accountId: String,
+        groupId: String,
+    ): io.morgan.mio.core.database.entity.LocalCollectionActivityEntity?
+
+    @Query(
         "SELECT MIN(retry_not_before_utc_ms) FROM pending_operation " +
             "WHERE account_id = :accountId AND lifecycle_state = 'retryable_failure'",
     )
     public abstract suspend fun getNextRetryAt(accountId: String): Instant?
 
     @Query(
-        "SELECT MIN(undo_until_utc_ms) FROM local_progress_activity " +
+        "SELECT MIN(undo_until_utc_ms) FROM (" +
+            "SELECT undo_until_utc_ms FROM local_progress_activity " +
             "WHERE account_id = :accountId AND undone_at_utc_ms IS NULL " +
             "AND undo_until_utc_ms > :now AND EXISTS (SELECT 1 FROM pending_operation_group g " +
-            "WHERE g.operation_group_id = local_progress_activity.operation_group_id)",
+            "WHERE g.operation_group_id = local_progress_activity.operation_group_id) " +
+            "UNION ALL " +
+            "SELECT undo_until_utc_ms FROM local_collection_activity " +
+            "WHERE account_id = :accountId AND undone_at_utc_ms IS NULL " +
+            "AND undo_until_utc_ms > :now AND EXISTS (SELECT 1 FROM pending_operation_group g " +
+            "WHERE g.operation_group_id = local_collection_activity.operation_group_id))",
     )
     public abstract suspend fun getNextUndoDeadline(
         accountId: String,
@@ -399,6 +414,7 @@ public abstract class SyncDao {
     @Query(
         "UPDATE collection_entry SET remote_status = :remoteStatus, remote_progress = :remoteProgress, " +
             "remote_total = :remoteTotal, remote_updated_at_utc_ms = :remoteUpdatedAtUtcMs, " +
+            "remote_present = 1, effective_present = :effectivePresent, " +
             "effective_status = :effectiveStatus, effective_progress = :effectiveProgress, " +
             "effective_total = :effectiveTotal, effective_updated_at_utc_ms = :effectiveUpdatedAtUtcMs, " +
             "local_progress_revision = :localProgressRevision " +
@@ -417,6 +433,7 @@ public abstract class SyncDao {
         effectiveTotal: Int?,
         effectiveUpdatedAtUtcMs: Instant,
         localProgressRevision: Long,
+        effectivePresent: Boolean = true,
     ): Int
 
     @Query("SELECT * FROM sync_lease WHERE account_id = :accountId")

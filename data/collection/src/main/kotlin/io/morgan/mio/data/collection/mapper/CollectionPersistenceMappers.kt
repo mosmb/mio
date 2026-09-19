@@ -2,9 +2,12 @@ package io.morgan.mio.data.collection.mapper
 
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
 import io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity
+import io.morgan.mio.core.database.entity.LocalCollectionActivityEntity
 import io.morgan.mio.core.database.model.StoredCollectionStatus
 import io.morgan.mio.core.database.model.StoredConnectedProvider
 import io.morgan.mio.core.database.model.StoredProgressUnit
+import io.morgan.mio.domain.collection.CollectionAction
+import io.morgan.mio.domain.collection.CollectionActionKind
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionStatus
 import io.morgan.mio.domain.model.AccountId
@@ -39,10 +42,12 @@ internal fun CollectionEntry.toInitialEntity(): CollectionEntryEntity =
         remoteProgress = progress.value,
         remoteTotal = total?.value,
         remoteUpdatedAtUtcMs = updatedAt,
+        remotePresent = true,
         effectiveStatus = status.toStoredValue(),
         effectiveProgress = progress.value,
         effectiveTotal = total?.value,
         effectiveUpdatedAtUtcMs = updatedAt,
+        effectivePresent = true,
     )
 
 internal fun CollectionEntryEntity.toEffectiveDomain(): CollectionEntry =
@@ -64,6 +69,49 @@ internal fun CollectionEntryProviderIdInput.toEntity(): CollectionEntryProviderI
         collectionEntryId = entryId.value,
     )
 
+internal fun LocalCollectionActivityEntity.toCollectionAction(): CollectionAction {
+    val after =
+        CollectionEntry(
+            id = CollectionEntryId(collectionEntryId),
+            accountId = AccountId(accountId),
+            mediaId = MediaId(mediaId),
+            status = afterStatus.toDomain(),
+            progress = ProgressValue(afterProgress),
+            progressUnit = progressUnit.toDomain(),
+            total = afterTotal?.let(::UnitTotal),
+            updatedAt = afterUpdatedAtUtcMs,
+        )
+    val before =
+        if (!beforePresent) {
+            null
+        } else {
+            CollectionEntry(
+                id = CollectionEntryId(collectionEntryId),
+                accountId = AccountId(accountId),
+                mediaId = MediaId(mediaId),
+                status = requireNotNull(beforeStatus).toDomain(),
+                progress = ProgressValue(requireNotNull(beforeProgress)),
+                progressUnit = progressUnit.toDomain(),
+                total = beforeTotal?.let(::UnitTotal),
+                updatedAt = requireNotNull(beforeUpdatedAtUtcMs),
+            )
+        }
+    return CollectionAction(
+        id =
+            io.morgan.mio.domain.model
+                .OperationGroupId(operationGroupId),
+        accountId = AccountId(accountId),
+        entryId = CollectionEntryId(collectionEntryId),
+        mediaId = MediaId(mediaId),
+        kind = if (actionKind == "add") CollectionActionKind.ADD else CollectionActionKind.STATUS,
+        before = before,
+        after = after,
+        createdAt = createdAtUtcMs,
+        undoUntil = undoUntilUtcMs,
+        undoneAt = undoneAtUtcMs,
+    )
+}
+
 private fun ProgressUnit.toStoredValue(): StoredProgressUnit =
     when (this) {
         ProgressUnit.EPISODE -> StoredProgressUnit.EPISODE
@@ -77,6 +125,10 @@ private fun StoredProgressUnit.toDomain(): ProgressUnit =
         StoredProgressUnit.CHAPTER -> ProgressUnit.CHAPTER
         StoredProgressUnit.VOLUME -> ProgressUnit.VOLUME
     }
+
+internal fun ProgressUnit.toStoredUnit(): StoredProgressUnit = toStoredValue()
+
+internal fun CollectionStatus.toStoredStatus(): StoredCollectionStatus = toStoredValue()
 
 private fun CollectionStatus.toStoredValue(): StoredCollectionStatus =
     when (this) {

@@ -1,8 +1,11 @@
 package io.morgan.mio.feature.today.impl
 
+import io.morgan.mio.domain.collection.CollectionAction
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.collection.CollectionStatusChange
+import io.morgan.mio.domain.collection.CollectionWriteResult
 import io.morgan.mio.domain.media.Artwork
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.MediaFormat
@@ -452,6 +455,31 @@ private class TestRepositories :
         entries.map { values ->
             values.firstOrNull { entry -> entry.accountId == accountId && entry.mediaId == mediaId }
         }
+
+    override suspend fun readEntryForMedia(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): CollectionEntry? =
+        entries.value.firstOrNull { entry ->
+            entry.accountId == accountId && entry.mediaId == mediaId
+        }
+
+    override fun observeWritableStatuses(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): Flow<List<CollectionStatus>> = flowOf(CollectionStatus.entries.toList())
+
+    override suspend fun findAction(actionId: OperationGroupId): CollectionAction? = null
+
+    override fun observeLatestAction(): Flow<CollectionAction?> = flowOf(null)
+
+    override suspend fun readLatestAction(): CollectionAction? = null
+
+    override suspend fun commitStatus(change: CollectionStatusChange): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(actionId: OperationGroupId): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.UNDO_UNAVAILABLE)
 
     override fun observeMedia(mediaId: MediaId): Flow<Media?> = mediaState
 

@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.withTransaction
+import io.morgan.mio.core.database.dao.CollectionActivityDao
 import io.morgan.mio.core.database.dao.CollectionEntryDao
 import io.morgan.mio.core.database.dao.MediaDao
 import io.morgan.mio.core.database.dao.MediaSearchDao
@@ -16,6 +17,7 @@ import io.morgan.mio.core.database.dao.SyncDao
 import io.morgan.mio.core.database.entity.AccountProviderIdEntity
 import io.morgan.mio.core.database.entity.CollectionEntryEntity
 import io.morgan.mio.core.database.entity.CollectionEntryProviderIdEntity
+import io.morgan.mio.core.database.entity.LocalCollectionActivityEntity
 import io.morgan.mio.core.database.entity.LocalProgressActivityEntity
 import io.morgan.mio.core.database.entity.MediaEntity
 import io.morgan.mio.core.database.entity.MediaGenreEntity
@@ -51,12 +53,13 @@ import io.morgan.mio.core.database.model.MioTypeConverters
         PendingOperationEntity::class,
         PendingOperationDependencyEntity::class,
         LocalProgressActivityEntity::class,
+        LocalCollectionActivityEntity::class,
         SyncLeaseEntity::class,
         SyncScheduleEntity::class,
         SyncIssueEntity::class,
         SyncAccountIssueEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(MioTypeConverters::class)
@@ -71,6 +74,8 @@ public abstract class MioDatabase : RoomDatabase() {
 
     public abstract fun collectionEntryDao(): CollectionEntryDao
 
+    public abstract fun collectionActivityDao(): CollectionActivityDao
+
     public abstract fun providerIdDao(): ProviderIdDao
 
     public abstract fun pendingOperationDao(): PendingOperationDao
@@ -82,6 +87,6 @@ public abstract class MioDatabase : RoomDatabase() {
     public suspend fun <T> inTransaction(block: suspend () -> T): T = withTransaction(block)
 
     public companion object {
-        public const val VERSION: Int = 7
+        public const val VERSION: Int = 8
     }
 }

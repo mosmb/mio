@@ -38,4 +38,5 @@
     <string name="progress_status_dropped">Dropped</string>
     <string name="progress_status_repeating">Repeating</string>
     <string name="progress_conflict_value_and_status">%1$s · %2$s</string>
+    <string name="progress_conflict_not_in_library">Not in library</string>
 </resources>

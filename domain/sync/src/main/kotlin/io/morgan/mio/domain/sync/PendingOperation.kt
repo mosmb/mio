@@ -16,6 +16,10 @@ public sealed interface OperationValue {
     public data class Status(
         public val value: CollectionStatus,
     ) : OperationValue
+
+    public data class Membership(
+        public val present: Boolean,
+    ) : OperationValue
 }
 
 public class PendingOperation(
@@ -56,6 +60,13 @@ public class PendingOperation(
             -> {
                 require(base is OperationValue.Status && target is OperationValue.Status)
                 require(target.value != base.value)
+            }
+
+            PendingOperationKind.CREATE_ENTRY,
+            PendingOperationKind.REMOVE_ENTRY,
+            -> {
+                require(base is OperationValue.Membership && target is OperationValue.Membership)
+                require(base.present != target.present)
             }
         }
 

@@ -14,6 +14,7 @@ import io.morgan.mio.data.sync.mapper.toSyncEntryState
 import io.morgan.mio.domain.model.AccountId
 import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.OperationId
+import io.morgan.mio.domain.sync.OperationValue
 import io.morgan.mio.domain.sync.PendingOperation
 import io.morgan.mio.domain.sync.PendingOperationKind
 import io.morgan.mio.domain.sync.ProjectSyncEntryUseCase
@@ -216,7 +217,12 @@ public class RoomSyncLocalDataSource(
                     }
                 rows.forEach { (incoming, row) ->
                     val storedRemote = row.toRemoteSyncEntryState()
-                    val remote = if (incoming.updatedAt >= row.remoteUpdatedAtUtcMs) incoming else storedRemote
+                    val remote =
+                        if (!row.remotePresent || incoming.updatedAt >= row.remoteUpdatedAtUtcMs) {
+                            incoming
+                        } else {
+                            storedRemote
+                        }
                     val current = row.toSyncEntryState()
                     val pending = pendingForEntry(lease.accountId.value, row.collectionEntryId)
                     val effective = project(remote = remote, current = current, pending = pending)
@@ -234,6 +240,11 @@ public class RoomSyncLocalDataSource(
                             effectiveTotal = effective.total?.value,
                             effectiveUpdatedAtUtcMs = effective.updatedAt,
                             localProgressRevision = effective.revision,
+                            effectivePresent =
+                                pending
+                                    .lastOrNull { it.target is OperationValue.Membership }
+                                    ?.let { (it.target as OperationValue.Membership).present }
+                                    ?: true,
                         ) == 1,
                     )
                 }
@@ -245,6 +256,49 @@ public class RoomSyncLocalDataSource(
                         database.syncDao().deleteIssue(lease.accountId.value, "${original.operationId}:sync")
                     }
                 }
+                if (!ownsLease(lease, clock.now())) throw LeaseExpiredDuringCommit()
+                SyncCommitResult.Applied
+            }
+        }
+
+    public suspend fun commitRemoval(
+        lease: SyncLease,
+        candidate: SyncCandidate,
+    ): SyncCommitResult =
+        fencedCommit {
+            database.inTransaction {
+                val now = clock.now()
+                if (!ownsLease(lease, now)) return@inTransaction SyncCommitResult.LeaseLost
+                val operation =
+                    database.syncDao().getOperation(candidate.operation.id.value)
+                        ?: return@inTransaction SyncCommitResult.AccountGone
+                if (operation.lifecycleState == StoredPendingOperationState.CANCELLED) {
+                    return@inTransaction SyncCommitResult.Applied
+                }
+                require(operation.lifecycleState == StoredPendingOperationState.IN_FLIGHT)
+                require(operation.kind == StoredPendingOperationKind.REMOVE_ENTRY)
+                require(operation.accountId == lease.accountId.value)
+                check(
+                    database.syncDao().setOperationState(
+                        accountId = lease.accountId.value,
+                        operationId = operation.operationId,
+                        state = StoredPendingOperationState.DELIVERED,
+                        retryNotBeforeUtcMs = null,
+                    ) == 1,
+                )
+                database.syncDao().deleteIssue(lease.accountId.value, "${operation.operationId}:sync")
+                database.syncDao().getGroup(operation.operationGroupId)?.compensatesGroupId?.let { original ->
+                    database.syncDao().getOperationsForGroup(original).forEach {
+                        database.syncDao().deleteIssue(lease.accountId.value, "${it.operationId}:sync")
+                    }
+                }
+                database.providerIdDao().deleteCollectionEntryProviderIds(operation.collectionEntryId)
+                check(
+                    database.collectionEntryDao().markRemoteAbsent(
+                        accountId = lease.accountId.value,
+                        entryId = operation.collectionEntryId,
+                    ) == 1,
+                )
                 if (!ownsLease(lease, clock.now())) throw LeaseExpiredDuringCommit()
                 SyncCommitResult.Applied
             }
@@ -276,7 +330,11 @@ public class RoomSyncLocalDataSource(
                 if (retryAt != null) require(retryAt > now)
                 val operationGroup = database.syncDao().getGroup(operationEntity.operationGroupId)
                 val hasCompensation =
-                    operationGroup?.compensatesGroupId == null &&
+                    !(
+                        kind == SyncIssueKind.CONFLICT &&
+                            operationEntity.kind == StoredPendingOperationKind.CREATE_ENTRY
+                    ) &&
+                        operationGroup?.compensatesGroupId == null &&
                         database
                             .syncDao()
                             .getCompensatingGroups(
@@ -305,10 +363,11 @@ public class RoomSyncLocalDataSource(
                     require(remote.accountId == lease.accountId)
                     require(remote.entryId.value == row.collectionEntryId)
                     require(remote.unit.toStoredUnit() == row.progressUnit)
-                    if (remote.updatedAt >= row.remoteUpdatedAtUtcMs) {
+                    if (!row.remotePresent || remote.updatedAt >= row.remoteUpdatedAtUtcMs) {
                         database.collectionEntryDao().upsertEntries(
                             listOf(
                                 row.copy(
+                                    remotePresent = true,
                                     remoteStatus = remote.status.toStoredStatus(),
                                     remoteProgress = remote.progress.value,
                                     remoteTotal = remote.total?.value,
@@ -317,6 +376,10 @@ public class RoomSyncLocalDataSource(
                             ),
                         )
                     }
+                }
+                if (kind == SyncIssueKind.CONFLICT) {
+                    database.collectionActivityDao().expireUndo(lease.accountId.value, now)
+                    database.progressDao().expireUndo(lease.accountId.value, now)
                 }
                 if (kind != null) {
                     val operation =
@@ -339,6 +402,8 @@ public class RoomSyncLocalDataSource(
                             baseStatus = operation.base.statusValueOrNull()?.toStoredStatus(),
                             targetProgress = operation.target.progressValueOrNull(),
                             targetStatus = operation.target.statusValueOrNull()?.toStoredStatus(),
+                            basePresent = operation.base.membershipValueOrNull(),
+                            targetPresent = operation.target.membershipValueOrNull(),
                             progressUnit = local.unit.toStoredUnit(),
                             localProgress = local.progress.value,
                             localStatus = local.status.toStoredStatus(),
@@ -406,6 +471,15 @@ public class RoomSyncLocalDataSource(
                         }
                         val activity = database.syncDao().getActivity(lease.accountId.value, group.operationGroupId)
                         if (activity != null && activity.undoneAtUtcMs == null && now < activity.undoUntilUtcMs) {
+                            return@forEach
+                        }
+                        val collectionActivity =
+                            database.syncDao().getCollectionActivity(lease.accountId.value, group.operationGroupId)
+                        if (
+                            collectionActivity != null &&
+                            collectionActivity.undoneAtUtcMs == null &&
+                            now < collectionActivity.undoUntilUtcMs
+                        ) {
                             return@forEach
                         }
                         if (group.compensatesGroupId == null &&
@@ -497,10 +571,15 @@ public class RoomSyncLocalDataSource(
         groupId: String,
     ): io.morgan.mio.domain.model.ProgressValue? {
         if (operation.kind != PendingOperationKind.SET_STATUS) return null
-        val activity = database.syncDao().getActivity(operation.accountId.value, groupId) ?: return null
-        if (activity.direction != "correction" ||
-            activity.beforeStatus != StoredCollectionStatus.COMPLETED ||
-            activity.afterStatus != StoredCollectionStatus.CURRENT
+        val activity = database.syncDao().getActivity(operation.accountId.value, groupId)
+        val collectionActivity = database.syncDao().getCollectionActivity(operation.accountId.value, groupId)
+        val beforeStatus = activity?.beforeStatus ?: collectionActivity?.beforeStatus
+        val afterStatus = activity?.afterStatus ?: collectionActivity?.afterStatus
+        val afterProgress = activity?.afterProgress ?: collectionActivity?.afterProgress
+        if ((activity == null && collectionActivity == null) ||
+            (activity != null && activity.direction != "correction") ||
+            beforeStatus != StoredCollectionStatus.COMPLETED ||
+            afterStatus != StoredCollectionStatus.CURRENT
         ) {
             return null
         }
@@ -509,7 +588,7 @@ public class RoomSyncLocalDataSource(
                 pending.collectionEntryId == operation.collectionEntryId.value &&
                     pending.positionInGroup < operation.positionInGroup &&
                     pending.kind == StoredPendingOperationKind.SET_PROGRESS_CORRECTION &&
-                    pending.targetProgress == activity.afterProgress &&
+                    pending.targetProgress == afterProgress &&
                     OperationId(pending.operationId) in operation.dependsOn
             } ?: return null
         return predecessor.targetProgress?.let {
@@ -525,8 +604,11 @@ public class RoomSyncLocalDataSource(
         if (operation.kind != PendingOperationKind.SET_STATUS) return false
         val base = operation.base as? io.morgan.mio.domain.sync.OperationValue.Status ?: return false
         val target = operation.target as? io.morgan.mio.domain.sync.OperationValue.Status ?: return false
-        val activity = database.syncDao().getActivity(operation.accountId.value, groupId) ?: return false
-        return activity.afterStatus == StoredCollectionStatus.COMPLETED &&
+        val activity = database.syncDao().getActivity(operation.accountId.value, groupId)
+        val collectionActivity = database.syncDao().getCollectionActivity(operation.accountId.value, groupId)
+        val afterStatus = activity?.afterStatus ?: collectionActivity?.afterStatus
+        val afterProgress = activity?.afterProgress ?: collectionActivity?.afterProgress
+        return afterStatus == StoredCollectionStatus.COMPLETED &&
             base.value == io.morgan.mio.domain.collection.CollectionStatus.CURRENT &&
             target.value == io.morgan.mio.domain.collection.CollectionStatus.COMPLETED &&
             database.syncDao().getOperationsForGroup(groupId).any { predecessor ->
@@ -537,7 +619,7 @@ public class RoomSyncLocalDataSource(
                         StoredPendingOperationKind.SET_PROGRESS_FORWARD,
                         StoredPendingOperationKind.SET_PROGRESS_CORRECTION,
                     ) &&
-                    predecessor.targetProgress == activity.afterProgress
+                    predecessor.targetProgress == afterProgress
             }
     }
 
@@ -556,6 +638,9 @@ public class RoomSyncLocalDataSource(
     private fun io.morgan.mio.domain.sync.OperationValue.statusValueOrNull():
         io.morgan.mio.domain.collection.CollectionStatus? =
         (this as? io.morgan.mio.domain.sync.OperationValue.Status)?.value
+
+    private fun io.morgan.mio.domain.sync.OperationValue.membershipValueOrNull(): Boolean? =
+        (this as? OperationValue.Membership)?.present
 
     private fun io.morgan.mio.domain.model.ProgressUnit.toStoredUnit(): StoredProgressUnit =
         when (this) {

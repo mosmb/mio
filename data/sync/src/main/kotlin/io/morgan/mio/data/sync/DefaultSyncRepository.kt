@@ -56,6 +56,11 @@ public class DefaultSyncRepository(
         settledOperationIds: Set<OperationId>,
     ): SyncCommitResult = localDataSource.commitSnapshot(lease, entries, settledOperationIds)
 
+    override suspend fun commitRemoval(
+        lease: SyncLease,
+        candidate: SyncCandidate,
+    ): SyncCommitResult = localDataSource.commitRemoval(lease, candidate)
+
     override suspend fun recordFailure(
         lease: SyncLease,
         candidate: SyncCandidate,

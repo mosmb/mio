@@ -15,6 +15,17 @@ import io.morgan.mio.data.provider.api.ProviderSyncDataSource
 public class FakeProviderSyncDataSource(
     override val provider: ProviderKey,
 ) : ProviderSyncDataSource {
+    public var lookup: suspend (ProviderMediaId) -> ProviderResult<ProviderCollectionEntry?> = {
+        ProviderResult.Success(null)
+    }
+
+    override suspend fun findEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+    ): ProviderResult<ProviderCollectionEntry?> = lookup(mediaId)
+
     private val reads =
         ArrayDeque<
             suspend (
@@ -46,6 +57,27 @@ public class FakeProviderSyncDataSource(
                 ProviderProgressUnit,
                 ProviderCollectionStatus,
             ) -> ProviderResult<ProviderCollectionEntry>,
+        >()
+    private val creates =
+        ArrayDeque<
+            suspend (
+                ProviderCredentials,
+                ProviderAccountId,
+                ProviderMediaId,
+                ProviderProgressUnit,
+                ProviderCollectionStatus,
+                Int,
+            ) -> ProviderResult<ProviderCollectionEntry>,
+        >()
+    private val removes =
+        ArrayDeque<
+            suspend (
+                ProviderCredentials,
+                ProviderAccountId,
+                ProviderCollectionEntryId,
+                ProviderMediaId,
+                ProviderProgressUnit,
+            ) -> ProviderResult<Unit>,
         >()
     private val callsValue = mutableListOf<SyncCall>()
 
@@ -90,6 +122,31 @@ public class FakeProviderSyncDataSource(
         statusWrites.addLast(handler)
     }
 
+    public fun enqueueCreate(
+        handler: suspend (
+            ProviderCredentials,
+            ProviderAccountId,
+            ProviderMediaId,
+            ProviderProgressUnit,
+            ProviderCollectionStatus,
+            Int,
+        ) -> ProviderResult<ProviderCollectionEntry>,
+    ) {
+        creates.addLast(handler)
+    }
+
+    public fun enqueueRemove(
+        handler: suspend (
+            ProviderCredentials,
+            ProviderAccountId,
+            ProviderCollectionEntryId,
+            ProviderMediaId,
+            ProviderProgressUnit,
+        ) -> ProviderResult<Unit>,
+    ) {
+        removes.addLast(handler)
+    }
+
     override suspend fun readEntry(
         credentials: ProviderCredentials,
         accountId: ProviderAccountId,
@@ -130,5 +187,33 @@ public class FakeProviderSyncDataSource(
         callsValue += SyncCall.Status(credentials, accountId, entryId, mediaId, unit, target)
         return statusWrites.removeFirstOrNull()?.invoke(credentials, accountId, entryId, mediaId, unit, target)
             ?: error("No queued setStatus handler for provider $provider")
+    }
+
+    override suspend fun createEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+        status: ProviderCollectionStatus,
+        progress: Int,
+    ): ProviderResult<ProviderCollectionEntry> {
+        require(credentials.provider == provider)
+        callsValue +=
+            SyncCall.Create(credentials, accountId, ProviderCollectionEntryId("new"), mediaId, unit, status, progress)
+        return creates.removeFirstOrNull()?.invoke(credentials, accountId, mediaId, unit, status, progress)
+            ?: error("No queued createEntry handler for provider $provider")
+    }
+
+    override suspend fun removeEntry(
+        credentials: ProviderCredentials,
+        accountId: ProviderAccountId,
+        entryId: ProviderCollectionEntryId,
+        mediaId: ProviderMediaId,
+        unit: ProviderProgressUnit,
+    ): ProviderResult<Unit> {
+        require(credentials.provider == provider)
+        callsValue += SyncCall.Remove(credentials, accountId, entryId, mediaId, unit)
+        return removes.removeFirstOrNull()?.invoke(credentials, accountId, entryId, mediaId, unit)
+            ?: error("No queued removeEntry handler for provider $provider")
     }
 }

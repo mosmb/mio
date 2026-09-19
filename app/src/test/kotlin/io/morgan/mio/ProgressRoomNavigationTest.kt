@@ -203,6 +203,13 @@ class ProgressRoomNavigationTest {
                     ),
                 collectionRepository =
                     DefaultCollectionRepository(
+                        accountId = ACCOUNT_ID,
+                        pendingOperationWriter =
+                            io.morgan.mio.data.sync.DefaultPendingOperationWriter(
+                                ACCOUNT_ID,
+                                io.morgan.mio.data.sync.local
+                                    .RoomPendingOperationLocalDataSource(fixture.database),
+                            ),
                         localDataSource = RoomCollectionLocalDataSource(fixture.database),
                         refreshRequester = CollectionRefreshRequester {},
                     ),

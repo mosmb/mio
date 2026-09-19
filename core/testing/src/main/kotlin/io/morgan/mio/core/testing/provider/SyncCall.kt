@@ -39,4 +39,22 @@ public sealed interface SyncCall {
         override val unit: ProviderProgressUnit,
         public val target: ProviderCollectionStatus,
     ) : SyncCall
+
+    public data class Create(
+        override val credentials: ProviderCredentials,
+        override val accountId: ProviderAccountId,
+        override val entryId: ProviderCollectionEntryId,
+        override val mediaId: ProviderMediaId,
+        override val unit: ProviderProgressUnit,
+        public val status: ProviderCollectionStatus,
+        public val progress: Int,
+    ) : SyncCall
+
+    public data class Remove(
+        override val credentials: ProviderCredentials,
+        override val accountId: ProviderAccountId,
+        override val entryId: ProviderCollectionEntryId,
+        override val mediaId: ProviderMediaId,
+        override val unit: ProviderProgressUnit,
+    ) : SyncCall
 }

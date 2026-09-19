@@ -1,8 +1,11 @@
 package io.morgan.mio.domain.queue
 
+import io.morgan.mio.domain.collection.CollectionAction
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.collection.CollectionStatus
+import io.morgan.mio.domain.collection.CollectionStatusChange
+import io.morgan.mio.domain.collection.CollectionWriteResult
 import io.morgan.mio.domain.media.Artwork
 import io.morgan.mio.domain.media.Media
 import io.morgan.mio.domain.media.MediaFormat
@@ -16,6 +19,7 @@ import io.morgan.mio.domain.model.CollectionEntryId
 import io.morgan.mio.domain.model.MediaId
 import io.morgan.mio.domain.model.MediaTitle
 import io.morgan.mio.domain.model.MediaType
+import io.morgan.mio.domain.model.OperationGroupId
 import io.morgan.mio.domain.model.ProgressUnit
 import io.morgan.mio.domain.model.ProgressValue
 import io.morgan.mio.domain.model.UnitNumber
@@ -28,6 +32,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
@@ -439,6 +444,29 @@ private class TestCollectionRepository : CollectionRepository {
         entries.map { values ->
             values.firstOrNull { entry -> entry.accountId == accountId && entry.mediaId == mediaId }
         }
+
+    override suspend fun readEntryForMedia(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): CollectionEntry? =
+        entries.value.firstOrNull { entry -> entry.accountId == accountId && entry.mediaId == mediaId }
+
+    override fun observeWritableStatuses(
+        accountId: AccountId,
+        mediaId: MediaId,
+    ): Flow<List<CollectionStatus>> = flowOf(CollectionStatus.entries.toList())
+
+    override suspend fun findAction(actionId: OperationGroupId): CollectionAction? = null
+
+    override fun observeLatestAction(): Flow<CollectionAction?> = flowOf(null)
+
+    override suspend fun readLatestAction(): CollectionAction? = null
+
+    override suspend fun commitStatus(change: CollectionStatusChange): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.MISSING_ENTRY)
+
+    override suspend fun undo(actionId: OperationGroupId): CollectionWriteResult =
+        CollectionWriteResult.Rejected(CollectionWriteResult.Rejection.UNDO_UNAVAILABLE)
 
     override suspend fun refreshCollection(accountId: AccountId) {
         refreshCalls += accountId

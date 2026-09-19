@@ -108,6 +108,10 @@ public data class PendingOperationEntity(
     public val baseStatus: StoredCollectionStatus?,
     @ColumnInfo(name = "target_status")
     public val targetStatus: StoredCollectionStatus?,
+    @ColumnInfo(name = "base_present", defaultValue = "NULL")
+    public val basePresent: Boolean? = null,
+    @ColumnInfo(name = "target_present", defaultValue = "NULL")
+    public val targetPresent: Boolean? = null,
     @ColumnInfo(name = "lifecycle_state")
     public val lifecycleState: StoredPendingOperationState,
     @ColumnInfo(name = "attempt_count")
@@ -131,12 +135,14 @@ public data class PendingOperationEntity(
             StoredPendingOperationKind.SET_PROGRESS_FORWARD -> {
                 require(baseProgress != null && targetProgress != null)
                 require(baseStatus == null && targetStatus == null)
+                require(basePresent == null && targetPresent == null)
                 require(targetProgress > baseProgress)
             }
 
             StoredPendingOperationKind.SET_PROGRESS_CORRECTION -> {
                 require(baseProgress != null && targetProgress != null)
                 require(baseStatus == null && targetStatus == null)
+                require(basePresent == null && targetPresent == null)
                 require(targetProgress != baseProgress)
             }
 
@@ -146,6 +152,16 @@ public data class PendingOperationEntity(
                 require(baseProgress == null && targetProgress == null)
                 require(baseStatus != null && targetStatus != null)
                 require(targetStatus != baseStatus)
+                require(basePresent == null && targetPresent == null)
+            }
+
+            StoredPendingOperationKind.CREATE_ENTRY,
+            StoredPendingOperationKind.REMOVE_ENTRY,
+            -> {
+                require(baseProgress == null && targetProgress == null)
+                require(baseStatus == null && targetStatus == null)
+                require(basePresent != null && targetPresent != null)
+                require(basePresent != targetPresent)
             }
         }
 

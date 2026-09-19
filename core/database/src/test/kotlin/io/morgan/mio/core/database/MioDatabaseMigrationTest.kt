@@ -62,7 +62,7 @@ class MioDatabaseMigrationTest {
         }
 
         helper
-            .runMigrationsAndValidate(TEST_DATABASE_NAME, 7, true, *MioMigrations.ALL)
+            .runMigrationsAndValidate(TEST_DATABASE_NAME, 8, true, *MioMigrations.ALL)
             .use { migrated ->
                 assertEquals(1, countRows(migrated, "selected_account"))
                 assertEquals(1, countRows(migrated, "media"))
@@ -71,6 +71,7 @@ class MioDatabaseMigrationTest {
                 assertEquals(0, countRows(migrated, "pending_operation"))
                 assertEquals(0, countRows(migrated, "pending_operation_dependency"))
                 assertEquals(0, countRows(migrated, "local_progress_activity"))
+                assertEquals(0, countRows(migrated, "local_collection_activity"))
                 assertEquals(
                     0L,
                     migrated
@@ -83,6 +84,10 @@ class MioDatabaseMigrationTest {
                 )
                 assertTrue(hasColumn(migrated, "media", "release_year"))
                 assertTrue(hasColumn(migrated, "media", "score_percent"))
+                assertTrue(hasColumn(migrated, "collection_entry", "effective_present"))
+                assertTrue(hasColumn(migrated, "collection_entry", "remote_present"))
+                assertTrue(hasColumn(migrated, "pending_operation", "base_present"))
+                assertTrue(hasColumn(migrated, "sync_issue", "target_present"))
             }
 
         val current = MioDatabaseFactory.create(context, TEST_DATABASE_NAME)
@@ -97,14 +102,15 @@ class MioDatabaseMigrationTest {
         assertNotNull(current.syncDao())
         current.close()
 
-        assertEquals(7, MioDatabase.VERSION)
-        assertEquals(6, MioMigrations.ALL.size)
+        assertEquals(8, MioDatabase.VERSION)
+        assertEquals(7, MioMigrations.ALL.size)
         assertTrue(MioMigrations.ALL[0] === MioMigrations.MIGRATION_1_2)
         assertTrue(MioMigrations.ALL[1] === MioMigrations.MIGRATION_2_3)
         assertTrue(MioMigrations.ALL[2] === MioMigrations.MIGRATION_3_4)
         assertTrue(MioMigrations.ALL[3] === MioMigrations.MIGRATION_4_5)
         assertTrue(MioMigrations.ALL[4] === MioMigrations.MIGRATION_5_6)
         assertTrue(MioMigrations.ALL[5] === MioMigrations.MIGRATION_6_7)
+        assertTrue(MioMigrations.ALL[6] === MioMigrations.MIGRATION_7_8)
     }
 
     @Test
@@ -293,7 +299,7 @@ class MioDatabaseMigrationTest {
     }
 
     @Test
-    fun versionFiveSyncStateSurvivesAccountIssueMigration() {
+    fun versionFiveSyncStateSurvivesThroughMembershipMigration() {
         helper.createDatabase(TEST_DATABASE_V5_NAME, 5).use { database ->
             database.execSQL(
                 "INSERT INTO selected_account " +
@@ -380,8 +386,14 @@ class MioDatabaseMigrationTest {
         }
 
         helper
-            .runMigrationsAndValidate(TEST_DATABASE_V5_NAME, 6, true, MioMigrations.MIGRATION_5_6)
-            .use { migrated ->
+            .runMigrationsAndValidate(
+                TEST_DATABASE_V5_NAME,
+                8,
+                true,
+                MioMigrations.MIGRATION_5_6,
+                MioMigrations.MIGRATION_6_7,
+                MioMigrations.MIGRATION_7_8,
+            ).use { migrated ->
                 assertEquals(1, countRows(migrated, "selected_account"))
                 assertEquals(1, countRows(migrated, "account_provider_id"))
                 assertEquals(1, countRows(migrated, "media_provider_id"))
