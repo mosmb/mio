@@ -146,9 +146,13 @@ public class RefreshEmulatorFixtureTest {
     @Test
     public fun resumeAfterRestart() = holdActivityUntilReleased()
 
-    private fun holdActivityUntilReleased() =
+    // Manual onboarding/import checks use the same opt-in HTTP/OAuth fixture without seeded rows.
+    @Test
+    public fun holdOnboardingForCli() = holdActivityUntilReleased(requireSeed = false)
+
+    private fun holdActivityUntilReleased(requireSeed: Boolean = true) =
         runBlocking {
-            requireFixture()
+            if (requireSeed) requireFixture()
             val finish = File(app.filesDir, FINISH_FILE)
             finish.delete()
             ActivityScenario.launch(MainActivity::class.java).use {
@@ -172,22 +176,24 @@ public class RefreshEmulatorFixtureTest {
     }
 
     private suspend fun snapshotRows() {
-        val entries = database.syncDao().getEntries(ACCOUNT_ID)
-        val operations = database.syncDao().getOrderedOperations(ACCOUNT_ID)
-        val entryIssues = database.syncDao().getIssues(ACCOUNT_ID)
-        val accountIssue = database.syncDao().getAccountIssue(ACCOUNT_ID)
-        val schedule = database.syncDao().getSchedule(ACCOUNT_ID)
-        val lease = database.syncDao().getLease(ACCOUNT_ID)
+        val selectedAccount = database.syncDao().getSelectedAccount()
+        val accountId = selectedAccount?.accountId ?: ACCOUNT_ID
+        val entries = database.syncDao().getEntries(accountId)
+        val operations = database.syncDao().getOrderedOperations(accountId)
+        val entryIssues = database.syncDao().getIssues(accountId)
+        val accountIssue = database.syncDao().getAccountIssue(accountId)
+        val schedule = database.syncDao().getSchedule(accountId)
+        val lease = database.syncDao().getLease(accountId)
         val work =
             androidx.work.WorkManager
                 .getInstance(app)
-                .getWorkInfosForUniqueWork("mio.pending.$ACCOUNT_ID")
+                .getWorkInfosForUniqueWork("mio.pending.$accountId")
                 .get()
                 .map { info -> "${info.id}:${info.state}:${info.runAttemptCount}:${info.tags.sorted()}" }
         val snapshot =
             buildString {
                 appendLine("pid=${android.os.Process.myPid()}")
-                appendLine("provider=${provider.name}")
+                appendLine("provider=${selectedAccount?.connectedProvider}")
                 appendLine("capturedAt=${Clock.System.now()}")
                 appendLine("entries=$entries")
                 appendLine("operations=$operations")
