@@ -100,6 +100,7 @@ dependencies {
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.room.testing)
+    testImplementation(libs.work.testing)
     testImplementation(libs.datastore.preferences)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit4)

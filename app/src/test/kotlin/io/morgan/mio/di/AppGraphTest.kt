@@ -2,6 +2,8 @@ package io.morgan.mio.di
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.ListenableWorker
+import androidx.work.testing.TestListenableWorkerBuilder
 import dev.zacsweers.metro.createDynamicGraphFactory
 import dev.zacsweers.metro.createGraphFactory
 import io.morgan.mio.core.testing.provider.providerBindingFixture
@@ -49,6 +51,28 @@ class AppGraphTest {
             assertNotNull(graph.workerFactory)
             assertNotNull(graph.workManagerConfiguration)
             assertNotNull(graph.pendingSyncWorkDispatcher)
+        } finally {
+            graph.database.close()
+            graph.processCoroutineScope.cancel()
+            graph.imageLoader.shutdown()
+        }
+    }
+
+    @Test
+    fun productionConfigurationCanConstructPendingSyncWorker() {
+        val graph = createGraphFactory<AppGraph.Factory>().create(context)
+        try {
+            val workerClass =
+                Class
+                    .forName("io.morgan.mio.sync.work.PendingSyncWorker")
+                    .asSubclass(ListenableWorker::class.java)
+            val worker =
+                TestListenableWorkerBuilder
+                    .from(context, workerClass)
+                    .setWorkerFactory(graph.workManagerConfiguration.workerFactory)
+                    .build()
+
+            assertEquals(workerClass, worker.javaClass)
         } finally {
             graph.database.close()
             graph.processCoroutineScope.cancel()
