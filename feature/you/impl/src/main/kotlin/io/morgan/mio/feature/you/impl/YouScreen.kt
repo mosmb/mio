@@ -141,7 +141,6 @@ internal fun YouScreen(
                     style = MioTheme.typography.title,
                     modifier = Modifier.semantics { heading() },
                 )
-                IdentityCard(state.identity)
                 RecapSection(state.statistics, state.rotationDate) { onAction(YouAction.RetryScreen) }
                 StatisticsSection(
                     statistics = state.statistics,
@@ -638,18 +637,6 @@ private fun DisconnectConfirmationDialog(
             }
         },
     )
-}
-
-@Composable
-private fun IdentityCard(identity: YouIdentityUiModel) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MioTheme.colors.surface,
-        shape = MioTheme.shapes.lg,
-        border = BorderStroke(1.dp, MioTheme.colors.border),
-    ) {
-        IdentityContent(identity)
-    }
 }
 
 @Composable
