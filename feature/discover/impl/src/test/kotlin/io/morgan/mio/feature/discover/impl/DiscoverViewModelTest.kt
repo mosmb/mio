@@ -140,6 +140,39 @@ class DiscoverViewModelTest {
         }
 
     @Test
+    fun repeatedConnectionFailuresCanRecoverWithRetryWithoutRecreatingTheViewModel() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repository = FakeMediaSearchRepository()
+            val viewModel = DiscoverViewModel(AccountId("discover-account"), repository, EmptyCollectionRepository)
+            val store = ViewModelStore().also { it.put("discover", viewModel) }
+            try {
+                repository.refreshBehavior = { _, _ -> throw java.io.IOException("Unavailable") }
+                viewModel.onAction(DiscoverAction.SelectFilter(DiscoverMediaFilter.ANIME))
+                viewModel.onAction(DiscoverAction.QueryChanged("Mushishi"))
+                advanceTimeBy(300)
+                runCurrent()
+                assertTrue(viewModel.uiState.value.refreshFailed)
+                viewModel.onAction(DiscoverAction.Retry)
+                runCurrent()
+                assertTrue(viewModel.uiState.value.refreshFailed)
+                repository.refreshBehavior = { query, filter ->
+                    repository.observations.getValue(query to filter).value = MediaSearchResults(emptyList(), false)
+                    MediaSearchCommandOutcome.SUCCEEDED
+                }
+                viewModel.onAction(DiscoverAction.Retry)
+                runCurrent()
+                assertEquals(List(3) { "Mushishi" to MediaSearchFilter.ANIME }, repository.refreshCalls)
+                assertFalse(viewModel.uiState.value.refreshFailed)
+                assertFalse(viewModel.uiState.value.isSearching)
+                assertTrue(viewModel.uiState.value.hasObservedResults)
+            } finally {
+                store.clear()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
     fun retryRestartsFailedCacheObservation() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))

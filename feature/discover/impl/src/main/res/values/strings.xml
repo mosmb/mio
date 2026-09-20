@@ -8,7 +8,7 @@
     <string name="discover_prompt_title">Find something to watch or read</string>
     <string name="discover_prompt_message">Search titles from your connected account.</string>
     <string name="discover_failure_title">Search could not be loaded</string>
-    <string name="discover_failure_message">Check your connection, then try again.</string>
+    <string name="discover_failure_message">Try again in a moment. Your saved library is still available.</string>
     <string name="discover_cached_failure_message">Could not update results. Saved results are still shown.</string>
     <string name="discover_no_results_title">No results found</string>
     <string name="discover_no_results_message">Try another title or change the filter.</string>
