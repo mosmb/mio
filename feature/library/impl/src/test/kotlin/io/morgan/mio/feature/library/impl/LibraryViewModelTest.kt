@@ -202,6 +202,7 @@ class LibraryViewModelTest {
             media.media("manga-current").value = media("manga-current", MediaType.MANGA)
             media.media("anime-completed").value = media("anime-completed", MediaType.ANIME)
             media.releases("anime-ready").value = listOf(release("anime-ready", 2, ReleaseTime.Trusted(now)))
+            media.releases("manga-current").value = listOf(release("manga-current", 2, ReleaseTime.Trusted(now)))
             val saved =
                 TestPreferencesRepository(
                     AccountPreferences(
@@ -225,10 +226,11 @@ class LibraryViewModelTest {
                     restored.uiState.value.rows
                         .map(LibraryRowUiModel::mediaId),
                 )
-                assertEquals(LibraryMediaFilter.ANIME, ready.uiState.value.mediaFilter)
+                assertEquals(LibraryMediaFilter.ALL, ready.uiState.value.mediaFilter)
                 assertEquals(LibraryStatusFilter.READY, ready.uiState.value.statusFilter)
+                assertEquals("", ready.uiState.value.query)
                 assertEquals(
-                    listOf("anime-ready"),
+                    listOf("anime-ready", "manga-current"),
                     ready.uiState.value.rows
                         .map(LibraryRowUiModel::mediaId),
                 )

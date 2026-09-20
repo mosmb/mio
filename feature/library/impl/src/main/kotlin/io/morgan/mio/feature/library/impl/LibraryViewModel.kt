@@ -146,7 +146,7 @@ internal class LibraryViewModel(
         viewModelScope.launch {
             preferencesRepository.observeAccountPreferences(accountId).collect { preferences ->
                 if (!preferencesRestored) {
-                    if (mediaSelectionGeneration == initialMediaGeneration) {
+                    if (!initialReady && mediaSelectionGeneration == initialMediaGeneration) {
                         mediaFilter = preferences.libraryMediaFilter.toUiFilter()
                     }
                     if (!initialReady && statusSelectionGeneration == initialStatusGeneration) {
