@@ -2,6 +2,7 @@ package io.morgan.mio
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -153,10 +154,10 @@ class ProgressRoomNavigationTest {
 
             waitForText(scheduler, "Fixture title")
             composeRule.onNodeWithText("Fixture title").performClick()
-            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Change status")
             composeRule
                 .onNodeWithContentDescription("Increase episode to 2")
-                .performScrollTo()
+                .assertIsDisplayed()
                 .performClick()
             waitForProgress(scheduler, fixture.database, 2)
             assertEquals(1, countRows(fixture.database, "local_progress_activity"))

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,10 +23,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -36,6 +40,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -71,7 +76,6 @@ internal fun MediaDetailRoute(
     mediaId: MediaId,
     onBack: () -> Unit,
     onRelatedTitle: (MediaId) -> Unit,
-    onEditProgress: (MediaId) -> Unit,
     onResolveProgressConflict: (OperationId, CollectionEntryId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -109,7 +113,6 @@ internal fun MediaDetailRoute(
         onBack = onBack,
         onRetry = { viewModel.onAction(MediaDetailAction.Retry) },
         onRelatedTitleClick = { relatedId -> onRelatedTitle(MediaId(relatedId)) },
-        onEditProgress = { onEditProgress(mediaId) },
         onResolveProgressConflict = { operationId, entryId ->
             onResolveProgressConflict(OperationId(operationId), CollectionEntryId(entryId))
         },
@@ -128,7 +131,6 @@ internal fun MediaDetailScreen(
     onRetry: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onEditProgress: () -> Unit = {},
     onResolveProgressConflict: (String, String) -> Unit = { _, _ -> },
     onAction: (MediaDetailAction) -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
@@ -137,45 +139,68 @@ internal fun MediaDetailScreen(
     onRetryRefresh: () -> Unit = {},
 ) {
     val loadingDescription = stringResource(R.string.media_detail_loading)
+    var trackingHeight by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     Box(modifier = modifier.fillMaxSize()) {
-        when (state) {
-            is MediaDetailUiState.Loading ->
-                Box(
-                    modifier = Modifier.fillMaxSize().semantics { liveRegion = LiveRegionMode.Polite },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.semantics { contentDescription = loadingDescription },
-                    )
-                    MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) {
+                when (state) {
+                    is MediaDetailUiState.Loading ->
+                        Box(
+                            modifier = Modifier.fillMaxSize().semantics { liveRegion = LiveRegionMode.Polite },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.semantics { contentDescription = loadingDescription },
+                            )
+                            MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+                        }
+                    is MediaDetailUiState.Error ->
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            MioErrorState(
+                                title = stringResource(R.string.media_detail_error_title),
+                                message = stringResource(R.string.media_detail_error_message),
+                                retryLabel = stringResource(R.string.media_detail_retry),
+                                onRetry = onRetry,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+                        }
+                    is MediaDetailUiState.Content ->
+                        MediaDetailContent(
+                            state = state,
+                            onBack = onBack,
+                            onRelatedTitleClick = onRelatedTitleClick,
+                            onResolveProgressConflict = onResolveProgressConflict,
+                            onAction = onAction,
+                            timeoutMillis = timeoutMillis,
+                            providerLabel = providerLabel,
+                            onReconnect = onReconnect,
+                            onRetryRefresh = onRetryRefresh,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                 }
-            is MediaDetailUiState.Error ->
-                Box(modifier = Modifier.fillMaxSize()) {
-                    MioErrorState(
-                        title = stringResource(R.string.media_detail_error_title),
-                        message = stringResource(R.string.media_detail_error_message),
-                        retryLabel = stringResource(R.string.media_detail_retry),
-                        onRetry = onRetry,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
-                }
-            is MediaDetailUiState.Content ->
-                MediaDetailContent(
+            }
+            if (state is MediaDetailUiState.Content) {
+                MediaDetailTrackingBar(
                     state = state,
-                    onBack = onBack,
-                    onRelatedTitleClick = onRelatedTitleClick,
-                    onEditProgress = onEditProgress,
-                    onResolveProgressConflict = onResolveProgressConflict,
                     onAction = onAction,
                     timeoutMillis = timeoutMillis,
-                    providerLabel = providerLabel,
-                    onReconnect = onReconnect,
-                    onRetryRefresh = onRetryRefresh,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.onSizeChanged { trackingHeight = it.height },
                 )
+            }
         }
-        MediaDetailSnackbar(state = state, onAction = onAction)
+        MediaDetailSnackbar(
+            state = state,
+            onAction = onAction,
+            modifier =
+                Modifier.padding(
+                    bottom =
+                        with(density) {
+                            if (state is MediaDetailUiState.Content) trackingHeight.toDp() else 0.dp
+                        },
+                ),
+        )
     }
 }
 
@@ -184,7 +209,6 @@ private fun MediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
-    onEditProgress: () -> Unit,
     onResolveProgressConflict: (String, String) -> Unit,
     modifier: Modifier = Modifier,
     onAction: (MediaDetailAction) -> Unit = {},
@@ -198,7 +222,6 @@ private fun MediaDetailContent(
             state = state,
             onBack = onBack,
             onRelatedTitleClick = onRelatedTitleClick,
-            onEditProgress = onEditProgress,
             onResolveProgressConflict = onResolveProgressConflict,
             onAction = onAction,
             timeoutMillis = timeoutMillis,
@@ -212,7 +235,6 @@ private fun MediaDetailContent(
             state = state,
             onBack = onBack,
             onRelatedTitleClick = onRelatedTitleClick,
-            onEditProgress = onEditProgress,
             onResolveProgressConflict = onResolveProgressConflict,
             onAction = onAction,
             timeoutMillis = timeoutMillis,
@@ -229,7 +251,6 @@ private fun SheetRiseMediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
-    onEditProgress: () -> Unit,
     onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
@@ -273,7 +294,6 @@ private fun SheetRiseMediaDetailContent(
                     MediaDetailSections(
                         state = state,
                         onRelatedTitleClick = onRelatedTitleClick,
-                        onEditProgress = onEditProgress,
                         onResolveProgressConflict = onResolveProgressConflict,
                         onAction = onAction,
                         timeoutMillis = timeoutMillis,
@@ -285,7 +305,12 @@ private fun SheetRiseMediaDetailContent(
                 }
             }
         }
-        MediaDetailBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+        MediaDetailToolbar(
+            title = state.media.title,
+            onBack = onBack,
+            collapsed = rise.toolbarAlpha >= 1f,
+            modifier = Modifier.align(Alignment.TopStart),
+        )
     }
 }
 
@@ -294,7 +319,6 @@ private fun ReducedMotionMediaDetailContent(
     state: MediaDetailUiState.Content,
     onBack: () -> Unit,
     onRelatedTitleClick: (String) -> Unit,
-    onEditProgress: () -> Unit,
     onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
@@ -318,28 +342,35 @@ private fun ReducedMotionMediaDetailContent(
             }
         }
     val rise = remember(scrollOffset) { sheetRiseAt(scrollOffset, reducedMotion = true) }
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        item(key = "media-detail-header") {
-            MediaDetailHeader(media = state.media, rise = rise, onBack = onBack)
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            item(key = "media-detail-header") {
+                MediaDetailHeader(media = state.media, rise = rise, onBack = null)
+            }
+            item(key = "media-detail-sections") {
+                MediaDetailSections(
+                    state = state,
+                    onRelatedTitleClick = onRelatedTitleClick,
+                    onResolveProgressConflict = onResolveProgressConflict,
+                    onAction = onAction,
+                    timeoutMillis = timeoutMillis,
+                    providerLabel = providerLabel,
+                    onReconnect = onReconnect,
+                    onRetryRefresh = onRetryRefresh,
+                )
+            }
         }
-        item(key = "media-detail-sections") {
-            MediaDetailSections(
-                state = state,
-                onRelatedTitleClick = onRelatedTitleClick,
-                onEditProgress = onEditProgress,
-                onResolveProgressConflict = onResolveProgressConflict,
-                onAction = onAction,
-                timeoutMillis = timeoutMillis,
-                providerLabel = providerLabel,
-                onReconnect = onReconnect,
-                onRetryRefresh = onRetryRefresh,
-            )
-        }
+        MediaDetailToolbar(
+            title = state.media.title,
+            onBack = onBack,
+            collapsed = rise.toolbarAlpha >= 1f,
+            modifier = Modifier.align(Alignment.TopStart),
+        )
     }
 }
 
@@ -347,7 +378,6 @@ private fun ReducedMotionMediaDetailContent(
 private fun MediaDetailSections(
     state: MediaDetailUiState.Content,
     onRelatedTitleClick: (String) -> Unit,
-    onEditProgress: () -> Unit,
     onResolveProgressConflict: (String, String) -> Unit,
     onAction: (MediaDetailAction) -> Unit,
     timeoutMillis: Long,
@@ -369,41 +399,6 @@ private fun MediaDetailSections(
             onResolveProgressConflict = onResolveProgressConflict,
             onAction = onAction,
         )
-        MediaDetailCollectionContext(
-            title = state.media.title,
-            collection = state.collection,
-            mediaType = state.media.type,
-            writableStatuses = state.writableStatuses,
-            onDecrease = {
-                onAction(
-                    MediaDetailAction.Step(
-                        mediaId = state.media.id,
-                        direction = MediaDetailProgressDirection.DECREASE,
-                        timeoutMillis = timeoutMillis,
-                    ),
-                )
-            },
-            onIncrease = {
-                onAction(
-                    MediaDetailAction.Step(
-                        mediaId = state.media.id,
-                        direction = MediaDetailProgressDirection.INCREASE,
-                        timeoutMillis = timeoutMillis,
-                    ),
-                )
-            },
-            onEditProgress = onEditProgress,
-            onChangeStatus = { status ->
-                onAction(MediaDetailAction.ChangeStatus(status, timeoutMillis))
-            },
-            onInteractionChanged = { pressed ->
-                onAction(MediaDetailAction.InteractionChanged(state.media.id, pressed))
-            },
-            onMotionChanged = { generation, active ->
-                onAction(MediaDetailAction.MotionChanged(state.media.id, generation, active))
-            },
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
         MediaDetailSynopsis(
             synopsis = state.media.synopsis,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -417,6 +412,76 @@ private fun MediaDetailSections(
             onTitleClick = onRelatedTitleClick,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+    }
+}
+
+@Composable
+private fun MediaDetailTrackingBar(
+    state: MediaDetailUiState.Content,
+    onAction: (MediaDetailAction) -> Unit,
+    timeoutMillis: Long,
+    modifier: Modifier = Modifier,
+) {
+    MediaDetailCollectionContext(
+        title = state.media.title,
+        collection = state.collection,
+        mediaType = state.media.type,
+        writableStatuses = state.writableStatuses,
+        onDecrease = {
+            onAction(
+                MediaDetailAction.Step(
+                    mediaId = state.media.id,
+                    direction = MediaDetailProgressDirection.DECREASE,
+                    timeoutMillis = timeoutMillis,
+                ),
+            )
+        },
+        onIncrease = {
+            onAction(
+                MediaDetailAction.Step(
+                    mediaId = state.media.id,
+                    direction = MediaDetailProgressDirection.INCREASE,
+                    timeoutMillis = timeoutMillis,
+                ),
+            )
+        },
+        onChangeStatus = { status ->
+            onAction(MediaDetailAction.ChangeStatus(status, timeoutMillis))
+        },
+        onInteractionChanged = { pressed ->
+            onAction(MediaDetailAction.InteractionChanged(state.media.id, pressed))
+        },
+        onMotionChanged = { generation, active ->
+            onAction(MediaDetailAction.MotionChanged(state.media.id, generation, active))
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun MediaDetailToolbar(
+    title: String,
+    onBack: () -> Unit,
+    collapsed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier.fillMaxWidth().then(
+                if (collapsed) Modifier.background(MioTheme.colors.surface) else Modifier,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MediaDetailBackButton(onBack = onBack)
+        if (collapsed) {
+            Text(
+                title,
+                style = MioTheme.typography.bodyStrong,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = 16.dp),
+            )
+        }
     }
 }
 
@@ -567,6 +632,7 @@ private fun MediaDetailTotals(
 private fun MediaDetailSnackbar(
     state: MediaDetailUiState,
     onAction: (MediaDetailAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val error = state.progressErrorOrNull()
     val undo = state.latestUndoOrNull()
@@ -635,6 +701,7 @@ private fun MediaDetailSnackbar(
     MioSnackbarHost(
         snackbar = message,
         bottomNavigationVisible = false,
+        modifier = modifier,
         onAction = { id ->
             if (id == PROGRESS_ERROR_SNACKBAR_ID) {
                 onAction(MediaDetailAction.RetryProgress)

@@ -113,12 +113,12 @@ class TodayRoomQueueNavigationTest {
             )
             waitForText(scheduler, "Newer cached title")
             composeRule.onNodeWithText("Newer cached title").performClick()
-            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Change status")
             waitForText(scheduler, "Synopsis")
             composeRule.waitForIdle()
 
             composeRule.onNodeWithText("Newer cached title").assertIsDisplayed()
-            composeRule.onNodeWithText("In library").assertIsDisplayed()
+            composeRule.onNodeWithText("Change status").assertIsDisplayed()
             composeRule.onNodeWithText("Synopsis").performScrollTo().assertIsDisplayed()
             composeRule.onAllNodesWithText("Today").assertCountEquals(0)
             composeRule.onAllNodesWithText("Library").assertCountEquals(0)
@@ -176,7 +176,7 @@ class TodayRoomQueueNavigationTest {
             composeRule.onAllNodesWithText("Backlog title").assertCountEquals(0)
 
             composeRule.onNodeWithText("New one").performScrollTo().performClick()
-            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Change status")
             waitForText(scheduler, "Synopsis")
             composeRule.onAllNodesWithText("Today").assertCountEquals(0)
             composeRule.onAllNodesWithText("Library").assertCountEquals(0)
@@ -256,7 +256,7 @@ class TodayRoomQueueNavigationTest {
                         SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
                 ).performTouchInput { repeat(8) { swipeUp() } }
             composeRule.onNodeWithText("Overflow ready title").performClick()
-            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Change status")
             waitForText(scheduler, "Synopsis")
             composeRule.onNodeWithText("Overflow ready title").assertIsDisplayed()
         } finally {
@@ -320,7 +320,7 @@ class TodayRoomQueueNavigationTest {
             waitForText(scheduler, "Future title")
             waitForText(scheduler, "In 2 hours")
             composeRule.onNodeWithText("Future title").performScrollTo().performClick()
-            waitForText(scheduler, "In library")
+            waitForText(scheduler, "Change status")
             waitForText(scheduler, "Synopsis")
             composeRule.onAllNodesWithText("Today").assertCountEquals(0)
             composeRule.onAllNodesWithText("Library").assertCountEquals(0)

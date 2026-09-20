@@ -6,11 +6,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,9 +19,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -33,7 +34,6 @@ import io.morgan.mio.core.designsystem.component.MioIconButton
 import io.morgan.mio.core.designsystem.icon.MioIcons
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.image.MioArtwork
-import io.morgan.mio.core.ui.image.MioPoster
 import io.morgan.mio.feature.media.impl.MediaDetailFormat
 import io.morgan.mio.feature.media.impl.MediaDetailMediaType
 import io.morgan.mio.feature.media.impl.MediaDetailPublicationStatus
@@ -44,7 +44,7 @@ import io.morgan.mio.feature.media.impl.R
 internal fun MediaDetailHeader(
     media: MediaDetailUiModel,
     rise: SheetRise,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxWidth().testTag("media-detail-scrolling-hero")) {
@@ -68,6 +68,7 @@ internal fun MediaDetailBackdrop(
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
     val colors = MioTheme.colors
     val typography = MioTheme.typography
     val reducedMotion = MioTheme.accessibility.reducedMotionEnabled
@@ -122,12 +123,14 @@ internal fun MediaDetailBackdrop(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MediaDetailSheetHeader(
     media: MediaDetailUiModel,
     rise: SheetRise,
     modifier: Modifier = Modifier,
 ) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
     val colors = MioTheme.colors
     val typography = MioTheme.typography
     val posterDescription = stringResource(R.string.media_detail_poster_description, media.title)
@@ -148,25 +151,27 @@ internal fun MediaDetailSheetHeader(
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.Top,
+                maxItemsInEachRow = if (largeText) 1 else Int.MAX_VALUE,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                MioPoster(
+                MioArtwork(
                     reference = media.posterReference,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                     contentDescription = null,
                     modifier =
                         Modifier
-                            .size(width = 112.dp, height = 160.dp)
-                            .offset(y = (-52).dp)
+                            .size(width = 112.dp, height = 168.dp)
+                            .clip(MioTheme.shapes.sm)
                             .semantics { contentDescription = posterDescription }
                             .graphicsLayer { translationY = rise.posterTranslationY.toPx() },
                 )
                 Column(
                     modifier =
                         Modifier
-                            .weight(1f)
+                            .then(if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f))
                             .graphicsLayer {
                                 translationY = rise.introTranslationY.toPx()
                                 alpha = titleAlpha
@@ -222,11 +227,11 @@ private fun metadataLabel(media: MediaDetailUiModel): String {
             MediaDetailPublicationStatus.HIATUS -> stringResource(R.string.media_detail_status_hiatus)
             MediaDetailPublicationStatus.UNKNOWN -> stringResource(R.string.media_detail_status_unknown)
         }
-    return listOfNotNull(type, format, media.releaseYear?.toString(), status).joinToString(" · ")
+    return listOfNotNull(type, format, media.releaseYear?.toString(), status).distinct().joinToString(" · ")
 }
 
 @Composable
-private fun MediaDetailFormat.displayName(): String =
+internal fun MediaDetailFormat.displayName(): String =
     when (this) {
         MediaDetailFormat.TV -> stringResource(R.string.media_detail_format_tv)
         MediaDetailFormat.MOVIE -> stringResource(R.string.media_detail_format_movie)

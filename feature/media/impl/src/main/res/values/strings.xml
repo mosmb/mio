@@ -6,10 +6,7 @@
     <string name="media_detail_retry">Retry</string>
     <string name="media_detail_poster_description">Poster for %1$s</string>
     <string name="media_detail_score">Score %1$d%%</string>
-    <string name="media_detail_not_in_library">Not in library</string>
-    <string name="media_detail_in_library">In library</string>
-    <string name="media_detail_status">Status: %1$s</string>
-    <string name="media_detail_progress">Progress: %1$d of %2$s %3$s</string>
+    <string name="media_detail_progress">%1$d / %2$s %3$s</string>
     <string name="media_detail_decrease_episode">Decrease episode to %1$d</string>
     <string name="media_detail_increase_episode">Increase episode to %1$d</string>
     <string name="media_detail_decrease_chapter">Decrease chapter to %1$d</string>
@@ -83,7 +80,6 @@
     <string name="media_detail_sync_episodes">episodes</string>
     <string name="media_detail_sync_chapters">chapters</string>
     <string name="media_detail_sync_volumes">volumes</string>
-    <string name="media_detail_edit_progress">Edit exact progress</string>
     <string name="media_detail_add_to_library">Add to library</string>
     <string name="media_detail_change_status">Change status</string>
     <string name="media_detail_status_sheet_title">Choose a status</string>

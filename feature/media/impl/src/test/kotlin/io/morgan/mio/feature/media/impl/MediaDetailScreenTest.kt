@@ -67,7 +67,7 @@ class MediaDetailScreenTest {
         composeRule.onNodeWithText("Readable title").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Poster for Readable title").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Back").performClick()
-        composeRule.onNodeWithText("Not in library").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Add to library").assertIsDisplayed()
         composeRule.onNodeWithText("Synopsis").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Related titles").performScrollTo()
         composeRule.onNodeWithText("Related titles").assertIsDisplayed()
@@ -77,11 +77,44 @@ class MediaDetailScreenTest {
 
         assertEquals(1, backCalls)
         assertEquals("related-1", relatedId)
-        composeRule.onNodeWithText("Add to library").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Add to library").assertIsDisplayed()
         listOf("Change status", "Set status", "+1", "-1", "Progress editor", "Correction")
             .forEach { forbidden ->
                 composeRule.onAllNodesWithText(forbidden, substring = true, ignoreCase = true).assertCountEquals(0)
             }
+    }
+
+    @Test
+    fun trackingControlsStayFixedWhileRelatedTitlesScrollAndUndoRemainsAboveThem() {
+        val actions = mutableListOf<MediaDetailAction>()
+        show(
+            state =
+                populatedState().copy(
+                    collection =
+                        MediaDetailCollectionUiModel(
+                            MediaDetailCollectionStatus.CURRENT,
+                            4,
+                            MediaDetailProgressUnit.EPISODE,
+                            12,
+                            MediaDetailProgressControlsUiModel(true, true),
+                        ),
+                    latestUndo = MediaDetailUndoUiModel("undo", "media-1", 4, MediaDetailProgressUnit.EPISODE, false),
+                ),
+            onAction = actions::add,
+        )
+        val status = composeRule.onNodeWithText("Change status")
+        val before = status.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithText("Related title").performScrollTo().assertIsDisplayed()
+        assertEquals(before, status.assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
+        val undo = composeRule.onNodeWithText("Undo").assertIsDisplayed()
+        assertTrue(undo.fetchSemanticsNode().boundsInRoot.bottom <= before.top)
+        composeRule.onNodeWithContentDescription("Increase episode to 5").performClick()
+        assertTrue(actions.any { it is MediaDetailAction.Step })
+        undo.performClick()
+        assertTrue(actions.contains(MediaDetailAction.Undo("undo")))
+        composeRule.onAllNodesWithText("Edit exact progress").assertCountEquals(0)
+        status.performClick()
+        composeRule.onNodeWithText("Choose a status").assertIsDisplayed()
     }
 
     @Test
@@ -188,7 +221,7 @@ class MediaDetailScreenTest {
 
         assertEquals(0f, initialTop, 1f)
         composeRule.onNodeWithTag("media-detail-scrolling-hero").assertDoesNotExist()
-        composeRule.onNodeWithText("Add to library").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Add to library").assertIsDisplayed()
     }
 
     @Test
@@ -238,6 +271,7 @@ class MediaDetailScreenTest {
         onRetryRefresh: () -> Unit = {},
         onRelatedTitleClick: (String) -> Unit = {},
         reducedMotion: Boolean = false,
+        onAction: (MediaDetailAction) -> Unit = {},
     ) {
         imageLoader = ImageLoader.Builder(activityRule.activity).build()
         composeRule.setContent {
@@ -248,6 +282,7 @@ class MediaDetailScreenTest {
                         onBack = onBack,
                         onRetry = onRetry,
                         onRetryRefresh = onRetryRefresh,
+                        onAction = onAction,
                         onRelatedTitleClick = onRelatedTitleClick,
                     )
                 }

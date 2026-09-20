@@ -109,6 +109,9 @@ internal object MediaDetailUiMapper {
             title = title.value,
             type = type.toUiType(),
             posterReference = artwork.poster?.value,
+            format = format?.toUiFormat(),
+            releaseYear = releaseYear,
+            episodes = totals.episodes?.value,
         )
 
     private fun CollectionEntry.toUiModel(): MediaDetailCollectionUiModel =

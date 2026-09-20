@@ -57,6 +57,27 @@ class MediaDetailUiMapperTest {
     }
 
     @Test
+    fun relatedTitlesPreserveSeasonNamesAndMetadataForDisambiguation() {
+        val titles =
+            listOf(
+                media("season-2", title = "My Hero Academia Season 2", releaseYear = 2017),
+                media("season-3", title = "My Hero Academia Season 3", releaseYear = 2018),
+                media("manga", title = "My Hero Academia", type = MediaType.MANGA, format = MediaFormat.MANGA),
+            )
+        val result = MediaDetailUiMapper.mapContent(media("root"), titles, null).relatedTitles
+        assertEquals(
+            listOf("My Hero Academia Season 2", "My Hero Academia Season 3", "My Hero Academia"),
+            result.map {
+                it.title
+            },
+        )
+        assertEquals(listOf(2017, 2018, null), result.map { it.releaseYear })
+        assertEquals(MediaDetailFormat.TV, result.first().format)
+        assertEquals(12, result.first().episodes)
+        assertEquals(MediaDetailMediaType.MANGA, result.last().type)
+    }
+
+    @Test
     fun absentOrBlankSynopsisAndOptionalArtworkRemainAbsent() {
         assertNull(MediaDetailUiMapper.mapSynopsis(null))
         assertNull(MediaDetailUiMapper.mapSynopsis("  "))
@@ -103,12 +124,14 @@ class MediaDetailUiMapperTest {
         banner: String? = "https://images.invalid/$id-banner.jpg",
         releaseYear: Int? = null,
         score: Int? = null,
+        type: MediaType = MediaType.ANIME,
+        format: MediaFormat = MediaFormat.TV,
     ): Media =
         Media(
             id = MediaId(id),
-            type = MediaType.ANIME,
+            type = type,
             title = MediaTitle(title),
-            format = MediaFormat.TV,
+            format = format,
             publicationStatus = MediaPublicationStatus.RELEASING,
             synopsis = synopsis,
             artwork = Artwork(poster?.let(::ImageReference), banner?.let(::ImageReference)),

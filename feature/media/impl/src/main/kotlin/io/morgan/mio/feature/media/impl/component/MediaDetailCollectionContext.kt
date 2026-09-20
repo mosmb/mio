@@ -1,23 +1,27 @@
 package io.morgan.mio.feature.media.impl.component
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.component.MioBottomSheet
+import io.morgan.mio.core.designsystem.component.MioButton
 import io.morgan.mio.core.designsystem.component.MioStatusRow
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.progress.MioProgressStepper
@@ -28,6 +32,7 @@ import io.morgan.mio.feature.media.impl.MediaDetailMediaType
 import io.morgan.mio.feature.media.impl.MediaDetailProgressUnit
 import io.morgan.mio.feature.media.impl.R
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MediaDetailCollectionContext(
     collection: MediaDetailCollectionUiModel?,
@@ -38,11 +43,11 @@ internal fun MediaDetailCollectionContext(
         MediaDetailCollectionStatus.entries.filterNot { status -> status == MediaDetailCollectionStatus.REPEATING },
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
-    onEditProgress: () -> Unit = {},
     onChangeStatus: (MediaDetailCollectionStatus) -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
     onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
     val motionGeneration = remember { mutableLongStateOf(0L) }
     val motionActive = remember { mutableStateOf(false) }
     val statusSheetVisible = remember { mutableStateOf(false) }
@@ -58,84 +63,80 @@ internal fun MediaDetailCollectionContext(
             onMotionChanged(motionGeneration.longValue, false)
         }
     }
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(MioTheme.spacing.space2),
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(12.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = MioTheme.colors.surface,
+        border = BorderStroke(1.dp, MioTheme.colors.borderStrong),
     ) {
-        Text(
-            text =
-                if (collection == null) {
-                    stringResource(R.string.media_detail_not_in_library)
-                } else {
-                    stringResource(R.string.media_detail_in_library)
-                },
-            style = MioTheme.typography.section,
-            modifier = Modifier.semantics { heading() },
-        )
-        if (collection != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MioTheme.spacing.space3),
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(MioTheme.spacing.space2),
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (collection != null) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(R.string.media_detail_status, collection.status.statusLabel(mediaType)),
-                        style = MioTheme.typography.body,
+                        text = collection.status.statusLabel(mediaType),
+                        style = MioTheme.typography.bodyStrong,
+                        modifier = if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f),
                     )
+                    OutlinedButton(
+                        onClick = { statusSheetVisible.value = true },
+                        border = BorderStroke(1.dp, MioTheme.colors.text),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MioTheme.colors.text),
+                    ) {
+                        Text(stringResource(R.string.media_detail_change_status))
+                    }
+                }
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
                     MioProgressValue(
                         value = collection.progress,
                         total = collection.total,
                         description = collection.progressDescription(),
                         onMotionChanged = reportMotion,
+                        modifier = if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f),
                     )
+                    collection.controls?.let { controls ->
+                        MioProgressStepper(
+                            decreaseDescription =
+                                stringResource(
+                                    collection.progressUnit.decreaseDescriptionRes,
+                                    collection.progress.coerceAtLeast(1) - 1,
+                                ),
+                            increaseDescription =
+                                stringResource(
+                                    collection.progressUnit.increaseDescriptionRes,
+                                    collection.progress.takeIf { value -> value < Int.MAX_VALUE }?.plus(1)
+                                        ?: collection.progress,
+                                ),
+                            decreaseEnabled = controls.decreaseEnabled,
+                            increaseEnabled = controls.increaseEnabled,
+                            onDecrease = onDecrease,
+                            onIncrease = onIncrease,
+                            onInteractionChanged = onInteractionChanged,
+                        )
+                    }
                 }
-                collection.controls?.let { controls ->
-                    MioProgressStepper(
-                        decreaseDescription =
-                            stringResource(
-                                collection.progressUnit.decreaseDescriptionRes,
-                                collection.progress.coerceAtLeast(1) - 1,
-                            ),
-                        increaseDescription =
-                            stringResource(
-                                collection.progressUnit.increaseDescriptionRes,
-                                collection.progress.takeIf { value -> value < Int.MAX_VALUE }?.plus(1)
-                                    ?: collection.progress,
-                            ),
-                        decreaseEnabled = controls.decreaseEnabled,
-                        increaseEnabled = controls.increaseEnabled,
-                        onDecrease = onDecrease,
-                        onIncrease = onIncrease,
-                        onInteractionChanged = onInteractionChanged,
-                    )
-                }
-            }
-            if (collection.status == MediaDetailCollectionStatus.CURRENT ||
-                collection.status == MediaDetailCollectionStatus.COMPLETED
-            ) {
-                TextButton(
-                    colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
-                    onClick = onEditProgress,
-                ) {
-                    Text(stringResource(R.string.media_detail_edit_progress))
-                }
-            }
-            TextButton(colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text), onClick = {
-                statusSheetVisible.value =
-                    true
-            }) {
-                Text(stringResource(R.string.media_detail_change_status))
-            }
-        } else {
-            Button(modifier = Modifier.fillMaxWidth(), onClick = { statusSheetVisible.value = true }) {
-                Text(stringResource(R.string.media_detail_add_to_library))
+            } else {
+                MioButton(
+                    text = stringResource(R.string.media_detail_add_to_library),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { statusSheetVisible.value = true },
+                )
             }
         }
     }
+
     MioBottomSheet(
         visible = statusSheetVisible.value,
         onDismissRequest = { statusSheetVisible.value = false },

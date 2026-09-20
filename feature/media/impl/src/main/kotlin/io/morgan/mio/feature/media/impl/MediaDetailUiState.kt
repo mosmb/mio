@@ -66,6 +66,9 @@ internal data class MediaDetailRelatedTitleUiModel(
     val title: String,
     val type: MediaDetailMediaType,
     val posterReference: String?,
+    val format: MediaDetailFormat? = null,
+    val releaseYear: Int? = null,
+    val episodes: Int? = null,
 )
 
 internal data class MediaDetailTotalsUiModel(
