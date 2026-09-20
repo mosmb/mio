@@ -9,9 +9,14 @@ import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
 import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 
 internal fun DevicePreferencesRecord.toDomain(): DevicePreferences =
     DevicePreferences(
+        titleLanguage =
+            TitleLanguagePreference.entries.firstOrNull {
+                it.name.equals(titleLanguage, ignoreCase = true)
+            } ?: TitleLanguagePreference.SYSTEM,
         appearance = appearance.toDomainAppearance(),
         motion = motion.toDomainMotion(),
         hapticsEnabled = hapticsEnabled,

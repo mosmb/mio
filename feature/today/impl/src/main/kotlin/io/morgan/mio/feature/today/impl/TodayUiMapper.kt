@@ -1,5 +1,6 @@
 package io.morgan.mio.feature.today.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionStatus
 import io.morgan.mio.domain.model.MediaType
@@ -59,14 +60,20 @@ internal object TodayUiMapper {
         recovery: SyncRecoveryState,
         titleByEntryId: Map<String, String?>,
         mediaIdByEntryId: Map<String, String>,
+        namesByEntryId: Map<String, MediaTitleNames> = emptyMap(),
     ): TodayRecoveryUiModel =
         TodayRecoveryUiModel(
             syncIssues =
                 recovery.entryIssues.map { issue ->
-                    issue.toUiModel(
-                        title = titleByEntryId[issue.entryId.value],
-                        mediaId = mediaIdByEntryId[issue.entryId.value],
-                    )
+                    issue
+                        .toUiModel(
+                            title = titleByEntryId[issue.entryId.value],
+                            mediaId = mediaIdByEntryId[issue.entryId.value],
+                        ).copy(
+                            titleNames =
+                                namesByEntryId[issue.entryId.value] ?: io.morgan.mio.core.ui.title
+                                    .MediaTitleNames(),
+                        )
                 },
             accountIssue =
                 recovery.accountIssue?.let { issue ->
@@ -85,6 +92,9 @@ internal object TodayUiMapper {
             mediaId = mediaId.value,
             mediaType = mediaType.toUiType(),
             title = title.value,
+            titleNames =
+                io.morgan.mio.core.ui.title
+                    .MediaTitleNames(title.english, title.japanese, title.romaji),
             posterReference = poster?.value,
             bannerReference = banner?.value,
             progress = effectiveProgress.value,
@@ -112,6 +122,9 @@ internal object TodayUiMapper {
             mediaId = mediaId.value,
             mediaType = mediaType.toUiType(),
             title = title.value,
+            titleNames =
+                io.morgan.mio.core.ui.title
+                    .MediaTitleNames(title.english, title.japanese, title.romaji),
             posterReference = poster?.value,
             progress = effectiveProgress.value,
             progressUnit = effectiveProgressUnit.toUiUnit(),
@@ -171,6 +184,9 @@ internal object TodayUiMapper {
                     TodayCaughtUpArtworkUiModel(
                         mediaId = item.mediaId.value,
                         title = item.title.value,
+                        titleNames =
+                            io.morgan.mio.core.ui.title
+                                .MediaTitleNames(item.title.english, item.title.japanese, item.title.romaji),
                         reference = item.reference?.value,
                     )
                 },
@@ -182,6 +198,9 @@ internal object TodayUiMapper {
             mediaId = mediaId.value,
             mediaType = mediaType.toUiType(),
             title = title.value,
+            titleNames =
+                io.morgan.mio.core.ui.title
+                    .MediaTitleNames(title.english, title.japanese, title.romaji),
             posterReference = poster?.value,
             progressUnit = progressUnit.toUiUnit(),
             unitNumber = unitNumber.value,

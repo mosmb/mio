@@ -35,6 +35,12 @@ public data class MediaEntity(
     public val releaseYear: Int? = null,
     @ColumnInfo(name = "score_percent")
     public val scorePercent: Int? = null,
+    @ColumnInfo(name = "title_english")
+    public val titleEnglish: String? = null,
+    @ColumnInfo(name = "title_japanese")
+    public val titleJapanese: String? = null,
+    @ColumnInfo(name = "title_romaji")
+    public val titleRomaji: String? = null,
 ) {
     init {
         require(mediaId.isNotBlank())

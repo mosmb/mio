@@ -12,6 +12,19 @@ class AniListMediaDetailsMapperTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun keepsAllTitleVariantsWhenAttachingRelatedIds() {
+        val node =
+            decode(
+                "media-details.json",
+            ).data!!.media!!.copy(title = AniListMediaTitleDto("Preferred", "Romaji", "English", "日本語"))
+        val result = AniListMediaDetailsMapper.map(101, node) as ProviderResult.Success
+        assertEquals("Preferred", result.value.root.title)
+        assertEquals("English", result.value.root.titleEnglish)
+        assertEquals("日本語", result.value.root.titleJapanese)
+        assertEquals("Romaji", result.value.root.titleRomaji)
+    }
+
+    @Test
     fun mapsRootMetadataReleasesAndOrderedDeduplicatedRelations() {
         val node = decode("media-details.json").data!!.media!!
         val result = AniListMediaDetailsMapper.map(101, node) as ProviderResult.Success

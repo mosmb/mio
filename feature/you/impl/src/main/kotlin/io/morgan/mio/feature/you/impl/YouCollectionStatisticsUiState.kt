@@ -1,6 +1,7 @@
 package io.morgan.mio.feature.you.impl
 
 import androidx.compose.runtime.Immutable
+import io.morgan.mio.core.ui.title.MediaTitleNames
 
 @Immutable
 internal sealed interface YouCollectionStatisticsUiState {
@@ -44,4 +45,7 @@ internal data class YouArtworkUiModel(
     val mediaId: String,
     val title: String,
     val posterReference: String?,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )

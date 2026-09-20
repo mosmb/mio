@@ -79,6 +79,11 @@ internal fun DiscoverScreen(
     onMediaDetail: (MediaId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val state =
+        state.withTitleLanguage(
+            io.morgan.mio.core.ui.title
+                .rememberTitleResolver(),
+        )
     val gridState = rememberLazyGridState()
     val keyboardController = LocalSoftwareKeyboardController.current
     var previousQuery by rememberSaveable { mutableStateOf(state.query) }

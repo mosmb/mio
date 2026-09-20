@@ -98,6 +98,16 @@ class MyAnimeListMediaDetailDataSourceTest {
             val cancellingDataSource =
                 MyAnimeListMediaDetailDataSource(
                     object : MyAnimeListApiService {
+                        override suspend fun deleteAnimeListStatus(
+                            id: Int,
+                            authorization: String,
+                        ): Response<Unit> = error("unused")
+
+                        override suspend fun deleteMangaListStatus(
+                            id: Int,
+                            authorization: String,
+                        ): Response<Unit> = error("unused")
+
                         override suspend fun user(authorization: String): Response<MyAnimeListUserResponseDto> =
                             error("unused")
 

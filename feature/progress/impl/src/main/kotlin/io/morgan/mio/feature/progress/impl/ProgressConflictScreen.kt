@@ -69,6 +69,18 @@ internal fun ProgressConflictScreen(
     onAction: (ProgressConflictAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val resolveTitle =
+        io.morgan.mio.core.ui.title
+            .rememberTitleResolver()
+    val state =
+        if (state is ProgressConflictUiState.Content) {
+            state.copy(
+                title = resolveTitle(state.title, state.titleNames),
+            )
+        } else {
+            state
+        }
+
     var confirming by remember((state as? ProgressConflictUiState.Content)?.issue) {
         mutableStateOf<ProgressConflictSelection?>(null)
     }

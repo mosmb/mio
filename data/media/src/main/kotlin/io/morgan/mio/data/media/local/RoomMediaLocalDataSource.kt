@@ -96,7 +96,17 @@ public class RoomMediaLocalDataSource(
             }
 
         database.inTransaction {
-            database.mediaDao().upsertMedia(media.map { item -> item.toEntity() })
+            database.mediaDao().upsertMedia(
+                media.map { item ->
+                    val incoming = item.toEntity()
+                    val existing = database.mediaDao().getMedia(item.id.value)
+                    incoming.copy(
+                        titleEnglish = incoming.titleEnglish ?: existing?.titleEnglish,
+                        titleJapanese = incoming.titleJapanese ?: existing?.titleJapanese,
+                        titleRomaji = incoming.titleRomaji ?: existing?.titleRomaji,
+                    )
+                },
+            )
             database.mediaDao().deleteGenres(ownerMediaId)
             related.forEach { item -> database.mediaDao().deleteGenres(item.media.id.value) }
             database.mediaDao().deleteRelatedMedia(ownerMediaId)

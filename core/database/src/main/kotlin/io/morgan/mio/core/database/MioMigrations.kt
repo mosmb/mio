@@ -358,6 +358,15 @@ public object MioMigrations {
             }
         }
 
+    public val MIGRATION_8_9: Migration =
+        object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `media` ADD COLUMN `title_english` TEXT")
+                db.execSQL("ALTER TABLE `media` ADD COLUMN `title_japanese` TEXT")
+                db.execSQL("ALTER TABLE `media` ADD COLUMN `title_romaji` TEXT")
+            }
+        }
+
     public val ALL: Array<Migration> =
         arrayOf(
             MIGRATION_1_2,
@@ -367,5 +376,6 @@ public object MioMigrations {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
         )
 }

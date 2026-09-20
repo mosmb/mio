@@ -109,6 +109,11 @@ internal fun LibraryScreen(
     onExploreDiscover: () -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
 ) {
+    val state =
+        state.withTitleLanguage(
+            io.morgan.mio.core.ui.title
+                .rememberTitleResolver(),
+        )
     val listState = rememberLazyListState()
     var previousMediaFilter by rememberSaveable { mutableStateOf(state.mediaFilter.name) }
     var previousStatusFilter by rememberSaveable { mutableStateOf(state.statusFilter.name) }

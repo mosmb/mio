@@ -15,6 +15,7 @@ import io.morgan.mio.domain.preferences.LibraryMediaFilter
 import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -29,6 +30,10 @@ public class DefaultPreferencesRepository(
 
     override fun observeAccountPreferences(accountId: AccountId): Flow<AccountPreferences> =
         localDataSource.observeAccountPreferences(accountId).map { record -> record.toDomain() }
+
+    override suspend fun setTitleLanguage(preference: TitleLanguagePreference) {
+        localDataSource.setTitleLanguage(preference.name.lowercase(java.util.Locale.ROOT))
+    }
 
     override suspend fun setAppearance(preference: AppearancePreference) {
         localDataSource.setAppearance(preference.toStoredValue())

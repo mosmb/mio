@@ -2,6 +2,7 @@ package io.morgan.mio.feature.you.impl
 
 import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.preferences.AppearancePreference
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 
 internal sealed interface YouAction {
     data class SelectAppearance(
@@ -17,6 +18,10 @@ internal sealed interface YouAction {
     ) : YouAction
 
     data object RetryScreen : YouAction
+
+    data class SelectTitleLanguage(
+        val preference: TitleLanguagePreference,
+    ) : YouAction
 
     data object DismissAppearanceError : YouAction
 

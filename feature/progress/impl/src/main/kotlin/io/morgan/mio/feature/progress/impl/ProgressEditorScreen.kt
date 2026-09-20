@@ -64,6 +64,18 @@ internal fun ProgressEditorScreen(
     onAction: (ProgressEditorAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val resolveTitle =
+        io.morgan.mio.core.ui.title
+            .rememberTitleResolver()
+    val state =
+        if (state is ProgressEditorUiState.Content) {
+            state.copy(
+                title = resolveTitle(state.title, state.titleNames),
+            )
+        } else {
+            state
+        }
+
     when (state) {
         ProgressEditorUiState.Loading ->
             Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

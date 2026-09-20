@@ -49,6 +49,9 @@ internal fun Media.toEntity(): MediaEntity =
         mediaId = id.value,
         mediaType = type.toStoredValue(),
         title = title.value,
+        titleEnglish = title.english,
+        titleJapanese = title.japanese,
+        titleRomaji = title.romaji,
         format = format?.toStoredValue(),
         publicationStatus = publicationStatus.toStoredValue(),
         synopsis = synopsis,
@@ -101,7 +104,7 @@ internal fun MediaAggregate.toDomain(): Media {
     return Media(
         id = MediaId(media.mediaId),
         type = media.mediaType.toDomain(),
-        title = MediaTitle(media.title),
+        title = MediaTitle(media.title, media.titleEnglish, media.titleJapanese, media.titleRomaji),
         format = media.format?.toDomain(),
         publicationStatus = media.publicationStatus.toDomain(),
         synopsis = media.synopsis,

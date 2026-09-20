@@ -19,7 +19,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -105,6 +104,11 @@ internal fun YouScreen(
     modifier: Modifier = Modifier,
     onDisconnect: () -> Unit = {},
 ) {
+    val state =
+        state.withTitleLanguage(
+            io.morgan.mio.core.ui.title
+                .rememberTitleResolver(),
+        )
     var showDisconnectConfirmation by remember { mutableStateOf(false) }
     when (state) {
         YouUiState.Loading ->
@@ -144,11 +148,13 @@ internal fun YouScreen(
                     onSelectType = { type -> onAction(YouAction.SelectStatisticsType(type)) },
                 )
                 ActivitySection(state.activity, state.selectedStatisticsType) { onAction(YouAction.RetryScreen) }
-                AppearanceSection(
-                    selected = state.appearance,
+                YouPreferencesSection(
+                    appearance = state.appearance,
+                    titleLanguage = state.titleLanguage,
+                    onTitleLanguage = { onAction(YouAction.SelectTitleLanguage(it)) },
                     saveFailed = state.appearanceSaveFailed,
                     onDismissError = { onAction(YouAction.DismissAppearanceError) },
-                    onSelect = { preference -> onAction(YouAction.SelectAppearance(preference)) },
+                    onAppearance = { preference -> onAction(YouAction.SelectAppearance(preference)) },
                 )
                 SynchronizationSection(
                     state = state,
@@ -676,41 +682,6 @@ private fun IdentityCard(identity: YouIdentityUiModel) {
 }
 
 @Composable
-private fun AppearanceSection(
-    selected: AppearancePreference,
-    saveFailed: Boolean,
-    onDismissError: () -> Unit,
-    onSelect: (AppearancePreference) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(MioTheme.spacing.space3)) {
-        SectionHeading(stringResource(R.string.you_appearance))
-        if (saveFailed) {
-            Text(stringResource(R.string.you_appearance_failed), color = MioTheme.colors.error)
-            TextButton(
-                colors = ButtonDefaults.textButtonColors(contentColor = MioTheme.colors.text),
-                onClick = onDismissError,
-            ) {
-                Text(stringResource(R.string.you_dismiss))
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(MioTheme.spacing.space2)) {
-            AppearancePreference.entries.forEach { preference ->
-                FilterChip(
-                    selected = preference == selected,
-                    onClick = { onSelect(preference) },
-                    label = { Text(stringResource(preference.labelRes())) },
-                )
-            }
-        }
-        Text(
-            stringResource(R.string.you_appearance_description),
-            style = MioTheme.typography.label,
-            color = MioTheme.colors.textMuted,
-        )
-    }
-}
-
-@Composable
 private fun SynchronizationSection(
     state: YouUiState.Content,
     onRetry: (String) -> Unit,
@@ -875,7 +846,7 @@ private fun YouProgressUnit.labelRes(): Int =
         YouProgressUnit.VOLUME -> R.string.you_volume
     }
 
-private fun AppearancePreference.labelRes(): Int =
+internal fun AppearancePreference.labelRes(): Int =
     when (this) {
         AppearancePreference.SYSTEM -> R.string.you_appearance_system
         AppearancePreference.LIGHT -> R.string.you_appearance_light

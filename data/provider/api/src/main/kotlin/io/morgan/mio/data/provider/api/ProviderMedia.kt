@@ -52,6 +52,9 @@ public class ProviderMedia(
     releases: List<ProviderRelease>,
     public val releaseYear: Int? = null,
     public val scorePercent: Int? = null,
+    public val titleEnglish: String? = null,
+    public val titleJapanese: String? = null,
+    public val titleRomaji: String? = null,
 ) {
     public val genres: List<String> = genres.toList()
     public val relatedMediaIds: List<ProviderMediaId> = relatedMediaIds.toList()

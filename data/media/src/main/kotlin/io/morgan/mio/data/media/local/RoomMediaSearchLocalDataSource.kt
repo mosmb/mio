@@ -177,6 +177,12 @@ public class RoomMediaSearchLocalDataSource(
         val mediaDao = database.mediaDao()
         val mediaIds = snapshots.map { snapshot -> snapshot.media.id.value }.distinct()
         val existing = mediaDao.getMediaIds(mediaIds).toHashSet()
+        snapshots.filter { it.media.id.value in existing }.forEach { snapshot ->
+            val title = snapshot.media.title
+            if (title.english != null || title.japanese != null || title.romaji != null) {
+                mediaDao.enrichTitleNames(snapshot.media.id.value, title.english, title.japanese, title.romaji)
+            }
+        }
         val newSnapshots = snapshots.filterNot { snapshot -> snapshot.media.id.value in existing }
         mediaDao.insertMediaIfAbsent(snapshots.map { snapshot -> snapshot.media.toEntity() })
 

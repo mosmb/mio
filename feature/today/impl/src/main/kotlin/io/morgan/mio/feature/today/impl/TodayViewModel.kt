@@ -96,7 +96,7 @@ internal class TodayViewModel(
                     combine(mediaFlows) { mediaValues ->
                         mediaIds
                             .zip(mediaValues.toList())
-                            .associate { (mediaId, media) -> mediaId.value to media?.title?.value }
+                            .associate { (mediaId, media) -> mediaId.value to media?.title }
                     }.map(input::toRecoveryUi)
                 }
             }
@@ -342,13 +342,20 @@ internal class TodayViewModel(
         val recovery: io.morgan.mio.domain.sync.SyncRecoveryState,
         val collection: List<CollectionEntry>,
     ) {
-        fun toRecoveryUi(titlesByMediaId: Map<String, String?>): TodayRecoveryUiModel {
+        fun toRecoveryUi(titlesByMediaId: Map<String, io.morgan.mio.domain.model.MediaTitle?>): TodayRecoveryUiModel {
             val titleByEntryId =
                 collection.associate { entry ->
-                    entry.id.value to titlesByMediaId[entry.mediaId.value]
+                    entry.id.value to titlesByMediaId[entry.mediaId.value]?.value
                 }
             val mediaIdByEntryId = collection.associate { entry -> entry.id.value to entry.mediaId.value }
-            return TodayUiMapper.mapRecovery(recovery, titleByEntryId, mediaIdByEntryId)
+            val namesByEntryId =
+                collection.associate { entry ->
+                    val title = titlesByMediaId[entry.mediaId.value]
+                    entry.id.value to
+                        io.morgan.mio.core.ui.title
+                            .MediaTitleNames(title?.english, title?.japanese, title?.romaji)
+                }
+            return TodayUiMapper.mapRecovery(recovery, titleByEntryId, mediaIdByEntryId, namesByEntryId)
         }
     }
 }

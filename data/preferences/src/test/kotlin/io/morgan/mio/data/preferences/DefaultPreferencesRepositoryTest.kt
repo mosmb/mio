@@ -11,6 +11,7 @@ import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.LibraryMediaFilter
 import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -22,6 +23,27 @@ import org.junit.rules.TemporaryFolder
 class DefaultPreferencesRepositoryTest {
     @get:Rule
     val temporaryFolder: TemporaryFolder = TemporaryFolder()
+
+    @Test
+    fun titleLanguageSurvivesReconstructionAndAccountCleanupWithUnknownValueFallback() =
+        runTest {
+            val store = createDataStore(backgroundScope)
+            val local = DataStorePreferencesLocalDataSource(store)
+            val repository = DefaultPreferencesRepository(local)
+            repository.setTitleLanguage(TitleLanguagePreference.JAPANESE)
+            local.clearAccountPreferences(AccountId("account"))
+            assertEquals(
+                TitleLanguagePreference.JAPANESE,
+                DefaultPreferencesRepository(
+                    DataStorePreferencesLocalDataSource(store),
+                ).observeDevicePreferences().first().titleLanguage,
+            )
+            store.edit { it[PreferencesKeys.deviceTitleLanguage] = "future-value" }
+            assertEquals(
+                TitleLanguagePreference.SYSTEM,
+                repository.observeDevicePreferences().first().titleLanguage,
+            )
+        }
 
     @Test
     fun defaultsAndDeviceAndAccountScopesRemainIndependent() =

@@ -25,6 +25,7 @@ internal data class MyAnimeListAnimeListEntryDto(
 internal data class MyAnimeListAnimeDto(
     val id: Int? = null,
     val title: String? = null,
+    @SerialName("alternative_titles") val alternativeTitles: MyAnimeListAlternativeTitlesDto? = null,
     @SerialName("main_picture") val mainPicture: MyAnimeListPictureDto? = null,
     val synopsis: String? = null,
     @SerialName("media_type") val mediaType: String? = null,

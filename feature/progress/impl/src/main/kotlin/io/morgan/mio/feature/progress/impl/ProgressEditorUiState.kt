@@ -1,5 +1,7 @@
 package io.morgan.mio.feature.progress.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
+
 internal sealed interface ProgressEditorUiState {
     data object Loading : ProgressEditorUiState
 
@@ -14,6 +16,9 @@ internal sealed interface ProgressEditorUiState {
         val canSave: Boolean,
         val saving: Boolean,
         val error: ProgressEditorError?,
+        val titleNames: MediaTitleNames =
+            io.morgan.mio.core.ui.title
+                .MediaTitleNames(),
     ) : ProgressEditorUiState
 }
 

@@ -30,6 +30,16 @@ public abstract class MediaDao {
     @Query("SELECT * FROM media WHERE media_id = :mediaId")
     public abstract suspend fun getMedia(mediaId: String): MediaEntity?
 
+    @Query(
+        "UPDATE media SET title_english = COALESCE(:english, title_english), title_japanese = COALESCE(:japanese, title_japanese), title_romaji = COALESCE(:romaji, title_romaji) WHERE media_id = :mediaId",
+    )
+    public abstract suspend fun enrichTitleNames(
+        mediaId: String,
+        english: String?,
+        japanese: String?,
+        romaji: String?,
+    )
+
     @Query("SELECT media_id FROM media WHERE media_id IN (:mediaIds)")
     public abstract suspend fun getMediaIds(mediaIds: List<String>): List<String>
 

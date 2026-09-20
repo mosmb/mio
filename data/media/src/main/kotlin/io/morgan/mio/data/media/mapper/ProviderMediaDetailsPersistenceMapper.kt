@@ -91,7 +91,7 @@ internal object ProviderMediaDetailsPersistenceMapper {
         return Media(
             id = localId,
             type = type.toDomain(),
-            title = MediaTitle(title),
+            title = MediaTitle(title, titleEnglish, titleJapanese, titleRomaji),
             format = format?.toDomain(),
             publicationStatus = publicationStatus.toDomain(),
             synopsis = synopsis,

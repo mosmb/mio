@@ -15,6 +15,7 @@ import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.model.OperationId
 import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import io.morgan.mio.domain.progress.ProgressActivityRepository
 import io.morgan.mio.domain.progress.RecordedProgressActivity
 import io.morgan.mio.domain.sync.RetrySyncIssueUseCase
@@ -96,6 +97,7 @@ internal class YouViewModel(
                                 AccountSource.Content(
                                     account = account,
                                     appearance = preferences.appearance,
+                                    titleLanguage = preferences.titleLanguage,
                                     recovery = recovery,
                                     statistics = stats,
                                     activity = recordedActivity,
@@ -152,7 +154,7 @@ internal class YouViewModel(
                             activity = activityState,
                             selectedStatisticsType = selectedType,
                             rotationDate = rotationDate,
-                        ).copy(appearanceSaveFailed = appearanceFailed)
+                        ).copy(appearanceSaveFailed = appearanceFailed, titleLanguage = source.titleLanguage)
                 }
             }
         }.stateIn(
@@ -167,6 +169,7 @@ internal class YouViewModel(
 
     internal fun onAction(action: YouAction) {
         when (action) {
+            is YouAction.SelectTitleLanguage -> selectTitleLanguage(action.preference)
             is YouAction.SelectAppearance -> selectAppearance(action.preference)
             is YouAction.SelectStatisticsType -> selectedStatisticsType.value = action.mediaType
             is YouAction.RetrySync -> retry(action.operationId)
@@ -178,6 +181,19 @@ internal class YouViewModel(
 
     private fun currentActivityWindow(): YouActivityWindow =
         YouActivityWindow.current(clock.now(), TimeZone.currentSystemDefault())
+
+    private fun selectTitleLanguage(preference: TitleLanguagePreference) {
+        viewModelScope.launch {
+            appearanceSaveFailed.value = false
+            try {
+                preferencesRepository.setTitleLanguage(preference)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                appearanceSaveFailed.value = true
+            }
+        }
+    }
 
     private fun selectAppearance(preference: AppearancePreference) {
         appearanceSaveFailed.value = false
@@ -220,6 +236,7 @@ internal class YouViewModel(
         data class Content(
             val account: Account,
             val appearance: AppearancePreference,
+            val titleLanguage: TitleLanguagePreference,
             val recovery: SyncRecoveryState,
             val statistics: StatisticsSource,
             val activity: ActivitySource,

@@ -1,5 +1,6 @@
 package io.morgan.mio.feature.progress.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.sync.SyncIssue
 
 internal sealed interface ProgressConflictUiState {
@@ -16,6 +17,9 @@ internal sealed interface ProgressConflictUiState {
         val selected: ProgressConflictSelection?,
         val saving: Boolean,
         val error: ProgressConflictError?,
+        val titleNames: MediaTitleNames =
+            io.morgan.mio.core.ui.title
+                .MediaTitleNames(),
     ) : ProgressConflictUiState {
         val canConfirm: Boolean get() = selected != null && !saving
     }

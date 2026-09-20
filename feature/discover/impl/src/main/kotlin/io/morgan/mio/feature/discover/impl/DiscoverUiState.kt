@@ -1,5 +1,7 @@
 package io.morgan.mio.feature.discover.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
+
 internal data class DiscoverUiState(
     val query: String = "",
     val filter: DiscoverMediaFilter = DiscoverMediaFilter.ALL,
@@ -18,6 +20,9 @@ internal data class DiscoverResultUiModel(
     val posterReference: String?,
     val type: DiscoverMediaType,
     val trackedStatus: DiscoverTrackedStatus?,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal enum class DiscoverMediaType {

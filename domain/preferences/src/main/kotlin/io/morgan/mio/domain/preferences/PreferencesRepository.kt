@@ -8,6 +8,8 @@ public interface PreferencesRepository {
 
     public fun observeAccountPreferences(accountId: AccountId): Flow<AccountPreferences>
 
+    public suspend fun setTitleLanguage(preference: TitleLanguagePreference)
+
     public suspend fun setAppearance(preference: AppearancePreference)
 
     public suspend fun setMotion(preference: MotionPreference)

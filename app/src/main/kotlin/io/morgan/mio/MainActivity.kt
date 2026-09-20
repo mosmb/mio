@@ -22,6 +22,7 @@ import io.morgan.mio.core.ui.AccountRecoveryActions
 import io.morgan.mio.core.ui.AccountSessionActions
 import io.morgan.mio.core.ui.LocalAccountRecoveryActions
 import io.morgan.mio.core.ui.LocalAccountSessionActions
+import io.morgan.mio.core.ui.title.TitleLanguage
 import io.morgan.mio.domain.account.AccountAuthorizationRedirect
 import io.morgan.mio.domain.account.AccountReconnectionState
 import io.morgan.mio.domain.account.AccountSessionState
@@ -152,6 +153,10 @@ public class MainActivity : ComponentActivity() {
                     navigationRegistry = graph.navigationRegistry,
                     imageLoader = graph.imageLoader,
                     viewModelFactory = viewModelFactory,
+                    titleLanguage =
+                        TitleLanguage.valueOf(
+                            devicePreferences.titleLanguage.name,
+                        ),
                     darkTheme = darkTheme,
                     reducedMotionOverride = devicePreferences.motion == MotionPreference.REDUCED,
                     hapticsEnabled = devicePreferences.hapticsEnabled,

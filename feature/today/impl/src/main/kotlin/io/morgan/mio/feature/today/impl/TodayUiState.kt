@@ -1,5 +1,7 @@
 package io.morgan.mio.feature.today.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
+
 internal sealed interface TodayUiState {
     data class Loading(
         val latestUndo: TodayUndoUiModel? = null,
@@ -42,6 +44,9 @@ internal sealed interface TodayUiState {
         val entryId: String,
         val mediaId: String?,
         val title: String?,
+        val titleNames: MediaTitleNames =
+            io.morgan.mio.core.ui.title
+                .MediaTitleNames(),
         val kind: SyncIssueKind,
         val localProgress: Int,
         val localUnit: TodayProgressUnit,
@@ -72,6 +77,9 @@ internal data class TodayNowUiModel(
     val status: TodayCollectionStatus = TodayCollectionStatus.CURRENT,
     val controls: TodayProgressControlsUiModel? = null,
     val undo: TodayUndoUiModel? = null,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class TodayNewUiModel(
@@ -88,6 +96,9 @@ internal data class TodayNewUiModel(
     val status: TodayCollectionStatus = TodayCollectionStatus.CURRENT,
     val controls: TodayProgressControlsUiModel? = null,
     val undo: TodayUndoUiModel? = null,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class TodayProgressControlsUiModel(
@@ -125,6 +136,9 @@ internal data class TodayCaughtUpArtworkUiModel(
     val mediaId: String,
     val title: String,
     val reference: String?,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class TodayNextReleaseUiModel(
@@ -135,6 +149,9 @@ internal data class TodayNextReleaseUiModel(
     val progressUnit: TodayProgressUnit,
     val unitNumber: Int,
     val waitUntilRelease: TodayRelativeTime,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class TodayRelativeTime(

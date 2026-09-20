@@ -1,5 +1,6 @@
 package io.morgan.mio.feature.discover.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionStatus
 import io.morgan.mio.domain.media.MediaSearchResults
@@ -18,6 +19,12 @@ internal object DiscoverUiMapper {
                 DiscoverResultUiModel(
                     mediaId = media.id.value,
                     title = media.title.value,
+                    titleNames =
+                        MediaTitleNames(
+                            media.title.english,
+                            media.title.japanese,
+                            media.title.romaji,
+                        ),
                     posterReference = media.artwork.poster?.value,
                     type =
                         when (media.type) {

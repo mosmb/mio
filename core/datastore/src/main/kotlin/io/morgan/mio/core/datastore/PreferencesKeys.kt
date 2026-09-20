@@ -12,6 +12,8 @@ public object PreferencesKeys {
     public const val ACCOUNT_LIBRARY_MEDIA_FILTER_SUFFIX: String = ".library_media_filter"
     public const val ACCOUNT_LIBRARY_STATUS_FILTER_SUFFIX: String = ".library_status_filter"
 
+    public val deviceTitleLanguage: Preferences.Key<String> = stringPreferencesKey("device.title_language")
+
     public val deviceAppearance: Preferences.Key<String> =
         stringPreferencesKey(DEVICE_APPEARANCE_NAME)
     public val deviceMotion: Preferences.Key<String> = stringPreferencesKey(DEVICE_MOTION_NAME)

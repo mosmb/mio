@@ -122,6 +122,11 @@ internal fun TodayScreen(
     onReconnect: () -> Unit = {},
     onRetryRefresh: () -> Unit = {},
 ) {
+    val state =
+        state.withTitleLanguage(
+            io.morgan.mio.core.ui.title
+                .rememberTitleResolver(),
+        )
     val scrollState = rememberScrollState()
     Box(modifier = modifier.fillMaxSize()) {
         Column(

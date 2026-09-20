@@ -1,5 +1,7 @@
 package io.morgan.mio.feature.media.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
+
 internal sealed interface MediaDetailUiState {
     data class Loading(
         val latestUndo: MediaDetailUndoUiModel? = null,
@@ -39,6 +41,9 @@ internal sealed interface MediaDetailUiState {
         val remoteUnit: MediaDetailProgressUnit?,
         val remoteStatus: MediaDetailCollectionStatus?,
         val canRetry: Boolean,
+        val titleNames: MediaTitleNames =
+            io.morgan.mio.core.ui.title
+                .MediaTitleNames(),
     )
 
     data class AccountIssueUiModel(
@@ -59,6 +64,9 @@ internal data class MediaDetailUiModel(
     val genres: List<String>,
     val releaseYear: Int?,
     val scorePercent: Int?,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class MediaDetailRelatedTitleUiModel(
@@ -69,6 +77,9 @@ internal data class MediaDetailRelatedTitleUiModel(
     val format: MediaDetailFormat? = null,
     val releaseYear: Int? = null,
     val episodes: Int? = null,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class MediaDetailTotalsUiModel(

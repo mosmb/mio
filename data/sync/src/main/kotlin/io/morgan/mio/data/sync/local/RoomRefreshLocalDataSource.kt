@@ -298,6 +298,9 @@ public class RoomRefreshLocalDataSource(
 private fun MediaEntity.mergeMetadata(existing: MediaEntity?): MediaEntity {
     if (existing == null) return this
     return copy(
+        titleEnglish = titleEnglish ?: existing.titleEnglish,
+        titleJapanese = titleJapanese ?: existing.titleJapanese,
+        titleRomaji = titleRomaji ?: existing.titleRomaji,
         format = format ?: existing.format,
         publicationStatus =
             if (publicationStatus == io.morgan.mio.core.database.model.StoredMediaPublicationStatus.UNKNOWN) {

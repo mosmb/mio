@@ -18,6 +18,7 @@ public class DataStorePreferencesLocalDataSource(
     public fun observeDevicePreferences(): Flow<DevicePreferencesRecord> =
         dataStore.data.map { preferences ->
             DevicePreferencesRecord(
+                titleLanguage = preferences[PreferencesKeys.deviceTitleLanguage] ?: "system",
                 appearance = preferences[PreferencesKeys.deviceAppearance] ?: "system",
                 motion = preferences[PreferencesKeys.deviceMotion] ?: "follow_system",
                 hapticsEnabled = preferences[PreferencesKeys.deviceHapticsEnabled] ?: true,
@@ -34,6 +35,10 @@ public class DataStorePreferencesLocalDataSource(
                     preferences[PreferencesKeys.accountLibraryStatusFilter(accountId.value)] ?: "current",
             )
         }
+
+    public suspend fun setTitleLanguage(value: String) {
+        dataStore.edit { preferences -> preferences[PreferencesKeys.deviceTitleLanguage] = value }
+    }
 
     public suspend fun setAppearance(value: String) {
         dataStore.edit { preferences -> preferences[PreferencesKeys.deviceAppearance] = value }

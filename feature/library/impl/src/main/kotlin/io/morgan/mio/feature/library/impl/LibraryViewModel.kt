@@ -9,6 +9,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import io.morgan.mio.core.common.di.AccountScope
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.collection.CollectionStatus
@@ -337,7 +338,13 @@ internal class LibraryViewModel(
                 .filter { row ->
                     row.matchesMediaFilter(mediaFilter) &&
                         row.matchesStatusFilter(statusFilter, observation.readyMediaIds) &&
-                        (normalizedQuery.isEmpty() || row.title.contains(normalizedQuery, ignoreCase = true))
+                        (
+                            normalizedQuery.isEmpty() ||
+                                (
+                                    row.title.contains(normalizedQuery, ignoreCase = true) ||
+                                        row.titleNames.matches(normalizedQuery)
+                                )
+                        )
                 }.toMutableList()
         val protectedIds =
             touchedMediaIds.value +
@@ -392,6 +399,12 @@ internal class LibraryViewModel(
             entryId = entry.id.value,
             mediaId = entry.mediaId.value,
             title = observed.media?.title?.value ?: "",
+            titleNames =
+                MediaTitleNames(
+                    observed.media?.title?.english,
+                    observed.media?.title?.japanese,
+                    observed.media?.title?.romaji,
+                ),
             posterReference =
                 observed.media
                     ?.artwork

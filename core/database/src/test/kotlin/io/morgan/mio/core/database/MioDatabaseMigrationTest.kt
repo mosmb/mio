@@ -39,6 +39,25 @@ class MioDatabaseMigrationTest {
     }
 
     @Test
+    fun versionEightRetainsTitlesAndAddsNullableAlternates() {
+        helper.createDatabase(TEST_DATABASE_NAME, 8).use { database ->
+            database.execSQL(
+                "INSERT INTO media (media_id, media_type, title, publication_status) VALUES ('title-migration', 'anime', 'Original title', 'unknown')",
+            )
+        }
+        helper.runMigrationsAndValidate(TEST_DATABASE_NAME, 9, true, MioMigrations.MIGRATION_8_9).use { database ->
+            database
+                .query(
+                    "SELECT title, title_english, title_japanese, title_romaji FROM media WHERE media_id = 'title-migration'",
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("Original title", cursor.getString(0))
+                    assertTrue(cursor.isNull(1) && cursor.isNull(2) && cursor.isNull(3))
+                }
+        }
+    }
+
+    @Test
     fun versionOneRowsSurviveTheExplicitOutboxMigration() {
         helper.createDatabase(TEST_DATABASE_NAME, 1).use { database ->
             database.execSQL(
@@ -102,8 +121,8 @@ class MioDatabaseMigrationTest {
         assertNotNull(current.syncDao())
         current.close()
 
-        assertEquals(8, MioDatabase.VERSION)
-        assertEquals(7, MioMigrations.ALL.size)
+        assertEquals(9, MioDatabase.VERSION)
+        assertEquals(8, MioMigrations.ALL.size)
         assertTrue(MioMigrations.ALL[0] === MioMigrations.MIGRATION_1_2)
         assertTrue(MioMigrations.ALL[1] === MioMigrations.MIGRATION_2_3)
         assertTrue(MioMigrations.ALL[2] === MioMigrations.MIGRATION_3_4)

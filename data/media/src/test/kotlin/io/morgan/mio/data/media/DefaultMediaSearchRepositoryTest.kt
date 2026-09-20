@@ -457,7 +457,9 @@ class DefaultMediaSearchRepositoryTest {
             )
 
             searchSource.enqueue { _, _ ->
-                ProviderResult.Success(searchPage(searchMedia("501", title = "Search summary")))
+                ProviderResult.Success(
+                    searchPage(searchMedia("501", title = "Search summary", english = "English name")),
+                )
             }
             repository.refreshSearch("detailed title", MediaSearchFilter.ANIME)
 
@@ -468,6 +470,7 @@ class DefaultMediaSearchRepositoryTest {
                     .media
                     .single()
             assertEquals("Fixture Media", cached.title.value)
+            assertEquals("English name", cached.title.english)
             assertEquals(listOf("Adventure", "Drama"), cached.genres)
             assertEquals(listOf(relatedId), cached.relatedMediaIds)
             assertEquals(2023, cached.releaseYear)
@@ -568,11 +571,13 @@ class DefaultMediaSearchRepositoryTest {
         id: String,
         type: ProviderMediaType = ProviderMediaType.ANIME,
         title: String = "Title $id",
+        english: String? = null,
     ): ProviderMedia =
         ProviderMedia(
             id = ProviderMediaId(id),
             type = type,
             title = title,
+            titleEnglish = english,
             format = null,
             publicationStatus = io.morgan.mio.data.provider.api.ProviderMediaPublicationStatus.UNKNOWN,
             synopsis = null,

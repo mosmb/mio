@@ -1,5 +1,7 @@
 package io.morgan.mio.feature.library.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
+
 internal data class LibraryRowUiModel(
     val entryId: String,
     val mediaId: String,
@@ -11,6 +13,9 @@ internal data class LibraryRowUiModel(
     val progressUnit: LibraryProgressUnit,
     val total: Int?,
     val controls: LibraryProgressControlsUiModel?,
+    val titleNames: MediaTitleNames =
+        io.morgan.mio.core.ui.title
+            .MediaTitleNames(),
 )
 
 internal data class LibraryProgressControlsUiModel(

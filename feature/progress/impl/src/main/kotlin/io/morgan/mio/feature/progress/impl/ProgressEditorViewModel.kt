@@ -9,6 +9,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import io.morgan.mio.core.common.di.AccountScope
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.collection.CollectionEntry
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.collection.CollectionStatus
@@ -52,7 +53,16 @@ internal class ProgressEditorViewModel(
             if (media == null || entry == null) {
                 null
             } else {
-                EditorSource(title = media.title.value, entry = entry)
+                EditorSource(
+                    title = media.title.value,
+                    titleNames =
+                        MediaTitleNames(
+                            media.title.english,
+                            media.title.japanese,
+                            media.title.romaji,
+                        ),
+                    entry = entry,
+                )
             }
         }
 
@@ -80,6 +90,7 @@ internal class ProgressEditorViewModel(
                 }
             ProgressEditorUiState.Content(
                 title = content.title,
+                titleNames = content.titleNames,
                 unit = content.entry.progressUnit.toEditorUnit(),
                 currentProgress = content.entry.progress.value,
                 total = content.entry.total?.value,
@@ -162,6 +173,9 @@ internal class ProgressEditorViewModel(
 
     private data class EditorSource(
         val title: String,
+        val titleNames: MediaTitleNames =
+            io.morgan.mio.core.ui.title
+                .MediaTitleNames(),
         val entry: CollectionEntry,
     )
 

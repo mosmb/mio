@@ -86,6 +86,9 @@ internal object MediaDetailUiMapper {
         MediaDetailUiModel(
             id = id.value,
             title = title.value,
+            titleNames =
+                io.morgan.mio.core.ui.title
+                    .MediaTitleNames(title.english, title.japanese, title.romaji),
             type = type.toUiType(),
             format = format?.toUiFormat(),
             publicationStatus = publicationStatus.toUiStatus(),
@@ -107,6 +110,9 @@ internal object MediaDetailUiMapper {
         MediaDetailRelatedTitleUiModel(
             id = id.value,
             title = title.value,
+            titleNames =
+                io.morgan.mio.core.ui.title
+                    .MediaTitleNames(title.english, title.japanese, title.romaji),
             type = type.toUiType(),
             posterReference = artwork.poster?.value,
             format = format?.toUiFormat(),

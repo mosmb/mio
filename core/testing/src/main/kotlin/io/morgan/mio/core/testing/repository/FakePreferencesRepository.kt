@@ -8,6 +8,7 @@ import io.morgan.mio.domain.preferences.LibraryMediaFilter
 import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -31,6 +32,10 @@ public class FakePreferencesRepository : PreferencesRepository {
         state
             .map { current -> current.accounts[accountId] ?: AccountPreferences.default(accountId) }
             .distinctUntilChanged()
+
+    override suspend fun setTitleLanguage(preference: TitleLanguagePreference) {
+        state.update { current -> current.copy(device = current.device.copy(titleLanguage = preference)) }
+    }
 
     override suspend fun setAppearance(preference: AppearancePreference) {
         state.update { current -> current.copy(device = current.device.copy(appearance = preference)) }

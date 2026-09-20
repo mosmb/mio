@@ -13,6 +13,20 @@ class MyAnimeListMediaDetailsMapperTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun retainsLocalizedNamesThroughRelationMapping() {
+        val result =
+            MyAnimeListMediaDetailsMapper.map(
+                "anime/1",
+                decode(
+                    "anime-details.json",
+                ).copy(alternativeTitles = MyAnimeListAlternativeTitlesDto("English title", "日本語")),
+            ) as ProviderResult.Success
+        assertEquals("English title", result.value.root.titleEnglish)
+        assertEquals("日本語", result.value.root.titleJapanese)
+        assertEquals(result.value.root.title, result.value.root.titleRomaji)
+    }
+
+    @Test
     fun mapsAnimeRootAndOrdersAnimeBeforeMangaRelations() {
         val response = decode("anime-details.json")
         val result = MyAnimeListMediaDetailsMapper.map("anime/1", response) as ProviderResult.Success

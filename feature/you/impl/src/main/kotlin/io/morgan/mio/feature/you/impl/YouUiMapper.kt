@@ -1,5 +1,6 @@
 package io.morgan.mio.feature.you.impl
 
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.account.Account
 import io.morgan.mio.domain.account.ConnectedProvider
 import io.morgan.mio.domain.collection.CollectionStatisticsSnapshot
@@ -65,6 +66,12 @@ internal object YouUiMapper {
                     YouArtworkUiModel(
                         mediaId = artwork.mediaId.value,
                         title = artwork.title.value,
+                        titleNames =
+                            MediaTitleNames(
+                                artwork.title.english,
+                                artwork.title.japanese,
+                                artwork.title.romaji,
+                            ),
                         posterReference = artwork.poster?.value,
                     )
                 },

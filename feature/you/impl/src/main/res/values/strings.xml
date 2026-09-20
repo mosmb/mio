@@ -4,9 +4,9 @@
     <string name="you_avatar_description">%1$s avatar</string>
     <string name="you_provider_anilist">AniList</string>
     <string name="you_provider_myanimelist">MyAnimeList</string>
-    <string name="you_appearance_failed">Couldn’t save appearance. Please choose it again.</string>
+    <string name="you_appearance_failed">Couldn’t save preference. Please choose it again.</string>
     <string name="you_appearance">Appearance</string>
-    <string name="you_appearance_description">This setting applies throughout Mio and is saved on this device.</string>
+    <string name="you_appearance_description">Choose how Mio looks.</string>
     <string name="you_appearance_system">System</string>
     <string name="you_appearance_light">Light</string>
     <string name="you_appearance_dark">Dark</string>
@@ -78,4 +78,16 @@
     <string name="you_activity_unavailable">Activity summary unavailable right now.</string>
     <string name="you_activity_breakdown">Recorded actions: %1$s. Increases: %2$s · Decreases: %3$s · Corrections: %4$s.</string>
     <string name="you_activity_retained_note">Only retained local progress actions are included. Imported progress is not activity recorded by Mio.</string>
+    <string name="you_preferences">Preferences</string>
+    <string name="you_title_language">Title language</string>
+    <string name="you_title_language_description">Choose how anime and manga names are displayed.</string>
+    <string name="you_title_language_fallback">Uses an available title when your preference is missing. Older titles update as their information refreshes.</string>
+    <string name="you_title_english">English</string>
+    <string name="you_title_japanese">Japanese</string>
+    <string name="you_title_romaji">Romaji</string>
+    <string name="you_follow_device_language">Japanese on Japanese devices; English otherwise</string>
+    <string name="you_follow_device_appearance">Follow device appearance</string>
+    <string name="you_title_english_example">My Hero Academia</string>
+    <string name="you_title_japanese_example">僕のヒーローアカデミア</string>
+    <string name="you_title_romaji_example">Boku no Hero Academia</string>
 </resources>

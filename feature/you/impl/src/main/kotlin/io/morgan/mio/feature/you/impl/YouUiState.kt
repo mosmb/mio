@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import io.morgan.mio.domain.model.MediaType
 import io.morgan.mio.domain.preferences.AppearancePreference
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import kotlinx.datetime.LocalDate
 
 @Immutable
@@ -26,6 +27,7 @@ internal sealed interface YouUiState {
         val selectedStatisticsType: MediaType,
         val rotationDate: LocalDate,
         val appearanceSaveFailed: Boolean = false,
+        val titleLanguage: TitleLanguagePreference = TitleLanguagePreference.SYSTEM,
     ) : YouUiState
 }
 

@@ -37,7 +37,13 @@ public class RoomCollectionStatisticsLocalDataSource(
                 .map { aggregate ->
                     CollectionStatisticsSnapshot.Artwork(
                         mediaId = MediaId(aggregate.media.mediaId),
-                        title = MediaTitle(aggregate.media.title),
+                        title =
+                            MediaTitle(
+                                aggregate.media.title,
+                                aggregate.media.titleEnglish,
+                                aggregate.media.titleJapanese,
+                                aggregate.media.titleRomaji,
+                            ),
                         poster = aggregate.media.posterReference?.let(::ImageReference),
                     )
                 }.toList()

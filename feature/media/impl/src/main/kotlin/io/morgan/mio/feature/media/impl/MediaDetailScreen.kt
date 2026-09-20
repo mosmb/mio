@@ -138,6 +138,11 @@ internal fun MediaDetailScreen(
     onReconnect: () -> Unit = {},
     onRetryRefresh: () -> Unit = {},
 ) {
+    val state =
+        state.withTitleLanguage(
+            io.morgan.mio.core.ui.title
+                .rememberTitleResolver(),
+        )
     val loadingDescription = stringResource(R.string.media_detail_loading)
     var trackingHeight by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current

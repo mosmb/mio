@@ -26,6 +26,8 @@ import io.morgan.mio.core.navigation.TopLevelRootNavigationRequest
 import io.morgan.mio.core.navigation.rememberAuthenticatedNavigationState
 import io.morgan.mio.core.navigation.rememberOnboardingNavigationState
 import io.morgan.mio.core.ui.image.MioImageLoaderProvider
+import io.morgan.mio.core.ui.title.LocalTitleLanguage
+import io.morgan.mio.core.ui.title.TitleLanguage
 import io.morgan.mio.feature.media.api.OpenProgressConflictRequest
 import io.morgan.mio.feature.progress.api.ProgressConflictKey
 import io.morgan.mio.feature.you.api.YouResolveProgressRequest
@@ -41,6 +43,7 @@ internal fun MioApp(
     navigationRegistry: NavigationRegistry,
     imageLoader: ImageLoader,
     viewModelFactory: MetroViewModelFactory,
+    titleLanguage: TitleLanguage = TitleLanguage.SYSTEM,
     darkTheme: Boolean = isSystemInDarkTheme(),
     reducedMotionOverride: Boolean = false,
     hapticsEnabled: Boolean = true,
@@ -50,6 +53,7 @@ internal fun MioApp(
 ) {
     CompositionLocalProvider(
         LocalMetroViewModelFactory provides viewModelFactory,
+        LocalTitleLanguage provides titleLanguage,
     ) {
         MioTheme(
             darkTheme = darkTheme,

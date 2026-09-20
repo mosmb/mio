@@ -31,6 +31,7 @@ import io.morgan.mio.domain.preferences.AppearancePreference
 import io.morgan.mio.domain.preferences.DevicePreferences
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressChange
@@ -580,6 +581,8 @@ private class TestPreferencesRepository(
 
     override fun observeAccountPreferences(accountId: AccountId): Flow<AccountPreferences> =
         accounts.map { it[accountId] ?: AccountPreferences.default(accountId) }
+
+    override suspend fun setTitleLanguage(preference: TitleLanguagePreference) { }
 
     override suspend fun setAppearance(preference: AppearancePreference) = Unit
 

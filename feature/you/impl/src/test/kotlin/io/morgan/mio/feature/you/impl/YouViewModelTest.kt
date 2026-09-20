@@ -14,6 +14,7 @@ import io.morgan.mio.domain.preferences.LibraryMediaFilter
 import io.morgan.mio.domain.preferences.LibraryStatusFilter
 import io.morgan.mio.domain.preferences.MotionPreference
 import io.morgan.mio.domain.preferences.PreferencesRepository
+import io.morgan.mio.domain.preferences.TitleLanguagePreference
 import io.morgan.mio.domain.progress.ProgressActivityRepository
 import io.morgan.mio.domain.progress.RecordedProgressActivity
 import io.morgan.mio.domain.sync.PendingOperationGroup
@@ -109,6 +110,29 @@ class YouViewModelTest {
             assertFalse((model.uiState.value as YouUiState.Content).appearanceSaveFailed)
         }
 
+    @Test
+    fun titleLanguageFailureKeepsSelectionAndSuccessfulRetryClearsError() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val fixture = Fixture().apply { failure = "writeTitleLanguage" }
+            val model = fixture.viewModel()
+            backgroundScope.launch { model.uiState.collect() }
+            runCurrent()
+            model.onAction(
+                YouAction.SelectTitleLanguage(TitleLanguagePreference.JAPANESE),
+            )
+            runCurrent()
+            val content = model.uiState.value as YouUiState.Content
+            assertTrue(content.appearanceSaveFailed)
+            assertEquals(TitleLanguagePreference.SYSTEM, content.titleLanguage)
+            fixture.failure = null
+            model.onAction(
+                YouAction.SelectTitleLanguage(TitleLanguagePreference.JAPANESE),
+            )
+            runCurrent()
+            assertFalse((model.uiState.value as YouUiState.Content).appearanceSaveFailed)
+        }
+
     private class Fixture :
         AccountRepository,
         PreferencesRepository,
@@ -136,6 +160,10 @@ class YouViewModelTest {
         override fun observeDevicePreferences() = source("preferences", DevicePreferences.Default)
 
         override fun observeAccountPreferences(accountId: AccountId): Flow<AccountPreferences> = error("unused")
+
+        override suspend fun setTitleLanguage(preference: TitleLanguagePreference) {
+            check(failure != "writeTitleLanguage") { "fixture write failure" }
+        }
 
         override suspend fun setAppearance(preference: AppearancePreference) {
             check(failure != "writeAppearance")

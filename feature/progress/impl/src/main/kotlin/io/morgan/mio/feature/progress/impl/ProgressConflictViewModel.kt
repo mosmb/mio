@@ -9,6 +9,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import io.morgan.mio.core.common.di.AccountScope
+import io.morgan.mio.core.ui.title.MediaTitleNames
 import io.morgan.mio.domain.collection.CollectionRepository
 import io.morgan.mio.domain.media.MediaRepository
 import io.morgan.mio.domain.model.CollectionEntryId
@@ -65,7 +66,16 @@ internal class ProgressConflictViewModel(
             } else {
                 val (issue, mediaId) = pair
                 mediaRepository.observeMedia(mediaId).map { media ->
-                    ConflictSource(issue = issue, title = media?.title?.value ?: "Saved title")
+                    ConflictSource(
+                        issue = issue,
+                        title = media?.title?.value ?: "Saved title",
+                        titleNames =
+                            MediaTitleNames(
+                                media?.title?.english,
+                                media?.title?.japanese,
+                                media?.title?.romaji,
+                            ),
+                    )
                 }
             }
         }
@@ -78,6 +88,7 @@ internal class ProgressConflictViewModel(
             ProgressConflictUiState.Content(
                 issue = source.issue,
                 title = source.title,
+                titleNames = source.titleNames,
                 deviceProgress = source.issue.local.progress.value,
                 providerProgress = remote.progress.value,
                 unit =
@@ -163,6 +174,9 @@ internal class ProgressConflictViewModel(
     private data class ConflictSource(
         val issue: SyncIssue,
         val title: String,
+        val titleNames: MediaTitleNames =
+            io.morgan.mio.core.ui.title
+                .MediaTitleNames(),
     )
 
     private data class SelectedChoice(
