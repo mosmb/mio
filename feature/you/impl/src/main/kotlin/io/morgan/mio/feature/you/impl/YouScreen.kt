@@ -2,6 +2,7 @@ package io.morgan.mio.feature.you.impl
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.morgan.mio.core.designsystem.component.MioIcon
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
 import io.morgan.mio.core.designsystem.theme.MioTheme
@@ -156,15 +157,7 @@ internal fun YouScreen(
                     onDismissError = { onAction(YouAction.DismissAppearanceError) },
                     onAppearance = { preference -> onAction(YouAction.SelectAppearance(preference)) },
                 )
-                SynchronizationSection(
-                    state = state,
-                    onRetry = { operationId -> onAction(YouAction.RetrySync(operationId)) },
-                    onReconnect = onReconnect,
-                    onRetryRefresh = onRetryRefresh,
-                    onResolve = onResolve,
-                    onDismissError = { onAction(YouAction.DismissRetryError) },
-                )
-                AccountSection(onDisconnect = { showDisconnectConfirmation = true })
+                AccountSection(state.identity, onDisconnect = { showDisconnectConfirmation = true })
                 Spacer(Modifier.height(128.dp))
             }
     }
@@ -321,18 +314,7 @@ private fun StatisticsSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(MioTheme.spacing.space3)) {
         SectionHeading(stringResource(R.string.you_statistics_title))
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            val types = listOf(MediaType.ANIME, MediaType.MANGA)
-            types.forEachIndexed { index, type ->
-                SegmentedButton(
-                    selected = selectedType == type,
-                    onClick = { onSelectType(type) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = types.size),
-                ) {
-                    Text(stringResource(type.labelRes()))
-                }
-            }
-        }
+        YouStatisticsSelector(selectedType, onSelectType)
         when (statistics) {
             YouCollectionStatisticsUiState.Loading ->
                 CircularProgressIndicator(
@@ -589,18 +571,38 @@ private fun LocalDate.shortDate(): String {
 private fun LocalDate.shortNumericDate(): String = "${month.ordinal + 1}/$day"
 
 @Composable
-private fun AccountSection(onDisconnect: () -> Unit) {
+private fun AccountSection(
+    identity: YouIdentityUiModel,
+    onDisconnect: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(MioTheme.spacing.space3)) {
         SectionHeading(stringResource(R.string.you_account))
-        Button(
-            onClick = onDisconnect,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = MioTheme.colors.errorSurface,
-                    contentColor = MioTheme.colors.error,
-                ),
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MioTheme.colors.surface,
+            shape = MioTheme.shapes.lg,
+            border = BorderStroke(1.dp, MioTheme.colors.border),
         ) {
-            Text(stringResource(R.string.you_disconnect))
+            Column {
+                IdentityContent(identity)
+                HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MioTheme.colors.border)
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button, onClick = onDisconnect)
+                            .padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    MioIcon(R.drawable.you_logout, null, tint = MioTheme.colors.error)
+                    Text(
+                        stringResource(R.string.you_disconnect_provider, stringResource(identity.provider.labelRes)),
+                        style = MioTheme.typography.bodyStrong,
+                        color = MioTheme.colors.error,
+                    )
+                }
+            }
         }
     }
 }
@@ -646,37 +648,42 @@ private fun IdentityCard(identity: YouIdentityUiModel) {
         shape = MioTheme.shapes.lg,
         border = BorderStroke(1.dp, MioTheme.colors.border),
     ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (identity.avatarReference != null) {
-                MioArtwork(
-                    reference = identity.avatarReference,
-                    contentDescription = stringResource(R.string.you_avatar_description, identity.displayName),
-                    modifier = Modifier.size(56.dp).clip(CircleShape),
-                )
-            } else {
-                Box(
-                    modifier = Modifier.size(56.dp).clip(CircleShape).background(MioTheme.colors.surfaceSoft),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        identity.displayName.firstOrNull()?.uppercase() ?: "?",
-                        style = MioTheme.typography.section,
-                        color = MioTheme.colors.textMuted,
-                    )
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(identity.displayName, style = MioTheme.typography.cardTitle, fontWeight = FontWeight.SemiBold)
+        IdentityContent(identity)
+    }
+}
+
+@Composable
+private fun IdentityContent(identity: YouIdentityUiModel) {
+    Row(
+        modifier = Modifier.padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        if (identity.avatarReference != null) {
+            MioArtwork(
+                reference = identity.avatarReference,
+                contentDescription = stringResource(R.string.you_avatar_description, identity.displayName),
+                modifier = Modifier.size(56.dp).clip(CircleShape),
+            )
+        } else {
+            Box(
+                modifier = Modifier.size(56.dp).clip(CircleShape).background(MioTheme.colors.surfaceSoft),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
-                    stringResource(identity.provider.labelRes),
-                    style = MioTheme.typography.label,
+                    identity.displayName.firstOrNull()?.uppercase() ?: "?",
+                    style = MioTheme.typography.section,
                     color = MioTheme.colors.textMuted,
                 )
             }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(identity.displayName, style = MioTheme.typography.cardTitle, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(identity.provider.labelRes),
+                style = MioTheme.typography.label,
+                color = MioTheme.colors.textMuted,
+            )
         }
     }
 }

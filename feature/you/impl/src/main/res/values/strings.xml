@@ -12,7 +12,7 @@
     <string name="you_appearance_dark">Dark</string>
     <string name="you_synchronization">Synchronization</string>
     <string name="you_account">Account</string>
-    <string name="you_disconnect">Disconnect</string>
+    <string name="you_disconnect_provider">Disconnect %1$s</string>
     <string name="you_disconnect_title">Disconnect %1$s?</string>
     <string name="you_disconnect_message">Mio will remove this local connection and its saved data, including unsent local changes. Your %1$s collection will not be changed.</string>
     <string name="you_disconnect_confirm">Disconnect and delete local data</string>

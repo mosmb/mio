@@ -43,7 +43,11 @@ internal fun YouPreferencesSection(
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.you_preferences), style = MioTheme.typography.section)
-        Surface(shape = MioTheme.shapes.md, border = BorderStroke(1.dp, MioTheme.colors.borderStrong)) {
+        Surface(
+            shape = MioTheme.shapes.lg,
+            color = MioTheme.colors.surface,
+            border = BorderStroke(1.dp, MioTheme.colors.border),
+        ) {
             Column {
                 PreferenceRow(
                     stringResource(R.string.you_appearance),
@@ -53,7 +57,7 @@ internal fun YouPreferencesSection(
                     sheet =
                         "appearance"
                 }
-                HorizontalDivider(color = MioTheme.colors.border)
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MioTheme.colors.border)
                 PreferenceRow(
                     stringResource(R.string.you_title_language),
                     stringResource(titleLanguage.labelRes()),
