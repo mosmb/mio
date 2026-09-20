@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.component.MioBottomSheet
 import io.morgan.mio.core.designsystem.component.MioButton
+import io.morgan.mio.core.designsystem.component.MioIcon
 import io.morgan.mio.core.designsystem.component.MioStatusRow
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.progress.MioProgressStepper
@@ -80,11 +82,30 @@ internal fun MediaDetailCollectionContext(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = collection.status.statusLabel(mediaType),
-                        style = MioTheme.typography.bodyStrong,
+                    Row(
                         modifier = if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        if (collection.status == MediaDetailCollectionStatus.CURRENT ||
+                            collection.status == MediaDetailCollectionStatus.REPEATING
+                        ) {
+                            MioIcon(
+                                iconRes =
+                                    if (mediaType == MediaDetailMediaType.MANGA) {
+                                        R.drawable.media_detail_menu_book
+                                    } else {
+                                        R.drawable.media_detail_tv
+                                    },
+                                contentDescription = null,
+                                tint = MioTheme.colors.text,
+                            )
+                        }
+                        Text(
+                            text = collection.status.statusLabel(mediaType),
+                            style = MioTheme.typography.bodyStrong,
+                        )
+                    }
                     OutlinedButton(
                         onClick = { statusSheetVisible.value = true },
                         border = BorderStroke(1.dp, MioTheme.colors.text),
