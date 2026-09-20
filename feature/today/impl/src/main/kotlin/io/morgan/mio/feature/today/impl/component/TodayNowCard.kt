@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.accessibility.mioDecorative
@@ -76,7 +75,8 @@ internal fun TodayNowCard(
                 .observeTodayPointer(onInteractionChanged)
                 .fillMaxWidth()
                 .requiredHeightIn(min = 332.dp)
-                .clip(cardShape),
+                .clip(cardShape)
+                .clickable(role = Role.Button, onClickLabel = actionLabel, onClick = onClick),
     ) {
         MioArtwork(
             reference = now.bannerReference ?: now.posterReference,
@@ -100,12 +100,7 @@ internal fun TodayNowCard(
             Column(
                 modifier =
                     Modifier
-                        .then(if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f))
-                        .clickable(
-                            role = Role.Button,
-                            onClickLabel = actionLabel,
-                            onClick = onClick,
-                        ).semantics(mergeDescendants = true) {},
+                        .then(if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f)),
             ) {
                 Text(
                     text = stringResource(now.mediaType.labelRes),

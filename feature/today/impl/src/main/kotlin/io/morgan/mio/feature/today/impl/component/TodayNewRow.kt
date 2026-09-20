@@ -23,7 +23,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.accessibility.mioDecorative
 import io.morgan.mio.core.designsystem.theme.MioTheme
@@ -72,6 +71,7 @@ internal fun TodayNewRow(
                 .fillMaxWidth()
                 .heightIn(min = 104.dp)
                 .clip(MioTheme.shapes.sm)
+                .clickable(role = Role.Button, onClickLabel = actionLabel, onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         maxItemsInEachRow = if (largeText) 1 else Int.MAX_VALUE,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -84,12 +84,7 @@ internal fun TodayNewRow(
         Column(
             modifier =
                 Modifier
-                    .then(if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f))
-                    .clickable(
-                        role = Role.Button,
-                        onClickLabel = actionLabel,
-                        onClick = onClick,
-                    ).semantics(mergeDescendants = true) {},
+                    .then(if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f)),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(

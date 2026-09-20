@@ -8,6 +8,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalDensity
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -63,6 +65,24 @@ class TodayScreenTest {
     @After
     fun closeImageLoader() {
         imageLoader?.shutdown()
+    }
+
+    @Test
+    fun artworkOpensDetailButEnabledAndDisabledProgressTargetsDoNot() {
+        val opened = mutableListOf<String>()
+        val actions = mutableListOf<TodayAction>()
+        val initial = populatedState(newRecommendations = emptyList())
+        show(
+            state = initial.copy(now = initial.now.copy(controls = TodayProgressControlsUiModel(false, true))),
+            onMediaDetail = opened::add,
+            onAction = actions::add,
+        )
+        composeRule.onNodeWithContentDescription("Increase episode to 9").performTouchInput { click() }
+        composeRule.onNodeWithContentDescription("Decrease episode to 7").performTouchInput { click() }
+        assertTrue(opened.isEmpty())
+        assertEquals(1, actions.filterIsInstance<TodayAction.Step>().size)
+        composeRule.onNodeWithText("Readable title").performTouchInput { click(Offset(center.x, 20f)) }
+        assertEquals(listOf(initial.now.mediaId), opened)
     }
 
     @Test

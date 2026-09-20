@@ -94,64 +94,67 @@ internal fun Modifier.mioClickable(
                     disabled()
                 }
             }.pointerInput(enabled, interactionSource) {
-                if (enabled) {
-                    awaitEachGesture {
-                        var activePress: PressInteraction.Press? = null
-                        var gestureSettled = false
-                        var isInside = true
-                        var originalPointer: PointerId? = null
+                awaitEachGesture {
+                    var activePress: PressInteraction.Press? = null
+                    var gestureSettled = false
+                    var isInside = true
+                    var originalPointer: PointerId? = null
 
-                        fun cancelActivePress() {
-                            activePress?.let { press -> interactionSource.tryEmit(PressInteraction.Cancel(press)) }
-                            activePress = null
-                        }
+                    fun cancelActivePress() {
+                        activePress?.let { press -> interactionSource.tryEmit(PressInteraction.Cancel(press)) }
+                        activePress = null
+                    }
 
-                        try {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            originalPointer = down.id
-                            if (down.isConsumed) {
-                                gestureSettled = true
-                            } else {
+                    try {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        originalPointer = down.id
+                        if (down.isConsumed) {
+                            gestureSettled = true
+                        } else {
+                            // Claim this target even when disabled so enclosing cards do not open.
+                            down.consume()
+                            if (enabled) {
                                 activePress = PressInteraction.Press(down.position)
                                 interactionSource.tryEmit(requireNotNull(activePress))
+                            }
 
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change =
-                                        event.changes.firstOrNull { pointerChange ->
-                                            pointerChange.id == originalPointer
-                                        } ?: continue
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change =
+                                    event.changes.firstOrNull { pointerChange ->
+                                        pointerChange.id == originalPointer
+                                    } ?: continue
 
-                                    if (change.isConsumed) {
-                                        cancelActivePress()
-                                        gestureSettled = true
-                                        break
+                                if (change.isConsumed) {
+                                    cancelActivePress()
+                                    gestureSettled = true
+                                    break
+                                }
+
+                                val nowInside = change.isInside(size.width, size.height)
+                                if (enabled && nowInside && !isInside && activePress == null) {
+                                    activePress = PressInteraction.Press(change.position)
+                                    interactionSource.tryEmit(requireNotNull(activePress))
+                                } else if (!nowInside && isInside) {
+                                    cancelActivePress()
+                                }
+                                isInside = nowInside
+
+                                if (change.changedToUp()) {
+                                    change.consume()
+                                    val press = activePress
+                                    activePress = null
+                                    if (press != null) {
+                                        interactionSource.tryEmit(PressInteraction.Release(press))
+                                        latestOnClick()
                                     }
-
-                                    val nowInside = change.isInside(size.width, size.height)
-                                    if (nowInside && !isInside && activePress == null) {
-                                        activePress = PressInteraction.Press(change.position)
-                                        interactionSource.tryEmit(requireNotNull(activePress))
-                                    } else if (!nowInside && isInside) {
-                                        cancelActivePress()
-                                    }
-                                    isInside = nowInside
-
-                                    if (change.changedToUp()) {
-                                        val press = activePress
-                                        activePress = null
-                                        if (press != null) {
-                                            interactionSource.tryEmit(PressInteraction.Release(press))
-                                            latestOnClick()
-                                        }
-                                        gestureSettled = true
-                                        break
-                                    }
+                                    gestureSettled = true
+                                    break
                                 }
                             }
-                        } finally {
-                            if (!gestureSettled) cancelActivePress()
                         }
+                    } finally {
+                        if (!gestureSettled) cancelActivePress()
                     }
                 }
             }
