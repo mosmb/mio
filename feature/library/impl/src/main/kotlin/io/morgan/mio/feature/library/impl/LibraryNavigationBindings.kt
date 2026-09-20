@@ -12,6 +12,7 @@ import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.feature.library.api.LibraryKey
+import io.morgan.mio.feature.library.api.OpenDiscoverRequest
 import io.morgan.mio.feature.media.api.MediaKey
 import kotlin.reflect.KClass
 
@@ -22,6 +23,7 @@ private object LibraryNavEntryBuilder : NavEntryBuilder {
         entry<LibraryKey> { key ->
             LibraryRoute(
                 readyRequestId = key.readyRequestId,
+                onExploreDiscover = { navigator.navigate(OpenDiscoverRequest) },
                 onMediaDetail = { mediaId -> navigator.navigate(MediaKey(mediaId)) },
             )
         }

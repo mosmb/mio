@@ -31,6 +31,17 @@ import kotlin.time.Instant
 
 class TodayUiMapperTest {
     @Test
+    fun emptyCollectionIsDistinctFromCaughtUpAndPlannedCollections() {
+        val queue = TodayQueue(null, emptyList(), 0, CaughtUpSummary(emptyList(), null))
+
+        fun state(entries: List<CollectionEntry>) =
+            TodayUiMapper.map(queue, entries, null, null) as TodayUiState.CaughtUp
+        assertEquals(true, state(emptyList()).isCollectionEmpty)
+        assertEquals(false, state(listOf(collectionEntry("done", CollectionStatus.COMPLETED))).isCollectionEmpty)
+        assertEquals(false, state(listOf(collectionEntry("later", CollectionStatus.PLANNED))).isCollectionEmpty)
+    }
+
+    @Test
     fun populatedMapsNowNewAndRemainingWithPresentationOnlyValues() {
         val state =
             TodayUiMapper.map(

@@ -30,6 +30,7 @@ internal sealed interface TodayUiState {
 
     data class CaughtUp(
         val receipt: TodayCaughtUpUiModel,
+        val isCollectionEmpty: Boolean = false,
         val latestUndo: TodayUndoUiModel? = null,
         val progressError: TodayProgressErrorUiModel? = null,
         val syncIssues: List<SyncIssueUiModel> = emptyList(),

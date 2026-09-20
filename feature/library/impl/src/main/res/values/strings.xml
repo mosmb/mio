@@ -23,8 +23,8 @@
     <string name="library_row_type_and_status">%1$s · %2$s</string>
     <string name="library_unavailable_title">Title unavailable</string>
     <string name="library_media_type_unavailable">Media type unavailable</string>
-    <string name="library_empty_title">Your library is empty</string>
-    <string name="library_empty_message">Imported titles will appear here.</string>
+    <string name="library_empty_title">Add your first anime or manga</string>
+    <string name="library_empty_message">Find a title and add it to your library. Watching and Reading titles appear in Today.</string>
     <string name="library_filtered_empty_title">No titles match these filters</string>
     <string name="library_filtered_empty_message">Clear filters to see the rest of your collection.</string>
     <string name="library_clear_filters">Clear filters</string>
@@ -46,4 +46,5 @@
     <string name="library_observation_error_title">Library could not be updated</string>
     <string name="library_observation_error_message">Your saved collection is still here. Try loading it again.</string>
     <string name="library_retry">Retry</string>
+    <string name="library_search_titles">Search titles</string>
 </resources>

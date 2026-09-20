@@ -68,6 +68,7 @@ import io.morgan.mio.feature.library.impl.component.LibraryRow
 internal fun LibraryRoute(
     readyRequestId: String?,
     onMediaDetail: (MediaId) -> Unit,
+    onExploreDiscover: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel =
@@ -93,6 +94,7 @@ internal fun LibraryRoute(
         state = state,
         onAction = viewModel::onAction,
         onMediaDetail = { mediaId -> onMediaDetail(MediaId(mediaId)) },
+        onExploreDiscover = onExploreDiscover,
         timeoutMillis = timeoutMillis,
         modifier = modifier,
     )
@@ -104,6 +106,7 @@ internal fun LibraryScreen(
     onAction: (LibraryAction) -> Unit,
     onMediaDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onExploreDiscover: () -> Unit = {},
     timeoutMillis: Long = DEFAULT_UNDO_TIMEOUT_MILLIS.toLong(),
 ) {
     val listState = rememberLazyListState()
@@ -241,6 +244,8 @@ internal fun LibraryScreen(
                                 MioEmptyState(
                                     title = stringResource(R.string.library_empty_title),
                                     message = stringResource(R.string.library_empty_message),
+                                    actionLabel = stringResource(R.string.library_search_titles),
+                                    onAction = onExploreDiscover,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }

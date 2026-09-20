@@ -89,4 +89,7 @@
     <string name="today_sync_volumes">volumes</string>
     <string name="today_sync_saved_title">Saved title</string>
     <string name="today_sync_account">your account</string>
+    <string name="today_empty_title">Add your first anime or manga</string>
+    <string name="today_empty_message">Find a title and start Watching or Reading to see it here.</string>
+    <string name="today_search_titles">Search titles</string>
 </resources>

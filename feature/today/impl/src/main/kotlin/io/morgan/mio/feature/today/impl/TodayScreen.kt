@@ -40,6 +40,7 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.morgan.mio.core.designsystem.accessibility.MioHapticType
 import io.morgan.mio.core.designsystem.accessibility.mioHeading
 import io.morgan.mio.core.designsystem.accessibility.rememberMioHaptics
+import io.morgan.mio.core.designsystem.component.MioEmptyState
 import io.morgan.mio.core.designsystem.component.MioSkeleton
 import io.morgan.mio.core.designsystem.component.MioSnackbarHost
 import io.morgan.mio.core.designsystem.component.MioSnackbarMessage
@@ -237,11 +238,21 @@ internal fun TodayScreen(
                     }
                 }
                 is TodayUiState.CaughtUp -> {
-                    TodayCaughtUpReceipt(
-                        receipt = state.receipt,
-                        onExploreDiscover = onExploreDiscover,
-                        modifier = Modifier.padding(top = 24.dp),
-                    )
+                    if (state.isCollectionEmpty) {
+                        MioEmptyState(
+                            title = stringResource(R.string.today_empty_title),
+                            message = stringResource(R.string.today_empty_message),
+                            actionLabel = stringResource(R.string.today_search_titles),
+                            onAction = onExploreDiscover,
+                            modifier = Modifier.padding(top = 24.dp),
+                        )
+                    } else {
+                        TodayCaughtUpReceipt(
+                            receipt = state.receipt,
+                            onExploreDiscover = onExploreDiscover,
+                            modifier = Modifier.padding(top = 24.dp),
+                        )
+                    }
                     state.receipt.nextRelease?.let { recommendation ->
                         TodayNextReleaseRow(
                             recommendation = recommendation,

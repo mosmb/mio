@@ -47,6 +47,7 @@ internal object TodayUiMapper {
             )
         } ?: TodayUiState.CaughtUp(
             receipt = requireNotNull(queue.caughtUp).toUiModel(),
+            isCollectionEmpty = collection.isEmpty(),
             latestUndo = undo,
             progressError = progressError,
             syncIssues = syncIssues,
