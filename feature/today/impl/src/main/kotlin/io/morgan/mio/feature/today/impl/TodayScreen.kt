@@ -142,6 +142,17 @@ internal fun TodayScreen(
                 style = MioTheme.typography.display,
                 modifier = Modifier.mioHeading(),
             )
+            TodayRecovery(
+                syncIssues = state.syncIssues(),
+                accountIssue = state.accountIssue(),
+                providerLabel = providerLabel,
+                onReconnect = onReconnect,
+                onRetryRefresh = onRetryRefresh,
+                onMediaDetail = onMediaDetail,
+                onResolveProgressConflict = onResolveProgressConflict,
+                onAction = onAction,
+                modifier = Modifier.padding(top = 24.dp),
+            )
             when (state) {
                 is TodayUiState.Loading -> {
                     TodayNowSectionHeading()
@@ -240,21 +251,11 @@ internal fun TodayScreen(
                     }
                 }
             }
-            TodayRecovery(
-                syncIssues = state.syncIssues(),
-                accountIssue = state.accountIssue(),
-                providerLabel = providerLabel,
-                onReconnect = onReconnect,
-                onRetryRefresh = onRetryRefresh,
-                onMediaDetail = onMediaDetail,
-                onResolveProgressConflict = onResolveProgressConflict,
-                onAction = onAction,
-                modifier = Modifier.padding(top = 24.dp),
-            )
         }
         TodaySnackbar(
             state = state,
             onAction = onAction,
+            providerLabel = providerLabel,
         )
     }
 }
@@ -326,7 +327,7 @@ private fun TodayRecovery(
                     text = issue.title ?: stringResource(R.string.today_sync_saved_title),
                     style = MioTheme.typography.bodyStrong,
                 )
-                Text(text = issue.message(), style = MioTheme.typography.body)
+                Text(text = issue.message(providerLabel), style = MioTheme.typography.body)
                 Text(
                     text =
                         stringResource(
@@ -375,10 +376,11 @@ private fun TodayRecovery(
 }
 
 @Composable
-private fun TodayUiState.SyncIssueUiModel.message(): String =
+private fun TodayUiState.SyncIssueUiModel.message(providerLabel: String?): String =
     when (kind) {
         SyncIssueKind.AUTHENTICATION -> stringResource(R.string.today_sync_authentication_required)
-        SyncIssueKind.REJECTED -> stringResource(R.string.today_sync_rejected)
+        SyncIssueKind.REJECTED ->
+            stringResource(R.string.today_sync_rejected, providerLabel ?: stringResource(R.string.today_sync_account))
         SyncIssueKind.CONFLICT -> stringResource(R.string.today_sync_conflict)
         SyncIssueKind.RETRY_EXHAUSTED -> stringResource(R.string.today_sync_retry_exhausted)
         SyncIssueKind.INVALID_REMOTE_DATA -> stringResource(R.string.today_sync_invalid_data)
@@ -396,9 +398,11 @@ private fun TodayProgressUnit.displayName(): String =
 private fun TodaySnackbar(
     state: TodayUiState,
     onAction: (TodayAction) -> Unit,
+    providerLabel: String?,
 ) {
     val error = state.progressErrorOrNull()
     val undo = state.latestUndoOrNull()
+    val syncIssue = state.syncIssues().firstOrNull { it.mediaId == undo?.mediaId }
     val message =
         when {
             error != null ->
@@ -411,14 +415,18 @@ private fun TodaySnackbar(
                 MioSnackbarMessage(
                     id = undo.groupId,
                     message =
-                        stringResource(
-                            when (undo.unit) {
-                                TodayProgressUnit.EPISODE -> R.string.today_saved_episode
-                                TodayProgressUnit.CHAPTER -> R.string.today_saved_chapter
-                                TodayProgressUnit.VOLUME -> R.string.today_saved_volume
-                            },
-                            undo.progress,
-                        ),
+                        if (syncIssue != null) {
+                            syncIssue.message(providerLabel)
+                        } else {
+                            stringResource(
+                                when (undo.unit) {
+                                    TodayProgressUnit.EPISODE -> R.string.today_saved_episode
+                                    TodayProgressUnit.CHAPTER -> R.string.today_saved_chapter
+                                    TodayProgressUnit.VOLUME -> R.string.today_saved_volume
+                                },
+                                undo.progress,
+                            )
+                        },
                     actionLabel = stringResource(R.string.today_undo),
                 )
             else -> null

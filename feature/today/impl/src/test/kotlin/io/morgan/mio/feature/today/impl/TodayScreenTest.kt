@@ -263,6 +263,41 @@ class TodayScreenTest {
     }
 
     @Test
+    fun rejectedWriteIsVisibleAboveTheCardAndRetryKeepsLocalProgress() {
+        val actions = mutableListOf<TodayAction>()
+        val initial = populatedState()
+        show(
+            state =
+                initial.copy(
+                    syncIssues =
+                        listOf(
+                            TodayUiState.SyncIssueUiModel(
+                                operationId = "rejected-operation",
+                                entryId = "entry",
+                                mediaId = initial.now.mediaId,
+                                title = "Rejected title",
+                                kind = SyncIssueKind.REJECTED,
+                                localProgress = 9,
+                                localUnit = TodayProgressUnit.EPISODE,
+                                localStatus = TodayCollectionStatus.CURRENT,
+                                localTotal = 12,
+                                remoteProgress = null,
+                                remoteUnit = null,
+                                remoteStatus = null,
+                                canRetry = true,
+                            ),
+                        ),
+                ),
+            providerLabel = "AniList",
+            onAction = actions::add,
+        )
+        composeRule.onNodeWithText("Saved on this device. Couldn’t update AniList.").assertIsDisplayed()
+        composeRule.onNodeWithText("On this device: 9 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Retry sync").assertIsDisplayed().performClick()
+        assertTrue(actions.contains(TodayAction.RetrySync("rejected-operation")))
+    }
+
+    @Test
     fun accountRefreshIssueOffersOnlyTheReadOnlyRefreshRetry() {
         var refreshRequests = 0
         show(

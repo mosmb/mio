@@ -78,14 +78,15 @@
     <string name="today_sync_reconnect">Reconnect</string>
     <string name="today_sync_retry">Retry sync</string>
     <string name="today_sync_resolve">Resolve</string>
-    <string name="today_sync_rejected">This update was not accepted; your saved value is unchanged</string>
+    <string name="today_sync_rejected">Saved on this device. Couldn’t update %1$s.</string>
     <string name="today_sync_conflict">This update conflicts with a provider change</string>
     <string name="today_sync_retry_exhausted">This update needs another attempt</string>
     <string name="today_sync_invalid_data">Provider data needs attention</string>
-    <string name="today_sync_local_value">Saved value: %1$d %2$s</string>
+    <string name="today_sync_local_value">On this device: %1$d %2$s</string>
     <string name="today_sync_remote_value">Provider value: %1$d %2$s</string>
     <string name="today_sync_episodes">episodes</string>
     <string name="today_sync_chapters">chapters</string>
     <string name="today_sync_volumes">volumes</string>
     <string name="today_sync_saved_title">Saved title</string>
+    <string name="today_sync_account">your account</string>
 </resources>
