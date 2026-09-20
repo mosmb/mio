@@ -34,7 +34,7 @@ class AniListAuthenticatorTest {
         )
 
     @Test
-    fun launchUrlContainsExactParametersInOrder() =
+    fun implicitLaunchUsesRegisteredRedirectWithoutSendingRedirectUri() =
         runTest {
             val result =
                 authenticator("state-value").beginAuthorization(
@@ -44,7 +44,7 @@ class AniListAuthenticatorTest {
             val success = result as ProviderResult.Success
             val expected =
                 "${configuration.authorizationEndpoint}?client_id=mio-test-client" +
-                    "&redirect_uri=mio%3A%2F%2Foauth%2Fanilist&response_type=token&state=state-value"
+                    "&response_type=token&state=state-value"
             assertEquals(expected, success.value.authorizationUrl)
             assertEquals("state-value", success.value.transaction.state)
             assertNull(success.value.transaction.codeVerifier)

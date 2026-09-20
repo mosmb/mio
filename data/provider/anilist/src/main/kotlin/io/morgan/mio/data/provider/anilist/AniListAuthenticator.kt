@@ -34,9 +34,10 @@ internal class AniListAuthenticator(
             return ProviderResult.Failure(ProviderFailure.Unexpected)
         }
         val url =
+            // AniList uses the redirect registered with the client. Sending redirect_uri here
+            // makes its live implicit-grant endpoint reject the request as unsupported_grant_type.
             "${configuration.authorizationEndpoint}" +
                 "?client_id=${encode(configuration.clientId)}" +
-                "&redirect_uri=${encode(configuration.redirectUri)}" +
                 "&response_type=token" +
                 "&state=${encode(state)}"
         return ProviderResult.Success(
