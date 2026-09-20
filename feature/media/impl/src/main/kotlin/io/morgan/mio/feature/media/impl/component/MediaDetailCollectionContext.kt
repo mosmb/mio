@@ -18,6 +18,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,10 @@ internal fun MediaDetailCollectionContext(
     onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     val largeText = LocalDensity.current.fontScale > 1.3f
+    val colors = MioTheme.colors
+    // Lime needs a darker shade when used as foreground artwork on a light surface.
+    val activeIconTint =
+        if (colors.surface.luminance() > 0.5f) lerp(colors.accent, colors.onAccent, 0.5f) else colors.accent
     val motionGeneration = remember { mutableLongStateOf(0L) }
     val motionActive = remember { mutableStateOf(false) }
     val statusSheetVisible = remember { mutableStateOf(false) }
@@ -98,7 +104,7 @@ internal fun MediaDetailCollectionContext(
                                         R.drawable.media_detail_tv
                                     },
                                 contentDescription = null,
-                                tint = MioTheme.colors.text,
+                                tint = activeIconTint,
                             )
                         }
                         Text(
@@ -108,6 +114,7 @@ internal fun MediaDetailCollectionContext(
                     }
                     OutlinedButton(
                         onClick = { statusSheetVisible.value = true },
+                        shape = MioTheme.shapes.md,
                         border = BorderStroke(1.dp, MioTheme.colors.text),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MioTheme.colors.text),
                     ) {
