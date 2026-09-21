@@ -32,6 +32,10 @@ internal sealed interface TodayAction {
         val visible: Boolean,
     ) : TodayAction
 
+    data class CompletionMotionFinished(
+        val groupId: String,
+    ) : TodayAction
+
     data object DismissError : TodayAction
 }
 

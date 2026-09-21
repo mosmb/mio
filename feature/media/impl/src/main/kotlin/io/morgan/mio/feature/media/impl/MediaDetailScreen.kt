@@ -430,6 +430,7 @@ private fun MediaDetailTrackingBar(
     MediaDetailCollectionContext(
         title = state.media.title,
         collection = state.collection,
+        completionId = state.latestUndo?.takeIf { it.completed }?.groupId,
         mediaType = state.media.type,
         writableStatuses = state.writableStatuses,
         onDecrease = {

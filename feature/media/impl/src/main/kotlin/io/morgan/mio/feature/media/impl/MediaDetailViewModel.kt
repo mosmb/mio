@@ -289,6 +289,7 @@ internal class MediaDetailViewModel(
 
     private fun startUndo(action: MediaDetailAction.Undo) {
         val groupId = runCatching { OperationGroupId(action.groupId) }.getOrNull() ?: return
+        latestHiddenUndoId.value = groupId.value
         viewModelScope.launch {
             val result =
                 try {

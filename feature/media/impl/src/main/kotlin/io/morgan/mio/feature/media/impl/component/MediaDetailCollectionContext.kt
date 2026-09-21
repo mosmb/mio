@@ -18,8 +18,11 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -28,6 +31,7 @@ import io.morgan.mio.core.designsystem.component.MioButton
 import io.morgan.mio.core.designsystem.component.MioIcon
 import io.morgan.mio.core.designsystem.component.MioStatusRow
 import io.morgan.mio.core.designsystem.theme.MioTheme
+import io.morgan.mio.core.ui.progress.MioAchievementStamp
 import io.morgan.mio.core.ui.progress.MioProgressStepper
 import io.morgan.mio.core.ui.progress.MioProgressValue
 import io.morgan.mio.feature.media.impl.MediaDetailCollectionStatus
@@ -42,6 +46,7 @@ internal fun MediaDetailCollectionContext(
     collection: MediaDetailCollectionUiModel?,
     modifier: Modifier = Modifier,
     title: String = "",
+    completionId: String? = null,
     mediaType: MediaDetailMediaType = MediaDetailMediaType.ANIME,
     writableStatuses: List<MediaDetailCollectionStatus> =
         MediaDetailCollectionStatus.entries.filterNot { status -> status == MediaDetailCollectionStatus.REPEATING },
@@ -51,6 +56,8 @@ internal fun MediaDetailCollectionContext(
     onInteractionChanged: (Boolean) -> Unit = {},
     onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
+    val sourceBounds = remember { mutableStateOf<Rect?>(null) }
+    val statusBounds = remember { mutableStateOf<Rect?>(null) }
     val largeText = LocalDensity.current.fontScale > 1.3f
     val colors = MioTheme.colors
     // Lime needs a darker shade when used as foreground artwork on a light surface.
@@ -107,13 +114,16 @@ internal fun MediaDetailCollectionContext(
                                 tint = activeIconTint,
                             )
                         }
-                        Text(
-                            text = collection.status.statusLabel(mediaType),
-                            style = MioTheme.typography.bodyStrong,
+                        MioAchievementStamp(
+                            completed = collection.status == MediaDetailCollectionStatus.COMPLETED,
+                            label = collection.status.statusLabel(mediaType),
+                            completionId = completionId,
+                            sourceBounds = sourceBounds.value ?: statusBounds.value,
                         )
                     }
                     OutlinedButton(
                         onClick = { statusSheetVisible.value = true },
+                        modifier = Modifier.onGloballyPositioned { statusBounds.value = it.boundsInWindow() },
                         shape = MioTheme.shapes.md,
                         border = BorderStroke(1.dp, MioTheme.colors.text),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MioTheme.colors.text),
@@ -152,13 +162,17 @@ internal fun MediaDetailCollectionContext(
                             onDecrease = onDecrease,
                             onIncrease = onIncrease,
                             onInteractionChanged = onInteractionChanged,
+                            modifier = Modifier.onGloballyPositioned { sourceBounds.value = it.boundsInWindow() },
                         )
                     }
                 }
             } else {
                 MioButton(
                     text = stringResource(R.string.media_detail_add_to_library),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier.fillMaxWidth().onGloballyPositioned {
+                            statusBounds.value = it.boundsInWindow()
+                        },
                     onClick = { statusSheetVisible.value = true },
                 )
             }
@@ -179,6 +193,7 @@ internal fun MediaDetailCollectionContext(
                     selected = collection?.status == status,
                     onSelected = {
                         statusSheetVisible.value = false
+                        sourceBounds.value = statusBounds.value
                         if (collection?.status != status) onChangeStatus(status)
                     },
                 )

@@ -62,6 +62,7 @@ internal class TodayViewModel(
     private val touchedMediaIds = MutableStateFlow<Set<String>>(emptySet())
     private val settlingMediaIds = MutableStateFlow<Set<String>>(emptySet())
     private val pendingRequests = MutableStateFlow<Map<OperationGroupId, PendingProgressRequest>>(emptyMap())
+    private val finishedCompletionId = MutableStateFlow<String?>(null)
     private val visible = MutableStateFlow(true)
     private val routineHapticEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var lastRequest: PendingProgressRequest? = null
@@ -134,13 +135,14 @@ internal class TodayViewModel(
             baseState,
             collectionRepository.observeCollection(accountId),
             presentationProtection,
-        ) { base, collection, protection ->
+            finishedCompletionId,
+        ) { base, collection, protection, finishedId ->
             val protectedIds =
                 if (protection.visible) {
                     protection.touchedMediaIds +
                         protection.pendingMediaIds +
                         protection.settlingMediaIds +
-                        listOfNotNull(base.latestUndoMediaId())
+                        listOfNotNull(base.latestUndoMediaId(finishedId))
                 } else {
                     emptySet()
                 }
@@ -181,6 +183,7 @@ internal class TodayViewModel(
                     motionGenerations.clear()
                 }
             }
+            is TodayAction.CompletionMotionFinished -> finishedCompletionId.value = action.groupId
             TodayAction.DismissError -> progressError.value = null
         }
     }
@@ -248,6 +251,7 @@ internal class TodayViewModel(
 
     private fun startUndo(action: TodayAction.Undo) {
         val groupId = runCatching { OperationGroupId(action.groupId) }.getOrNull() ?: return
+        latestHiddenUndoId.value = groupId.value
         viewModelScope.launch {
             val result =
                 try {
@@ -360,11 +364,17 @@ internal class TodayViewModel(
     }
 }
 
-private fun TodayUiState.latestUndoMediaId(): String? =
+private fun TodayUiState.latestUndoMediaId(finishedCompletionId: String?): String? =
     when (this) {
         is TodayUiState.Loading -> null
-        is TodayUiState.Populated -> latestUndo?.mediaId
-        is TodayUiState.CaughtUp -> latestUndo?.mediaId
+        is TodayUiState.Populated ->
+            latestUndo
+                ?.takeUnless { it.completed && it.groupId == finishedCompletionId }
+                ?.mediaId
+        is TodayUiState.CaughtUp ->
+            latestUndo
+                ?.takeUnless { it.completed && it.groupId == finishedCompletionId }
+                ?.mediaId
     }
 
 private fun TodayUiState.syncIssues(): List<TodayUiState.SyncIssueUiModel> =

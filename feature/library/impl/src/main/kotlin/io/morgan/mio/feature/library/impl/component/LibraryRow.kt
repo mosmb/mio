@@ -16,12 +16,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -29,6 +33,7 @@ import io.morgan.mio.core.designsystem.component.MioStepButton
 import io.morgan.mio.core.designsystem.icon.MioIcons
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.image.MioArtwork
+import io.morgan.mio.core.ui.progress.MioAchievementStamp
 import io.morgan.mio.feature.library.impl.LibraryProgressUnit
 import io.morgan.mio.feature.library.impl.LibraryRowMediaType
 import io.morgan.mio.feature.library.impl.LibraryRowStatus
@@ -44,8 +49,10 @@ internal fun LibraryRow(
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     modifier: Modifier = Modifier,
+    completionId: String? = null,
     onInteractionChanged: (Boolean) -> Unit = {},
 ) {
+    val sourceBounds = remember { mutableStateOf<Rect?>(null) }
     val title = row.title.ifBlank { stringResource(R.string.library_unavailable_title) }
     val mediaType =
         when (row.mediaType) {
@@ -120,11 +127,20 @@ internal fun LibraryRow(
                     style = MioTheme.typography.bodyStrong,
                     maxLines = 2,
                 )
-                Text(
-                    text = stringResource(R.string.library_row_type_and_status, mediaType, status),
-                    style = MioTheme.typography.caption,
-                    color = MioTheme.colors.textMuted,
-                    maxLines = 1,
+                MioAchievementStamp(
+                    completed = row.status == LibraryRowStatus.COMPLETED,
+                    label =
+                        if (row.status ==
+                            LibraryRowStatus.COMPLETED
+                        ) {
+                            status
+                        } else {
+                            stringResource(R.string.library_row_type_and_status, mediaType, status)
+                        },
+                    completionId = completionId,
+                    sourceBounds = sourceBounds.value,
+                    labelStyle = MioTheme.typography.caption,
+                    labelColor = MioTheme.colors.textMuted,
                 )
                 Text(
                     text = progressText,
@@ -160,6 +176,7 @@ internal fun LibraryRow(
                     accent = true,
                     onClick = onIncrease,
                     interactionSource = increaseInteractionSource,
+                    modifier = Modifier.onGloballyPositioned { sourceBounds.value = it.boundsInWindow() },
                 )
             }
         }

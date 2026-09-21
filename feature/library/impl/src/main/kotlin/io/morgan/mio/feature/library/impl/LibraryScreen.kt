@@ -283,6 +283,7 @@ internal fun LibraryScreen(
                         else ->
                             LibraryRows(
                                 rows = state.rows,
+                                latestUndo = state.latestUndo,
                                 listState = listState,
                                 onMediaDetail = onMediaDetail,
                                 onAction = onAction,
@@ -340,6 +341,7 @@ private fun MediaFilterPill(
 @Composable
 private fun LibraryRows(
     rows: List<LibraryRowUiModel>,
+    latestUndo: LibraryUndoUiModel?,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onMediaDetail: (String) -> Unit,
     onAction: (LibraryAction) -> Unit,
@@ -360,6 +362,7 @@ private fun LibraryRows(
         items(items = rows, key = LibraryRowUiModel::entryId) { row ->
             LibraryRow(
                 row = row,
+                completionId = latestUndo?.takeIf { it.mediaId == row.mediaId }?.groupId,
                 onClick = { onMediaDetail(row.mediaId) },
                 onDecrease = {
                     onAction(LibraryAction.Step(row.mediaId, LibraryProgressDirection.DECREASE, timeoutMillis))

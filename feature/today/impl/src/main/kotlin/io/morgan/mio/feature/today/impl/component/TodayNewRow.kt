@@ -18,6 +18,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.accessibility.mioDecorative
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.image.MioArtwork
+import io.morgan.mio.core.ui.progress.MioAchievementStamp
 import io.morgan.mio.core.ui.progress.MioProgressStepper
 import io.morgan.mio.core.ui.progress.MioProgressValue
 import io.morgan.mio.feature.today.impl.R
@@ -43,11 +47,14 @@ internal fun TodayNewRow(
     recommendation: TodayNewUiModel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    completionId: String? = null,
+    onCompletionFinished: (String) -> Unit = {},
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
     onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
+    val sourceBounds = remember { mutableStateOf<Rect?>(null) }
     val largeText = LocalDensity.current.fontScale > 1.3f
     val motionGeneration = remember { mutableLongStateOf(0L) }
     val motionActive = remember { mutableStateOf(false) }
@@ -128,13 +135,22 @@ internal fun TodayNewRow(
                         style = MioTheme.typography.caption,
                     )
                 }
-            }
-            if (recommendation.status != TodayCollectionStatus.CURRENT) {
-                Text(
-                    text = recommendation.status.displayName(),
-                    style = MioTheme.typography.bodyStrong,
+                MioAchievementStamp(
+                    completed = recommendation.status == TodayCollectionStatus.COMPLETED,
+                    label =
+                        if (recommendation.status ==
+                            TodayCollectionStatus.CURRENT
+                        ) {
+                            ""
+                        } else {
+                            recommendation.status.displayName()
+                        },
+                    completionId = completionId,
+                    sourceBounds = sourceBounds.value,
+                    onFinished = onCompletionFinished,
                 )
             }
+
             MioProgressValue(
                 value = recommendation.progress,
                 total = recommendation.total,
@@ -159,7 +175,10 @@ internal fun TodayNewRow(
                 increaseEnabled = controls.increaseEnabled,
                 onDecrease = onDecrease,
                 onIncrease = onIncrease,
-                modifier = Modifier.padding(start = 8.dp),
+                modifier =
+                    Modifier.onGloballyPositioned { sourceBounds.value = it.boundsInWindow() }.padding(
+                        start = 8.dp,
+                    ),
             )
         }
     }

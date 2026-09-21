@@ -2,6 +2,11 @@ package io.morgan.mio.feature.today.impl
 
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -128,6 +133,7 @@ internal fun TodayScreen(
                 .rememberTitleResolver(),
         )
     val scrollState = rememberScrollState()
+    val completionUndo = state.latestUndoOrNull()
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier =
@@ -159,57 +165,32 @@ internal fun TodayScreen(
                 onAction = onAction,
                 modifier = Modifier.padding(top = 24.dp),
             )
-            when (state) {
-                is TodayUiState.Loading -> {
-                    TodayNowSectionHeading()
-                    TodayLoadingCard(modifier = Modifier.padding(top = 12.dp))
-                }
-                is TodayUiState.Populated -> {
-                    TodayNowSectionHeading()
-                    TodayNowCard(
-                        now = state.now,
-                        onClick = { onMediaDetail(state.now.mediaId) },
-                        onDecrease = {
-                            onAction(
-                                TodayAction.Step(
-                                    mediaId = state.now.mediaId,
-                                    direction = TodayProgressDirection.DECREASE,
-                                    timeoutMillis = timeoutMillis,
-                                ),
-                            )
-                        },
-                        onIncrease = {
-                            onAction(
-                                TodayAction.Step(
-                                    mediaId = state.now.mediaId,
-                                    direction = TodayProgressDirection.INCREASE,
-                                    timeoutMillis = timeoutMillis,
-                                ),
-                            )
-                        },
-                        onInteractionChanged = { pressed ->
-                            onAction(TodayAction.InteractionChanged(state.now.mediaId, pressed))
-                        },
-                        onMotionChanged = { generation, active ->
-                            onAction(TodayAction.MotionChanged(state.now.mediaId, generation, active))
-                        },
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                    if (state.newRecommendations.isNotEmpty()) {
-                        Text(
-                            text = stringResource(R.string.today_new),
-                            style = MioTheme.typography.section,
-                            modifier = Modifier.padding(top = 24.dp).mioHeading(),
-                        )
-                        state.newRecommendations.forEachIndexed { index, recommendation ->
-                            if (index > 0) TodayRowDivider()
-                            TodayNewRow(
-                                recommendation = recommendation,
-                                onClick = { onMediaDetail(recommendation.mediaId) },
+            AnimatedContent(
+                targetState = state,
+                contentKey = { it::class },
+                transitionSpec = { (fadeIn(tween(180)) togetherWith fadeOut(tween(180))).using(null) },
+                label = "todayCaughtUp",
+            ) { state ->
+                Column {
+                    when (state) {
+                        is TodayUiState.Loading -> {
+                            TodayNowSectionHeading()
+                            TodayLoadingCard(modifier = Modifier.padding(top = 12.dp))
+                        }
+                        is TodayUiState.Populated -> {
+                            TodayNowSectionHeading()
+                            TodayNowCard(
+                                now = state.now,
+                                completionId =
+                                    completionUndo
+                                        ?.takeIf { it.completed && it.mediaId == state.now.mediaId }
+                                        ?.groupId,
+                                onCompletionFinished = { onAction(TodayAction.CompletionMotionFinished(it)) },
+                                onClick = { onMediaDetail(state.now.mediaId) },
                                 onDecrease = {
                                     onAction(
                                         TodayAction.Step(
-                                            mediaId = recommendation.mediaId,
+                                            mediaId = state.now.mediaId,
                                             direction = TodayProgressDirection.DECREASE,
                                             timeoutMillis = timeoutMillis,
                                         ),
@@ -218,52 +199,100 @@ internal fun TodayScreen(
                                 onIncrease = {
                                     onAction(
                                         TodayAction.Step(
-                                            mediaId = recommendation.mediaId,
+                                            mediaId = state.now.mediaId,
                                             direction = TodayProgressDirection.INCREASE,
                                             timeoutMillis = timeoutMillis,
                                         ),
                                     )
                                 },
                                 onInteractionChanged = { pressed ->
-                                    onAction(TodayAction.InteractionChanged(recommendation.mediaId, pressed))
+                                    onAction(TodayAction.InteractionChanged(state.now.mediaId, pressed))
                                 },
                                 onMotionChanged = { generation, active ->
-                                    onAction(TodayAction.MotionChanged(recommendation.mediaId, generation, active))
+                                    onAction(TodayAction.MotionChanged(state.now.mediaId, generation, active))
                                 },
-                                modifier = Modifier.padding(top = if (index == 0) 12.dp else 0.dp),
+                                modifier = Modifier.padding(top = 12.dp),
                             )
+                            if (state.newRecommendations.isNotEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.today_new),
+                                    style = MioTheme.typography.section,
+                                    modifier = Modifier.padding(top = 24.dp).mioHeading(),
+                                )
+                                state.newRecommendations.forEachIndexed { index, recommendation ->
+                                    if (index > 0) TodayRowDivider()
+                                    TodayNewRow(
+                                        recommendation = recommendation,
+                                        completionId =
+                                            completionUndo
+                                                ?.takeIf {
+                                                    it.completed &&
+                                                        it.mediaId == recommendation.mediaId
+                                                }?.groupId,
+                                        onCompletionFinished = { onAction(TodayAction.CompletionMotionFinished(it)) },
+                                        onClick = { onMediaDetail(recommendation.mediaId) },
+                                        onDecrease = {
+                                            onAction(
+                                                TodayAction.Step(
+                                                    mediaId = recommendation.mediaId,
+                                                    direction = TodayProgressDirection.DECREASE,
+                                                    timeoutMillis = timeoutMillis,
+                                                ),
+                                            )
+                                        },
+                                        onIncrease = {
+                                            onAction(
+                                                TodayAction.Step(
+                                                    mediaId = recommendation.mediaId,
+                                                    direction = TodayProgressDirection.INCREASE,
+                                                    timeoutMillis = timeoutMillis,
+                                                ),
+                                            )
+                                        },
+                                        onInteractionChanged = { pressed ->
+                                            onAction(TodayAction.InteractionChanged(recommendation.mediaId, pressed))
+                                        },
+                                        onMotionChanged = { generation, active ->
+                                            onAction(
+                                                TodayAction.MotionChanged(recommendation.mediaId, generation, active),
+                                            )
+                                        },
+                                        modifier = Modifier.padding(top = if (index == 0) 12.dp else 0.dp),
+                                    )
+                                }
+                            }
+                            if (state.remainingReadyCount > 0) {
+                                TodayRemainingReadySummary(
+                                    count = state.remainingReadyCount,
+                                    onClick = onRemainingReady,
+                                    modifier = Modifier.padding(top = 16.dp),
+                                )
+                            }
                         }
-                    }
-                    if (state.remainingReadyCount > 0) {
-                        TodayRemainingReadySummary(
-                            count = state.remainingReadyCount,
-                            onClick = onRemainingReady,
-                            modifier = Modifier.padding(top = 16.dp),
-                        )
-                    }
-                }
-                is TodayUiState.CaughtUp -> {
-                    if (state.isCollectionEmpty) {
-                        MioEmptyState(
-                            title = stringResource(R.string.today_empty_title),
-                            message = stringResource(R.string.today_empty_message),
-                            actionLabel = stringResource(R.string.today_search_titles),
-                            onAction = onExploreDiscover,
-                            modifier = Modifier.padding(top = 24.dp),
-                        )
-                    } else {
-                        TodayCaughtUpReceipt(
-                            receipt = state.receipt,
-                            onExploreDiscover = onExploreDiscover,
-                            modifier = Modifier.padding(top = 24.dp),
-                        )
-                    }
-                    state.receipt.nextRelease?.let { recommendation ->
-                        TodayNextReleaseRow(
-                            recommendation = recommendation,
-                            onClick = { onMediaDetail(recommendation.mediaId) },
-                            modifier = Modifier.padding(top = 16.dp),
-                        )
+                        is TodayUiState.CaughtUp -> {
+                            if (state.isCollectionEmpty) {
+                                MioEmptyState(
+                                    title = stringResource(R.string.today_empty_title),
+                                    message = stringResource(R.string.today_empty_message),
+                                    actionLabel = stringResource(R.string.today_search_titles),
+                                    onAction = onExploreDiscover,
+                                    modifier = Modifier.padding(top = 24.dp),
+                                )
+                            } else {
+                                TodayCaughtUpReceipt(
+                                    receipt = state.receipt,
+                                    onExploreDiscover = onExploreDiscover,
+                                    modifier = Modifier.padding(top = 24.dp),
+                                )
+                            }
+                            state.receipt.nextRelease?.let { recommendation ->
+                                TodayNextReleaseRow(
+                                    recommendation = recommendation,
+                                    onClick = { onMediaDetail(recommendation.mediaId) },
+                                    modifier = Modifier.padding(top = 16.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }

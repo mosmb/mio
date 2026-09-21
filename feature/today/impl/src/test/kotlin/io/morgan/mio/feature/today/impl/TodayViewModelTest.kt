@@ -28,6 +28,7 @@ import io.morgan.mio.domain.model.UnitTotal
 import io.morgan.mio.domain.progress.ObserveProgressUndoUseCase
 import io.morgan.mio.domain.progress.ProgressAction
 import io.morgan.mio.domain.progress.ProgressChange
+import io.morgan.mio.domain.progress.ProgressDirection
 import io.morgan.mio.domain.progress.ProgressRepository
 import io.morgan.mio.domain.progress.ProgressSnapshot
 import io.morgan.mio.domain.progress.ProgressUndo
@@ -334,6 +335,61 @@ class TodayViewModelTest {
             viewModel.onAction(TodayAction.MotionChanged("media-1", generation = 1L, active = false))
             runCurrent()
             assertTrue(viewModel.uiState.value is TodayUiState.CaughtUp)
+        }
+
+    @Test
+    fun completionHoldsCardUntilStampFinishesThenReceiptKeepsUndo() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repositories = TestRepositories()
+            repositories.entries.value = listOf(entry(11))
+            repositories.mediaState.value = media()
+            repositories.releaseState.value = listOf(release(12))
+            val latest = MutableStateFlow<ProgressAction?>(null)
+            val progress =
+                object : ProgressRepository by TestProgressRepository() {
+                    override fun observeLatestAction() = latest
+                }
+            val viewModel = repositories.viewModel(progress)
+            backgroundScope.launch { viewModel.uiState.collect() }
+            runCurrent()
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", true))
+            latest.value =
+                ProgressAction(
+                    id = OperationGroupId("completion"),
+                    order = 1,
+                    direction = ProgressDirection.INCREASE,
+                    accountId = accountId,
+                    entryId = CollectionEntryId("entry-1"),
+                    mediaId = MediaId("media-1"),
+                    unit = ProgressUnit.EPISODE,
+                    beforeProgress = ProgressValue(11),
+                    afterProgress = ProgressValue(12),
+                    beforeStatus = CollectionStatus.CURRENT,
+                    afterStatus = CollectionStatus.COMPLETED,
+                    beforeUpdatedAt = now,
+                    afterUpdatedAt = now,
+                    afterRevision = 1,
+                    createdAt = now,
+                    undoUntil = now + 6.seconds,
+                    undoneAt = null,
+                )
+            repositories.entries.value = listOf(entry(12).copy(status = CollectionStatus.COMPLETED))
+            runCurrent()
+            viewModel.onAction(TodayAction.InteractionChanged("media-1", false))
+            runCurrent()
+            assertEquals(12, (viewModel.uiState.value as TodayUiState.Populated).now.progress)
+            viewModel.onAction(TodayAction.CompletionMotionFinished("obsolete"))
+            runCurrent()
+            assertTrue(viewModel.uiState.value is TodayUiState.Populated)
+            viewModel.onAction(TodayAction.CompletionMotionFinished("completion"))
+            runCurrent()
+            assertEquals("completion", (viewModel.uiState.value as TodayUiState.CaughtUp).latestUndo?.groupId)
+            // Room's restored state reverses the receipt without replaying the completion.
+            latest.value = null
+            repositories.entries.value = listOf(entry(11))
+            runCurrent()
+            assertEquals(11, (viewModel.uiState.value as TodayUiState.Populated).now.progress)
         }
 
     private fun TestRepositories.viewModel(progress: ProgressRepository = TestProgressRepository()): TodayViewModel =

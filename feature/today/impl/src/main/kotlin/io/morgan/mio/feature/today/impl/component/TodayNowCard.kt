@@ -21,8 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import io.morgan.mio.core.designsystem.accessibility.mioDecorative
 import io.morgan.mio.core.designsystem.theme.MioTheme
 import io.morgan.mio.core.ui.image.MioArtwork
+import io.morgan.mio.core.ui.progress.MioAchievementStamp
 import io.morgan.mio.core.ui.progress.MioProgressStepper
 import io.morgan.mio.core.ui.progress.MioProgressValue
 import io.morgan.mio.feature.today.impl.R
@@ -47,11 +51,14 @@ internal fun TodayNowCard(
     now: TodayNowUiModel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    completionId: String? = null,
+    onCompletionFinished: (String) -> Unit = {},
     onDecrease: () -> Unit = {},
     onIncrease: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
     onMotionChanged: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
+    val sourceBounds = remember { mutableStateOf<Rect?>(null) }
     val largeText = LocalDensity.current.fontScale > 1.3f
     val motionGeneration = remember { mutableLongStateOf(0L) }
     val motionActive = remember { mutableStateOf(false) }
@@ -145,15 +152,16 @@ internal fun TodayNowCard(
                             modifier = Modifier.padding(top = 4.dp),
                         )
                     }
-                }
-                if (now.status != TodayCollectionStatus.CURRENT) {
-                    Text(
-                        text = now.status.displayName(),
-                        style = MioTheme.typography.bodyStrong,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 4.dp),
+                    MioAchievementStamp(
+                        completed = now.status == TodayCollectionStatus.COMPLETED,
+                        label = if (now.status == TodayCollectionStatus.CURRENT) "" else now.status.displayName(),
+                        completionId = completionId,
+                        sourceBounds = sourceBounds.value,
+                        labelColor = Color.White,
+                        onFinished = onCompletionFinished,
                     )
                 }
+
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
                     MioProgressValue(
                         value = now.progress,
@@ -180,10 +188,14 @@ internal fun TodayNowCard(
                     onDecrease = onDecrease,
                     onIncrease = onIncrease,
                     modifier =
-                        Modifier.align(Alignment.Bottom).padding(
-                            start = if (largeText) 0.dp else 8.dp,
-                            top = if (largeText) 12.dp else 0.dp,
-                        ),
+                        Modifier
+                            .onGloballyPositioned { sourceBounds.value = it.boundsInWindow() }
+                            .align(
+                                Alignment.Bottom,
+                            ).padding(
+                                start = if (largeText) 0.dp else 8.dp,
+                                top = if (largeText) 12.dp else 0.dp,
+                            ),
                 )
             }
         }

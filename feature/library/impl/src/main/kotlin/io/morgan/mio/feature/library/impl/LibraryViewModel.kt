@@ -290,6 +290,9 @@ internal class LibraryViewModel(
 
     private fun startUndo(action: LibraryAction.Undo) {
         val groupId = runCatching { OperationGroupId(action.groupId) }.getOrNull() ?: return
+        latestHiddenUndoId.value = groupId.value
+        latestUndo = null
+        publish()
         viewModelScope.launch {
             val result =
                 try {
