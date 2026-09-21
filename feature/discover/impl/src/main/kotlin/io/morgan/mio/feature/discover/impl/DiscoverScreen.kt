@@ -2,7 +2,6 @@ package io.morgan.mio.feature.discover.impl
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -49,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.morgan.mio.core.designsystem.component.MioButton
-import io.morgan.mio.core.designsystem.component.MioFilterPill
 import io.morgan.mio.core.designsystem.component.MioSkeleton
 import io.morgan.mio.core.designsystem.preview.MioPreviewConfiguration
 import io.morgan.mio.core.designsystem.preview.MioPreviewSurface
@@ -60,15 +57,42 @@ import io.morgan.mio.domain.model.MediaId
 @Composable
 internal fun DiscoverRoute(
     onMediaDetail: (MediaId) -> Unit,
+    onCategory: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel = metroViewModel<DiscoverViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var savedFilter by rememberSaveable { mutableStateOf(DiscoverMediaFilter.ANIME) }
+    LaunchedEffect(Unit) { viewModel.onAction(DiscoverAction.SelectFilter(savedFilter)) }
+    val browseViewModel = metroViewModel<DiscoverBrowseViewModel>()
+    val browseState by browseViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(state.filter) {
+        browseViewModel.open(
+            if (state.filter ==
+                DiscoverMediaFilter.MANGA
+            ) {
+                io.morgan.mio.domain.model.MediaType.MANGA
+            } else {
+                io.morgan.mio.domain.model.MediaType.ANIME
+            },
+        )
+    }
     DiscoverScreen(
         state = state,
-        onAction = viewModel::onAction,
+        onAction = { action ->
+            if (action is DiscoverAction.SelectFilter) savedFilter = action.filter
+            viewModel.onAction(action)
+        },
         onMediaDetail = onMediaDetail,
         modifier = modifier,
+        browseContent = {
+            DiscoverBrowseHome(
+                browseState,
+                browseViewModel::retry,
+                { category -> onCategory(browseState.type.name, category.name) },
+                onMediaDetail,
+            )
+        },
     )
 }
 
@@ -78,6 +102,7 @@ internal fun DiscoverScreen(
     onAction: (DiscoverAction) -> Unit,
     onMediaDetail: (MediaId) -> Unit,
     modifier: Modifier = Modifier,
+    browseContent: @Composable () -> Unit = { EmptyPrompt() },
 ) {
     val state =
         state.withTitleLanguage(
@@ -109,13 +134,32 @@ internal fun DiscoverScreen(
         ) {
             Text(
                 text = stringResource(R.string.discover_title),
-                style = MioTheme.typography.display,
+                style = MioTheme.typography.title,
             )
             OutlinedTextField(
                 value = state.query,
                 onValueChange = { query -> onAction(DiscoverAction.QueryChanged(query)) },
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = 56.dp),
-                placeholder = { Text(stringResource(R.string.discover_search_hint)) },
+                shape = MioTheme.shapes.md,
+                leadingIcon = {
+                    io.morgan.mio.core.designsystem.component.MioIcon(
+                        io.morgan.mio.core.designsystem.R.drawable.mio_icon_search,
+                        null,
+                    )
+                },
+                placeholder = {
+                    Text(
+                        stringResource(
+                            if (state.filter ==
+                                DiscoverMediaFilter.MANGA
+                            ) {
+                                R.string.discover_search_manga
+                            } else {
+                                R.string.discover_search_anime
+                            },
+                        ),
+                    )
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions =
@@ -136,31 +180,7 @@ internal fun DiscoverScreen(
                     }
                 },
             )
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MediaFilterPill(
-                    filter = DiscoverMediaFilter.ALL,
-                    selected = state.filter == DiscoverMediaFilter.ALL,
-                    onAction = onAction,
-                )
-                MediaFilterPill(
-                    filter = DiscoverMediaFilter.ANIME,
-                    selected = state.filter == DiscoverMediaFilter.ANIME,
-                    onAction = onAction,
-                )
-                MediaFilterPill(
-                    filter = DiscoverMediaFilter.MANGA,
-                    selected = state.filter == DiscoverMediaFilter.MANGA,
-                    onAction = onAction,
-                )
-            }
+            DiscoverTypeSelector(state.filter) { onAction(DiscoverAction.SelectFilter(it)) }
         }
 
         if (state.isSearching) {
@@ -170,7 +190,7 @@ internal fun DiscoverScreen(
         }
 
         when {
-            state.query.isBlank() -> EmptyPrompt(modifier = Modifier.weight(1f))
+            state.query.isBlank() -> Box(Modifier.weight(1f)) { browseContent() }
             !state.hasObservedResults && !state.refreshFailed -> LoadingGrid(modifier = Modifier.weight(1f))
             !state.hasObservedResults ->
                 FailureState(
@@ -238,26 +258,7 @@ internal fun DiscoverScreen(
 }
 
 @Composable
-private fun MediaFilterPill(
-    filter: DiscoverMediaFilter,
-    selected: Boolean,
-    onAction: (DiscoverAction) -> Unit,
-) {
-    val label =
-        when (filter) {
-            DiscoverMediaFilter.ALL -> stringResource(R.string.discover_filter_all)
-            DiscoverMediaFilter.ANIME -> stringResource(R.string.discover_filter_anime)
-            DiscoverMediaFilter.MANGA -> stringResource(R.string.discover_filter_manga)
-        }
-    MioFilterPill(
-        label = label,
-        selected = selected,
-        onClick = { onAction(DiscoverAction.SelectFilter(filter)) },
-    )
-}
-
-@Composable
-private fun DiscoverResultTile(
+internal fun DiscoverResultTile(
     result: DiscoverResultUiModel,
     onClick: () -> Unit,
 ) {
@@ -277,7 +278,9 @@ private fun DiscoverResultTile(
         Text(
             text = result.title,
             style = MioTheme.typography.bodyStrong,
+            minLines = 2,
             maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         Text(
             text = mediaTypeLabel(result.type),
@@ -420,7 +423,7 @@ private fun FailureState(
 }
 
 @Composable
-private fun FailureBanner(
+internal fun FailureBanner(
     message: String,
     onRetry: () -> Unit,
 ) {

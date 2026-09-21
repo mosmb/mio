@@ -12,16 +12,25 @@ import io.morgan.mio.core.navigation.NavEntryBuilder
 import io.morgan.mio.core.navigation.TopLevelDestination
 import io.morgan.mio.core.navigation.TopLevelSlot
 import io.morgan.mio.domain.model.MediaId
+import io.morgan.mio.feature.discover.api.DiscoverCategoryKey
 import io.morgan.mio.feature.discover.api.DiscoverKey
 import io.morgan.mio.feature.media.api.MediaKey
 import kotlin.reflect.KClass
 
 private object DiscoverNavEntryBuilder : NavEntryBuilder {
-    override val destinationKeyTypes: Set<KClass<out NavKey>> = setOf(DiscoverKey::class)
+    override val destinationKeyTypes: Set<KClass<out NavKey>> = setOf(DiscoverKey::class, DiscoverCategoryKey::class)
 
     override fun EntryProviderScope<NavKey>.build(navigator: MioNavigator) {
+        entry<DiscoverCategoryKey> { key ->
+            DiscoverCategoryRoute(
+                key,
+                onBack = { navigator.goBack() },
+                onMediaDetail = { navigator.navigate(MediaKey(it)) },
+            )
+        }
         entry<DiscoverKey> {
             DiscoverRoute(
+                onCategory = { type, category -> navigator.navigate(DiscoverCategoryKey(type, category)) },
                 onMediaDetail = { mediaId: MediaId -> navigator.navigate(MediaKey(mediaId)) },
             )
         }

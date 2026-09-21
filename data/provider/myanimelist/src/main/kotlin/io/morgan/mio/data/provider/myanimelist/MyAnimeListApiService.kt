@@ -11,6 +11,25 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 internal interface MyAnimeListApiService {
+    @GET("{kind}/ranking")
+    suspend fun ranking(
+        @Path("kind") kind: String,
+        @Header("Authorization") authorization: String,
+        @Query("ranking_type") rankingType: String,
+        @Query("fields") fields: String,
+        @Query("limit") limit: Int,
+    ): Response<MyAnimeListMediaSearchResponseDto>
+
+    @GET("anime/season/{year}/{season}")
+    suspend fun season(
+        @Path("year") year: Int,
+        @Path("season") season: String,
+        @Header("Authorization") authorization: String,
+        @Query("fields") fields: String,
+        @Query("limit") limit: Int,
+        @Query("sort") sort: String = "anime_num_list_users",
+    ): Response<MyAnimeListMediaSearchResponseDto>
+
     @GET("users/@me")
     suspend fun user(
         @Header("Authorization") authorization: String,

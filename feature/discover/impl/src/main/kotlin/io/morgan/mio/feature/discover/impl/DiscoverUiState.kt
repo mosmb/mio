@@ -4,7 +4,7 @@ import io.morgan.mio.core.ui.title.MediaTitleNames
 
 internal data class DiscoverUiState(
     val query: String = "",
-    val filter: DiscoverMediaFilter = DiscoverMediaFilter.ALL,
+    val filter: DiscoverMediaFilter = DiscoverMediaFilter.ANIME,
     val results: List<DiscoverResultUiModel> = emptyList(),
     val hasObservedResults: Boolean = false,
     val hasMore: Boolean = false,

@@ -35,7 +35,7 @@ public data class MediaSearchQueryEntity(
 ) {
     init {
         require(accountId.isNotBlank())
-        require(filter in setOf("ALL", "ANIME", "MANGA"))
+        require(filter in setOf("ALL", "ANIME", "MANGA") || filter.matches(Regex("BROWSE:(ANIME|MANGA):[A-Z_]+")))
         require(normalizedQuery.isNotBlank() && normalizedQuery == normalizedQuery.trim())
     }
 }

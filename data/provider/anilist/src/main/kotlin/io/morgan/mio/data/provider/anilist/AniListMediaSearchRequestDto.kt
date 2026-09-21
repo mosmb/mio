@@ -10,8 +10,14 @@ internal data class AniListMediaSearchRequestDto(
 
 @Serializable
 internal data class AniListMediaSearchVariablesDto(
-    val search: String,
+    val search: String? = null,
     val type: String,
     val page: Int,
     val perPage: Int,
+    val sort: String? = null,
+    val status: String? = null,
+    val format: String? = null,
+    val genre: String? = null,
+    val season: String? = null,
+    val seasonYear: Int? = null,
 )

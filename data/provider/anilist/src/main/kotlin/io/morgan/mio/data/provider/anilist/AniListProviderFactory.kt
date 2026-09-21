@@ -32,6 +32,7 @@ public class AniListProviderFactory(
             initialImportDataSource = AniListInitialImportDataSource(service),
             mediaDetailDataSource = AniListMediaDetailDataSource(service),
             mediaSearchDataSource = AniListMediaSearchDataSource(service),
+            mediaBrowseDataSource = AniListMediaBrowseDataSource(service),
             syncDataSource = AniListSyncDataSource(service),
         )
     }

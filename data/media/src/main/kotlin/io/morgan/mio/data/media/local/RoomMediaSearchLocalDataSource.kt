@@ -172,7 +172,7 @@ public class RoomMediaSearchLocalDataSource(
         }
     }
 
-    private suspend fun insertSearchSummaries(snapshots: List<MediaPersistenceSnapshot>) {
+    internal suspend fun insertSearchSummaries(snapshots: List<MediaPersistenceSnapshot>) {
         if (snapshots.isEmpty()) return
         val mediaDao = database.mediaDao()
         val mediaIds = snapshots.map { snapshot -> snapshot.media.id.value }.distinct()

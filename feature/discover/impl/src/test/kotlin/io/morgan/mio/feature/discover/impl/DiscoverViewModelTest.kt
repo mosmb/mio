@@ -66,7 +66,7 @@ class DiscoverViewModelTest {
                 advanceTimeBy(1)
                 runCurrent()
                 firstSearchEntered.await()
-                assertEquals(listOf("first" to MediaSearchFilter.ALL), repository.refreshCalls)
+                assertEquals(listOf("first" to MediaSearchFilter.ANIME), repository.refreshCalls)
 
                 viewModel.onAction(DiscoverAction.QueryChanged("second"))
                 runCurrent()
@@ -78,8 +78,8 @@ class DiscoverViewModelTest {
                 runCurrent()
                 assertEquals(
                     listOf(
-                        "first" to MediaSearchFilter.ALL,
-                        "second" to MediaSearchFilter.ALL,
+                        "first" to MediaSearchFilter.ANIME,
+                        "second" to MediaSearchFilter.ANIME,
                     ),
                     repository.refreshCalls,
                 )
@@ -115,7 +115,7 @@ class DiscoverViewModelTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val repository =
                 FakeMediaSearchRepository().apply {
-                    observations["cached" to MediaSearchFilter.ALL] =
+                    observations["cached" to MediaSearchFilter.ANIME] =
                         MutableStateFlow(MediaSearchResults(emptyList(), true))
                     refreshBehavior = { _, _ -> MediaSearchCommandOutcome.FAILED }
                 }
@@ -184,13 +184,78 @@ class DiscoverViewModelTest {
                 advanceTimeBy(300)
                 runCurrent()
                 assertTrue(viewModel.uiState.value.refreshFailed)
-                repository.observations.getValue("cached" to MediaSearchFilter.ALL).value =
+                repository.observations.getValue("cached" to MediaSearchFilter.ANIME).value =
                     MediaSearchResults(emptyList(), false)
                 viewModel.onAction(DiscoverAction.Retry)
                 runCurrent()
                 assertTrue(viewModel.uiState.value.hasObservedResults)
                 assertFalse(viewModel.uiState.value.refreshFailed)
                 assertFalse(viewModel.uiState.value.isSearching)
+            } finally {
+                store.clear()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun browsingKeepsMediaTypeAndRetriesFailedObservation() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var failObservation = true
+            var observationCount = 0
+            val refreshTypes = mutableListOf<io.morgan.mio.domain.model.MediaType>()
+            val browse =
+                object : io.morgan.mio.domain.media.MediaBrowseRepository {
+                    override fun categories(type: io.morgan.mio.domain.model.MediaType) =
+                        listOf(io.morgan.mio.domain.media.MediaBrowseCategory.TRENDING)
+
+                    override fun observe(
+                        type: io.morgan.mio.domain.model.MediaType,
+                        category: io.morgan.mio.domain.media.MediaBrowseCategory,
+                    ): Flow<List<io.morgan.mio.domain.media.Media>?> =
+                        flow {
+                            observationCount++
+                            if (failObservation) {
+                                failObservation = false
+                                error("cache unavailable")
+                            }
+                            emit(emptyList())
+                        }
+
+                    override suspend fun refresh(
+                        type: io.morgan.mio.domain.model.MediaType,
+                        category: io.morgan.mio.domain.media.MediaBrowseCategory,
+                    ): MediaSearchCommandOutcome {
+                        refreshTypes += type
+                        return MediaSearchCommandOutcome.SUCCEEDED
+                    }
+                }
+            val vm =
+                DiscoverBrowseViewModel(
+                    browse,
+                    EmptyCollectionRepository,
+                    AccountId("browse"),
+                    kotlin.time.Clock.System,
+                )
+            val store = ViewModelStore().also { it.put("browse", vm) }
+            try {
+                val manga = io.morgan.mio.domain.model.MediaType.MANGA
+                val trending = io.morgan.mio.domain.media.MediaBrowseCategory.TRENDING
+                vm.open(manga, trending)
+                runCurrent()
+                assertTrue(trending in vm.uiState.value.failed)
+                vm.retry(trending)
+                runCurrent()
+                assertEquals(2, observationCount)
+                assertTrue(
+                    vm.uiState.value.failed
+                        .isEmpty(),
+                )
+                assertEquals(manga, vm.uiState.value.type)
+                assertEquals(emptyList<DiscoverResultUiModel>(), vm.uiState.value.items[trending])
+                vm.open(manga, trending)
+                runCurrent()
+                assertEquals(2, refreshTypes.size)
             } finally {
                 store.clear()
                 Dispatchers.resetMain()

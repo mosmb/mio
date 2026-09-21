@@ -35,7 +35,7 @@ internal class DiscoverViewModel(
     internal val uiState: StateFlow<DiscoverUiState> = mutableUiState.asStateFlow()
 
     private var query = ""
-    private var filter = DiscoverMediaFilter.ALL
+    private var filter = DiscoverMediaFilter.ANIME
     private var resultSnapshot: MediaSearchResults? = null
     private var collection: List<CollectionEntry> = emptyList()
     private var inputGeneration = 0L
