@@ -231,7 +231,7 @@ class DiscoverViewModelTest {
                     }
                 }
             val vm =
-                DiscoverBrowseViewModel(
+                DiscoverCategoryViewModel(
                     browse,
                     EmptyCollectionRepository,
                     AccountId("browse"),

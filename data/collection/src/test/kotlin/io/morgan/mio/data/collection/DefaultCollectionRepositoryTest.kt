@@ -64,7 +64,7 @@ class DefaultCollectionRepositoryTest {
     fun setUp() =
         runBlocking {
             database = MioDatabaseFactory.createInMemory(ApplicationProvider.getApplicationContext())
-            localDataSource = RoomCollectionLocalDataSource(database)
+            localDataSource = RoomCollectionLocalDataSource(database, kotlin.time.Clock.System)
             database.selectedAccountDao().replaceSelectedAccount(
                 SelectedAccountEntity(
                     selectionKey = "selected",

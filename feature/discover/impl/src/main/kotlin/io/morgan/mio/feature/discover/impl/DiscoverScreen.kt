@@ -64,7 +64,7 @@ internal fun DiscoverRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var savedFilter by rememberSaveable { mutableStateOf(DiscoverMediaFilter.ANIME) }
     LaunchedEffect(Unit) { viewModel.onAction(DiscoverAction.SelectFilter(savedFilter)) }
-    val browseViewModel = metroViewModel<DiscoverBrowseViewModel>()
+    val browseViewModel = metroViewModel<DiscoverCategoryViewModel>()
     val browseState by browseViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(state.filter) {
         browseViewModel.open(

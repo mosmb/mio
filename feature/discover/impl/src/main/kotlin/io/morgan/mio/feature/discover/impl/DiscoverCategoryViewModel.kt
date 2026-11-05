@@ -18,6 +18,7 @@ import io.morgan.mio.domain.model.MediaType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
@@ -27,14 +28,14 @@ import kotlin.time.Clock
 @ContributesIntoMap(AccountScope::class)
 @ViewModelKey
 @Inject
-internal class DiscoverBrowseViewModel(
+internal class DiscoverCategoryViewModel(
     private val repository: MediaBrowseRepository,
     collectionRepository: CollectionRepository,
     accountId: AccountId,
     private val clock: Clock,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(DiscoverBrowseUiState())
-    val uiState = mutableState.asStateFlow()
+    private val mutableState = MutableStateFlow(DiscoverBrowseUiState(season = DiscoverBrowseSeason.at(clock.now())))
+    val uiState: StateFlow<DiscoverBrowseUiState> = mutableState.asStateFlow()
     private var selection: Pair<MediaType, MediaBrowseCategory?>? = null
     private var generation = 0
     private var collection: List<CollectionEntry> = emptyList()

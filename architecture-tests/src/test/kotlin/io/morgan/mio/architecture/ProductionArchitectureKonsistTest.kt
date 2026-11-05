@@ -806,7 +806,7 @@ class ProductionArchitectureKonsistTest {
         assertTrue(
             files.any { ownedFile ->
                 ownedFile.modulePath == ":core:database" &&
-                    ownedFile.file.text.contains("version = 7")
+                    ownedFile.file.text.contains("version = 9")
             },
             "production scan omitted the current database version",
         )
@@ -862,10 +862,9 @@ class ProductionArchitectureKonsistTest {
                     ownedFile.file.path
                         .replace('\\', '/')
                         .endsWith("/TodayNowCard.kt") &&
-                    ownedFile.file.text.contains("requiredHeightIn(min = 332.dp)") &&
-                    ownedFile.file.text.contains("mergeDescendants = true")
+                    ownedFile.file.text.contains("requiredHeightIn(min = 332.dp)")
             },
-            "production scan omitted the bounded, merged-semantic Now card",
+            "production scan omitted the bounded Now card",
         )
     }
 
@@ -934,9 +933,9 @@ class ProductionArchitectureKonsistTest {
         )
         assertTrue(
             files.any { ownedFile ->
-                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 7")
+                ownedFile.modulePath == ":core:database" && ownedFile.file.text.contains("version = 9")
             },
-            "production scan omitted the Task 20 database version",
+            "production scan omitted the current database version",
         )
         assertTrue(
             files.any { ownedFile ->

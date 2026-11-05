@@ -214,13 +214,14 @@ internal fun DiscoverCategoryRoute(
     key: DiscoverCategoryKey,
     onBack: () -> Unit,
     onMediaDetail: (MediaId) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val viewModel = metroViewModel<DiscoverBrowseViewModel>()
+    val viewModel = metroViewModel<DiscoverCategoryViewModel>()
     val type = MediaType.valueOf(key.mediaType)
     val category = MediaBrowseCategory.valueOf(key.category)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(key) { viewModel.open(type, category) }
-    DiscoverCategoryScreen(state, category, onBack, { viewModel.retry(category) }, onMediaDetail)
+    DiscoverCategoryScreen(state, category, onBack, { viewModel.retry(category) }, onMediaDetail, modifier)
 }
 
 @Composable
@@ -230,10 +231,11 @@ internal fun DiscoverCategoryScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onMediaDetail: (MediaId) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val resolve = rememberTitleResolver()
     val items = state.items[category]
-    Column(Modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = MioTheme.spacing.screenGutter, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -442,6 +444,7 @@ private fun CategoryDarkPreview() {
 
 private fun previewBrowseState() =
     DiscoverBrowseUiState(
+        season = DiscoverBrowseSeason.at(kotlin.time.Instant.parse("2026-07-15T00:00:00Z")),
         categories =
             listOf(
                 MediaBrowseCategory.TRENDING,

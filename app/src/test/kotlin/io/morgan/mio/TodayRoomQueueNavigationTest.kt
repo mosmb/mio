@@ -393,7 +393,7 @@ class TodayRoomQueueNavigationTest {
                             io.morgan.mio.data.sync.local
                                 .RoomPendingOperationLocalDataSource(fixture.database),
                         ),
-                    localDataSource = RoomCollectionLocalDataSource(fixture.database),
+                    localDataSource = RoomCollectionLocalDataSource(fixture.database, fixture.clock),
                     refreshRequester = CollectionRefreshRequester {},
                 ),
             preferencesRepository = fixture.preferencesRepository,

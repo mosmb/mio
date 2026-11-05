@@ -108,6 +108,23 @@ class MyAnimeListMediaDetailDataSourceTest {
                             authorization: String,
                         ): Response<Unit> = error("unused")
 
+                        override suspend fun ranking(
+                            kind: String,
+                            authorization: String,
+                            rankingType: String,
+                            fields: String,
+                            limit: Int,
+                        ): Response<MyAnimeListMediaSearchResponseDto> = error("unused")
+
+                        override suspend fun season(
+                            year: Int,
+                            season: String,
+                            authorization: String,
+                            fields: String,
+                            limit: Int,
+                            sort: String,
+                        ): Response<MyAnimeListMediaSearchResponseDto> = error("unused")
+
                         override suspend fun user(authorization: String): Response<MyAnimeListUserResponseDto> =
                             error("unused")
 

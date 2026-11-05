@@ -1,5 +1,6 @@
 package io.morgan.mio.core.testing.repository
 
+import io.morgan.mio.core.testing.time.FakeClock
 import io.morgan.mio.domain.collection.CollectionAction
 import io.morgan.mio.domain.collection.CollectionActionKind
 import io.morgan.mio.domain.collection.CollectionEntry
@@ -17,8 +18,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
+import kotlin.time.Instant
 
-public class FakeCollectionRepository : CollectionRepository {
+public class FakeCollectionRepository(
+    private val clock: Clock = FakeClock(Instant.parse("2026-01-01T00:00:00Z")),
+) : CollectionRepository {
     private val entries = MutableStateFlow<List<CollectionEntry>>(emptyList())
     private val refreshedAccountIdValues = MutableStateFlow<List<AccountId>>(emptyList())
     private val latestAction = MutableStateFlow<CollectionAction?>(null)
@@ -114,7 +118,7 @@ public class FakeCollectionRepository : CollectionRepository {
             }
         }
             ?: entries.update { current -> current.filterNot { it.id == action.entryId } }
-        val undone = action.copy(undoneAt = Clock.System.now())
+        val undone = action.copy(undoneAt = clock.now())
         latestAction.value = undone
         return CollectionWriteResult.Committed(undone)
     }

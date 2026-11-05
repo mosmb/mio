@@ -38,7 +38,7 @@ import kotlin.time.Duration.Companion.ZERO
 @Inject
 public class RoomCollectionLocalDataSource(
     private val database: MioDatabase,
-    private val clock: Clock = Clock.System,
+    private val clock: Clock,
 ) {
     public fun observeCollection(accountId: AccountId): Flow<List<CollectionEntry>> =
         database.collectionEntryDao().observeCollection(accountId.value).map { entries ->
