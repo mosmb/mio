@@ -871,7 +871,7 @@ private fun YouPreview(configuration: MioPreviewConfiguration) {
         YouScreen(
             state =
                 YouUiState.Content(
-                    identity = YouIdentityUiModel("Morgan", YouProvider.ANILIST, null),
+                    identity = YouIdentityUiModel("Alex", YouProvider.ANILIST, null),
                     appearance = AppearancePreference.SYSTEM,
                     syncIssues = emptyList(),
                     accountIssue = null,

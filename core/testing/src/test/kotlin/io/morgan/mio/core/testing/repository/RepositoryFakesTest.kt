@@ -40,7 +40,7 @@ class RepositoryFakesTest {
     fun accountFakeEmitsStateAndRecordsRefreshes() =
         runTest {
             val fake = FakeAccountRepository()
-            val account = Account(accountId, ConnectedProvider.ANILIST, "Morgan", null)
+            val account = Account(accountId, ConnectedProvider.ANILIST, "Alex", null)
 
             assertNull(fake.observeSelectedAccount().first())
             fake.setSelectedAccount(account)

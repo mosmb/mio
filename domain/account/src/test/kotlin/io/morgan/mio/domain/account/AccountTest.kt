@@ -24,7 +24,7 @@ class AccountTest {
             Account(
                 id = AccountId("account-1"),
                 provider = ConnectedProvider.MY_ANIME_LIST,
-                displayName = "Morgan",
+                displayName = "Alex",
                 avatar = null,
             )
 

@@ -70,7 +70,7 @@ class DefaultCollectionRepositoryTest {
                     selectionKey = "selected",
                     accountId = accountId.value,
                     connectedProvider = StoredConnectedProvider.ANILIST,
-                    displayName = "Morgan",
+                    displayName = "Alex",
                     avatarReference = null,
                 ),
                 io.morgan.mio.core.database.entity.AccountProviderIdEntity(
