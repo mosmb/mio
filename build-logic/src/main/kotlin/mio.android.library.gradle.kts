@@ -44,8 +44,8 @@ extensions.configure<LibraryExtension> {
         warningsAsErrors = true
         checkDependencies = true
         checkReleaseBuilds = true
-        // Task 01 and Task 02 intentionally pin the toolchain and test BOM versions.
-        informational += setOf("AndroidGradlePluginVersion", "NewerVersionAvailable")
+        // Versions are pinned deliberately; report newer releases without failing the build.
+        informational += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
     }
 }
 
