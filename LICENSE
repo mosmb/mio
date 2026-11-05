@@ -1,0 +1,25 @@
+Copyright (c) 2026 mosmb. All rights reserved.
+
+This repository is published so its source code can be read and studied. It is
+NOT open-source software, and no license is granted to use it beyond that.
+
+Without the copyright holder's prior written permission, you may not:
+
+  - copy, modify, merge, or create derivative works of this software, in whole
+    or in part;
+  - distribute, sublicense, sell, or otherwise make this software or any
+    derivative available to others, including through app stores;
+  - use the "Mio" name, logo, or visual identity for any product or service.
+
+Viewing the source on GitHub, and forking it within GitHub as permitted by the
+GitHub Terms of Service, does not grant any of the rights listed above.
+
+Third-party components bundled in this repository (for example the Gabarito
+font and Material Symbols) remain under their own licenses; see the
+THIRD_PARTY_NOTICES.md files.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR ITS USE.
