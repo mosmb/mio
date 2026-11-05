@@ -14,3 +14,8 @@ captures/
 externalNativeBuild/
 *.iml
 .claude/worktrees
+**/.DS_Store
+.claude/
+.agents/
+skills-lock.json
+docs/reviews/

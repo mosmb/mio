@@ -7,7 +7,7 @@
 
 ## MVP scope amendment — 2026-09-17
 
-The first delivery milestone is the reduced MVP defined in [MVP scope and delivery](tasks/MVP.md). That ordered board and its remaining MVP tickets supersede the broader v0 scope below only for this milestone. Both providers, the daily progress loop, Library, Discover search/add through detail, correction/recovery, and You account/preferences remain required. Celebration polish, browsing shelves, rich personal statistics/history, duplicate status shortcuts, and the explicitly listed secondary features are deferred.
+The first delivery milestone is a reduced MVP. Its scope supersedes the broader v0 scope below only for this milestone. Both providers, the daily progress loop, Library, Discover search/add through detail, correction/recovery, and You account/preferences remain required. Celebration polish, browsing shelves, rich personal statistics/history, duplicate status shortcuts, and the explicitly listed secondary features are deferred.
 
 For MVP, You starts with account/preferences rather than recap; completion uses existing feedback rather than Achievement Stamp; Library uses latest-progress ordering; Discover has a search prompt instead of shelves/recent history. The original sections remain the post-MVP product direction, not additional MVP acceptance gates. Existing implemented behavior is not to be removed merely because it is now optional. Architecture, durable sync, security, and safe recovery are unchanged.
 

@@ -11,7 +11,7 @@
 
 ## MVP design amendment — 2026-09-17
 
-For the reduced milestone, [MVP scope and delivery](tasks/MVP.md) and the PRD MVP amendment supersede requirements below for deferred features and exhaustive validation. Apply existing tokens, components, ordinary semantic labels/selected states, touch targets, and system reduced-motion support to shipped screens. Preserve existing accessibility behavior.
+For the reduced milestone, the PRD MVP amendment supersedes requirements below for deferred features and exhaustive validation. Apply existing tokens, components, ordinary semantic labels/selected states, touch targets, and system reduced-motion support to shipped screens. Preserve existing accessibility behavior.
 
 MVP may use existing completion feedback without Achievement Stamp, a search prompt without Discover shelves/recent searches, and a You account/preferences screen without personal statistics/history. Additional sort modes, custom motion/haptic overrides, and animated theme crossfades are deferred. Detail remains the sole required Add/Change Status surface.
 
